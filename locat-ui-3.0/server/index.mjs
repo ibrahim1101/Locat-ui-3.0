@@ -15,12 +15,13 @@ const file = resolve(process.env.LOCAT_DATA_FILE ?? "./server/data/dev-auth.json
 const host = process.env.LOCAT_HOST ?? "127.0.0.1";
 const port = Number(process.env.LOCAT_PORT ?? 8787);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
-let db = { users: [], sessions: [] };
+let db = { users: [], sessions: [], envelopes: [] };
 let queue = Promise.resolve();
 
 async function load() {
   try { db = JSON.parse(await readFile(file, "utf8")); }
   catch (error) { if (error.code !== "ENOENT") throw error; }
+  db.envelopes ??= [];
 }
 async function persist() {
   await mkdir(dirname(file), { recursive: true });
@@ -67,6 +68,38 @@ async function handle(req, res) {
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);
     return json(res, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not authenticated" });
+  }
+  // Ciphertext-only transport. The server never accepts a plaintext message field.
+  // Clients must independently implement and verify their E2EE protocol.
+  if (url.pathname === "/api/messages" && req.method === "GET") {
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const cursor = Number(url.searchParams.get("after") ?? 0);
+    if (!Number.isSafeInteger(cursor) || cursor < 0) return json(res, 400, { error: "Invalid cursor" });
+    const messages = db.envelopes.filter(m => m.recipientId === user.id && m.sequence > cursor).slice(0, 100);
+    return json(res, 200, { messages, nextCursor: messages.at(-1)?.sequence ?? cursor });
+  }
+  if (url.pathname === "/api/messages" && req.method === "POST") {
+    const origin = req.headers.origin;
+    if (origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    const sender = sessionUser(req);
+    if (!sender) return json(res, 401, { error: "Not authenticated" });
+    const input = await body(req);
+    if (!input || typeof input !== "object" || "text" in input || "plaintext" in input) return json(res, 400, { error: "Only encrypted envelopes accepted" });
+    const { recipientId, ciphertext, nonce, algorithm } = input;
+    if (typeof recipientId !== "string" || typeof ciphertext !== "string" || typeof nonce !== "string" || algorithm !== "client-e2ee-v1" ||
+        ciphertext.length < 24 || ciphertext.length > 12000 || nonce.length < 16 || nonce.length > 128 ||
+        !/^[A-Za-z0-9+/=_-]+$/.test(ciphertext) || !/^[A-Za-z0-9+/=_-]+$/.test(nonce)) {
+      return json(res, 400, { error: "Invalid encrypted envelope" });
+    }
+    return serialized(async () => {
+      if (!db.users.some(u => u.id === recipientId)) return json(res, 404, { error: "Recipient not found" });
+      const sequence = (db.envelopes.at(-1)?.sequence ?? 0) + 1;
+      const envelope = { id: randomBytes(16).toString("hex"), sequence, senderId: sender.id, recipientId, ciphertext, nonce, algorithm, createdAt: Date.now() };
+      db.envelopes.push(envelope);
+      await persist();
+      return json(res, 201, { id: envelope.id, sequence });
+    });
   }
   if (req.method === "POST" && ["/api/auth/register", "/api/auth/login", "/api/auth/logout"].includes(url.pathname)) {
     // Same-origin requests only. Non-browser clients must supply a trusted Origin for state changes.
