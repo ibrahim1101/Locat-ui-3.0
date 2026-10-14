@@ -9,7 +9,7 @@ import { ActionMenu, Badge, IconButton, Slider, Sheet, Button, cn, formatDuratio
  * LocalCinemaPlayer / CinemaHlsPlayer <video> into `surface` and maps its
  * events into PlaybackView; this component never decodes media.
  */
-export function PlayerChrome({ video, state: s, cb, onClose, surface }: { surface?: ReactNode; video: VideoItemView; state: PlaybackView; cb: PlayerCallbacks; onClose(): void }) {
+export function PlayerChrome({ video, state: s, cb, onClose, surface, onLoadSubtitle }: { onLoadSubtitle?: () => void; surface?: ReactNode; video: VideoItemView; state: PlaybackView; cb: PlayerCallbacks; onClose(): void }) {
   const [shown, setShown] = useState(true);
   const [menu, setMenu] = useState<"speed" | "subs" | "quality" | "fit" | "info" | null>(null);
   const hide = useRef<number>(0);
@@ -81,7 +81,7 @@ export function PlayerChrome({ video, state: s, cb, onClose, surface }: { surfac
         </div>
       </div>
       <ActionMenu open={menu === "speed"} onClose={() => setMenu(null)} title="Playback speed" actions={[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => ({ id: `rate-${r}`, label: `${r}×${r === s.rate ? "  ✓" : ""}`, onSelect: () => cb.onRate(r) }))} />
-      <ActionMenu open={menu === "subs"} onClose={() => setMenu(null)} title="Subtitles" actions={[{ id: "sub-off", label: `Off${!s.activeSubtitle ? "  ✓" : ""}`, onSelect: () => cb.onSubtitle(undefined) }, ...s.subtitles.map((t) => ({ id: t.id, label: `${t.label}${t.id === s.activeSubtitle ? "  ✓" : ""}`, onSelect: () => cb.onSubtitle(t.id) })), { id: "sub-load", label: "Load WebVTT file…", onSelect: () => undefined, disabledReason: "Preview" }, { id: "sub-host", label: "Hosted subtitle & audio tracks", onSelect: () => undefined, disabledReason: "Planned" }]} />
+      <ActionMenu open={menu === "subs"} onClose={() => setMenu(null)} title="Subtitles" actions={[{ id: "sub-off", label: `Off${!s.activeSubtitle ? "  ✓" : ""}`, onSelect: () => cb.onSubtitle(undefined) }, ...s.subtitles.map((t) => ({ id: t.id, label: `${t.label}${t.id === s.activeSubtitle ? "  ✓" : ""}`, onSelect: () => cb.onSubtitle(t.id) })), { id: "sub-load", label: "Load WebVTT file…", onSelect: () => onLoadSubtitle?.(), disabledReason: onLoadSubtitle ? undefined : "Preview" }, { id: "sub-host", label: "Hosted subtitle & audio tracks", onSelect: () => undefined, disabledReason: "Planned" }]} />
       <ActionMenu open={menu === "fit"} onClose={() => setMenu(null)} title="Fit" actions={(["contain", "cover", "fill"] as const).map((f) => ({ id: f, label: `${{ contain: "Fit to screen", cover: "Fill (crop)", fill: "Stretch" }[f]}${f === s.fit ? "  ✓" : ""}`, onSelect: () => cb.onFit(f) }))} />
       <ActionMenu open={menu === "quality"} onClose={() => setMenu(null)} title="Quality" actions={s.qualities.map((q) => ({ id: q.id, label: `${q.label}${q.experimental ? " · experimental" : ""}${q.id === s.activeQuality ? "  ✓" : ""}`, onSelect: () => cb.onQuality(q.id) }))} />
       <Sheet open={menu === "info"} onClose={() => setMenu(null)} title="Stream details" size="sm">

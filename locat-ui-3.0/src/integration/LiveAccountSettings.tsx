@@ -12,6 +12,7 @@ async function api(path: string, data?: object) {
 export function LiveAccountSettings() {
   const { user, adapter, prefs, setPrefs } = useSession();
   const [name, setName] = useState(user?.displayName ?? "");
+  const [bio, setBio] = useState(user?.bio ?? "");
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,8 +44,10 @@ export function LiveAccountSettings() {
       void action(async () => { await api("/api/preferences", { theme }); setPrefs({ theme }); setMessage("Theme saved."); });
     }}><option value="obsidian">Obsidian</option><option value="graphite">Graphite</option><option value="daylight">Daylight</option><option value="system">System</option></select></label>
     <h2 className="text-xl font-semibold">Account settings</h2>
-    <form className="space-y-3" onSubmit={event => { event.preventDefault(); void action(async () => { await api("/api/profile", { displayName: name }); setMessage("Display name saved. Reload to refresh your account heading."); }); }}>
+    <form className="space-y-3" onSubmit={event => { event.preventDefault(); void action(async () => { await api("/api/profile", { displayName: name, bio }); setMessage("Display name saved. Reload to refresh your account heading."); }); }}>
       <label className="block">Display name<input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={80} /></label>
+      <label className="block">Bio<textarea className={inputClass} value={bio} onChange={event => setBio(event.target.value)} maxLength={500} /></label>
+      <p className="text-sm text-ink-3">Your directory identity: {user?.lcCode}. Profile information is visible to accounts that discover you.</p>
       <button className={buttonClass} disabled={busy}>Save profile</button>
     </form>
     <div className="space-y-3"><h3 className="font-semibold">Active sessions</h3>

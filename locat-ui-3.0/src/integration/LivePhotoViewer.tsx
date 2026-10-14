@@ -1,3 +1,4 @@
+import { safeMediaUrl } from "./mediaSource";
 import { useEffect, useRef, useState } from "react";
 import { defaultPhotoEdit, photoFilter, renderPhotoEdit } from "../lib/photoEditing";
 import { editedImageFile } from "../lib/imageEditing";
@@ -9,7 +10,8 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
   const [edit, setEdit] = useState(defaultPhotoEdit);
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState(1);
-  useEffect(() => { const url = URL.createObjectURL(item.file); const timer = setTimeout(() => setUrl(url), 0); return () => { clearTimeout(timer); URL.revokeObjectURL(url); }; }, [item.file]);
+  const direct = safeMediaUrl(item);
+  useEffect(() => { const url = direct ?? URL.createObjectURL(item.file); const timer = setTimeout(() => setUrl(url), 0); return () => { clearTimeout(timer); if (!direct) URL.revokeObjectURL(url); }; }, [item.file, direct]);
   async function exportCopy() {
     try {
       if (!image.current?.complete || !image.current.naturalWidth) throw new Error("Wait for the image to load.");

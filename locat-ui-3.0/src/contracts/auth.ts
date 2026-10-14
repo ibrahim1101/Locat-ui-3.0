@@ -5,6 +5,7 @@ export type SessionUserView = {
   id: string;
   username: string;
   displayName: string;
+  bio?: string;
   lcCode: string; // "LC-1234" formatted by contracts/userCode.ts in Locat
   avatarUrl?: string;
   isAdmin: boolean;

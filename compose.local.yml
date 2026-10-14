@@ -1,0 +1,29 @@
+services:
+  locat:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      LOCAT_PUBLIC_ORIGIN: ${LOCAT_PUBLIC_ORIGIN:?Set your trusted HTTPS origin}
+      LOCAT_TLS_KEY: /certs/key.pem
+      LOCAT_TLS_CERT: /certs/cert.pem
+      LOCAT_MEDIA_AUTHORIZED_ROOTS: /media
+    volumes:
+      - locat_data:/data
+      - ./certs:/certs:ro
+      - ${LOCAT_SHARED_MEDIA_DIR:-./media}:/media:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('node:net').connect(8787,'127.0.0.1',()=>{s.end();process.exit(0)});s.setTimeout(3000,()=>process.exit(1));s.on('error',()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  locat_data:

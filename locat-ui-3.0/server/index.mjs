@@ -1,20 +1,26 @@
 /**
  * Locat 3.0 development authentication service.
- * Run with Node 22+: node server/index.mjs
+ * Run with Node 24+: node server/index.mjs
  * Uses built-in modules and versioned SQLite persistence (Node 24+).
  * Never expose this development service directly to the public internet.
  */
-import { createServer } from "node:http";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { readFile } from "node:fs/promises";
+import { serverConfig, requestOrigin } from "./config.mjs";
+import { serveStatic } from "./static.mjs";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
+import { createMediaLibrary } from "./media.mjs";
 import { createRateLimiter } from "./rateLimit.mjs";
 import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
 if (process.env.LOCAT_DATA_FILE) throw new Error("LOCAT_DATA_FILE is retired; set LOCAT_DATABASE_FILE to a new SQLite path. Legacy JSON is never overwritten.");
+const config = serverConfig();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
-const host = process.env.LOCAT_HOST ?? "127.0.0.1";
-const port = Number(process.env.LOCAT_PORT ?? 8787);
+const { host, port } = config;
+const mediaLibrary = createMediaLibrary();
 const authLimit = createRateLimiter();
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
@@ -37,7 +43,7 @@ async function body(req) {
   try { return JSON.parse(text); }
   catch { throw Object.assign(new Error("Invalid JSON"), { status: 400 }); }
 }
-function publicUser(user) { return { id: user.id, username: user.username, displayName: user.displayName }; }
+function publicUser(user) { return { id: user.id, username: user.username, displayName: user.displayName, lcCode: "LC-" + user.lcCode, bio: user.bio }; }
 function cookie(req) {
   const match = /(?:^|;\s*)locat_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? "");
   return match?.[1] ?? null;
@@ -49,15 +55,32 @@ function sessionUser(req) {
   return db.sessionUser(digest, Date.now()) ?? null;
 }
 function setCookie(token, maxAge) {
-  return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge;
+  return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.tls ? "; Secure" : "");
 }
 async function handle(req, res) {
-  const url = new URL(req.url ?? "/", "http://localhost");
+  const trustedOrigin = requestOrigin(req, config);
+  if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
+  const url = new URL(req.url ?? "/", trustedOrigin);
   if (req.method === "POST" && ["/api/auth/login", "/api/auth/register", "/api/auth/password"].includes(url.pathname)) {
     const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
+  if (url.pathname === "/api/diagnostics" && req.method === "GET") {
+    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    const media = await mediaLibrary.refresh();
+    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.tls, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: "not-enabled", nativeClients: "not-verified" });
+  }
+  if (url.pathname === "/api/media" && req.method === "GET") {
+    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    return json(res, 200, await mediaLibrary.refresh());
+  }
+  if (url.pathname.startsWith("/api/media/stream/") && ["GET", "HEAD"].includes(req.method)) {
+    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    const id = url.pathname.slice("/api/media/stream/".length);
+    if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
+    return mediaLibrary.stream(req, res, id);
+  }
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);
     return json(res, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not authenticated" });
@@ -70,7 +93,7 @@ async function handle(req, res) {
     return json(res, 200, { contacts, blocked });
   }
   if (["/api/contacts/request", "/api/contacts/respond", "/api/contacts/block"].includes(url.pathname) && req.method === "POST") {
-    if (req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
     const input = await body(req);
@@ -95,7 +118,7 @@ async function handle(req, res) {
     return json(res, user ? 200 : 401, user ? { events: db.events(user.id) } : { error: "Not authenticated" });
   }
   if (url.pathname === "/api/preferences" && ["GET", "POST"].includes(req.method)) {
-    if (req.method === "POST" && req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    if (req.method === "POST" && req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
     if (req.method === "GET") return json(res, 200, { preferences: db.preferences(user.id) });
@@ -113,7 +136,7 @@ async function handle(req, res) {
     return json(res, 200, { sessions: db.sessions(user.id, Date.now()).map(s => ({ ...s, current: s.id === currentHash })) });
   }
   if (["/api/auth/sessions/revoke", "/api/auth/password", "/api/profile"].includes(url.pathname) && req.method === "POST") {
-    if (req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
     const input = await body(req);
@@ -127,7 +150,9 @@ async function handle(req, res) {
     if (url.pathname === "/api/profile") {
       const displayName = typeof input.displayName === "string" ? input.displayName.trim() : "";
       if (!displayName || displayName.length > 80) return json(res, 400, { error: "Invalid display name" });
-      db.updateProfile(user.id, displayName);
+      const bio = input.bio === undefined ? user.bio : typeof input.bio === "string" ? input.bio.trim() : null;
+      if (bio === null || bio.length > 500 || Object.keys(input).some(key => !["displayName", "bio"].includes(key))) return json(res, 400, { error: "Invalid profile; bio is limited to 500 characters" });
+      db.updateProfile(user.id, displayName, bio);
       return json(res, 200, { user: publicUser(db.userById(user.id)) });
     }
     const { currentPassword, newPassword } = input;
@@ -147,8 +172,9 @@ async function handle(req, res) {
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });
     const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires 3-32 username characters" });
-    const found = db.userByName(query);
+    const code = /^(?:lc-)?([1-9][0-9]{3})$/.exec(query)?.[1];
+    if (!code && !/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires an exact username or LC-1234 identity" });
+    const found = code ? db.userByCode(code) : db.userByName(query);
     const users = found && found.id !== viewer.id && !db.blocked(viewer.id, found.id) ? [publicUser(found)] : [];
     return json(res, 200, { users });
   }
@@ -164,7 +190,7 @@ async function handle(req, res) {
   }
   if (url.pathname === "/api/messages" && req.method === "POST") {
     const origin = req.headers.origin;
-    if (origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    if (origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const sender = sessionUser(req);
     if (!sender) return json(res, 401, { error: "Not authenticated" });
     const input = await body(req);
@@ -186,7 +212,7 @@ async function handle(req, res) {
   if (req.method === "POST" && ["/api/auth/register", "/api/auth/login", "/api/auth/logout"].includes(url.pathname)) {
     // Same-origin requests only. Non-browser clients must supply a trusted Origin for state changes.
     const origin = req.headers.origin;
-    const expected = "http://" + (req.headers.host ?? "");
+    const expected = trustedOrigin;
     if (origin !== expected) return json(res, 403, { error: "Origin mismatch" });
     if (url.pathname === "/api/auth/logout") {
       await serialized(async () => {
@@ -215,7 +241,7 @@ async function handle(req, res) {
         const user = { id: randomBytes(16).toString("hex"), username, displayName, salt, hash };
         db.addUser(user);
         db.audit(user.id, "account.registered");
-        return json(res, 201, { user: publicUser(user) });
+        return json(res, 201, { user: publicUser(db.userById(user.id)) });
       });
     }
     const user = db.userByName(username);
@@ -234,15 +260,18 @@ async function handle(req, res) {
       return json(res, 200, { user: publicUser(user) }, { "Set-Cookie": setCookie(token, SESSION_MS / 1000) });
     });
   }
+  if (await serveStatic(req, res, config.staticDir)) return;
   return json(res, 404, { error: "Not found" });
 }
-const server = createServer((req, res) => {
+const tlsOptions = config.tls ? { key: await readFile(config.key), cert: await readFile(config.cert), minVersion: "TLSv1.2" } : null;
+const listener = (req, res) => {
   Promise.resolve(handle(req, res)).catch(error => {
     if (!res.headersSent) json(res, error.status ?? 500, { error: error.status ? error.message : "Internal server error" });
     else res.end();
     if (!error.status) console.error(error);
   });
-}).listen(port, host, () => console.log("Locat development API listening on " + host + ":" + port));
+};
+const server = (tlsOptions ? createHttpsServer(tlsOptions, listener) : createHttpServer(listener)).listen(port, host, () => console.log("Locat development API listening on " + host + ":" + port));
 
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => {
   server.close(() => { db.close(); process.exit(0); });

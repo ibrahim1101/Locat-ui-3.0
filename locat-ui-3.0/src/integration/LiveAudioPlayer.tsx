@@ -1,3 +1,4 @@
+import { safeMediaUrl } from "./mediaSource";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useSession } from "../app/session";
 import { parseMusicPresets, upsertMusicPreset } from "../lib/musicPresets";
@@ -26,7 +27,8 @@ export function LiveAudioPlayer({ items, initialId, onClose }: { items: LocalMed
   const frequencies = useMemo(() => Array.from({ length: bands }, (_, i) => Math.round(31.5 * (16000 / 31.5) ** (i / (bands - 1)))), [bands]);
   const dspPoints = useMemo(() => mode === "parametric" ? points : frequencies.map((frequency, i) => ({ type: "peaking" as const, frequency, gain: gains[i] ?? 0, q: 1 })), [mode, points, frequencies, gains]);
   const file = item?.file;
-  useEffect(() => { if (!file) return; const url = URL.createObjectURL(file); const timer = setTimeout(() => setUrl(url), 0); return () => { clearTimeout(timer); URL.revokeObjectURL(url); }; }, [file]);
+  const streamUrl = item ? safeMediaUrl(item) : null;
+  useEffect(() => { if (!file) return; const url = streamUrl ?? URL.createObjectURL(file); const timer = setTimeout(() => setUrl(url), 0); return () => { clearTimeout(timer); if (!streamUrl) URL.revokeObjectURL(url); }; }, [file, streamUrl]);
   useEffect(() => { const current = graph.current; if (current) connectEqGraph(current.source, current.context, current.filters, current.gain, dspPoints, preamp, bypass); }, [dspPoints, preamp, bypass]);
   useEffect(() => () => { void graph.current?.context.close(); }, []);
   async function activateEq() {

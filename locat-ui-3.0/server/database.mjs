@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { mkdirSync, chmodSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -10,7 +11,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 3) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 4) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -40,9 +41,27 @@ export function openDatabase(filename) {
       PRAGMA user_version = 3;
       COMMIT;`);
   }
+  function allocateCode() {
+    const used = new Set(sql.prepare('SELECT lcCode FROM users').all().map(row => row.lcCode));
+    const start = randomInt(9000);
+    for (let i = 0; i < 9000; i++) {
+      const code = String(1000 + (start + i) % 9000);
+      if (!used.has(code)) return code;
+    }
+    throw Object.assign(new Error('This server has reached its 9000 LC identity capacity'), { status: 503 });
+  }
+  if (version < 4) {
+    sql.exec('BEGIN IMMEDIATE');
+    try {
+      sql.exec("ALTER TABLE users ADD COLUMN lcCode TEXT; ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''; CREATE UNIQUE INDEX users_code ON users(lcCode);");
+      for (const user of sql.prepare('SELECT id FROM users').all()) sql.prepare('UPDATE users SET lcCode = ? WHERE id = ?').run(allocateCode(), user.id);
+      sql.exec('PRAGMA user_version = 4; COMMIT;');
+    } catch (error) { sql.exec('ROLLBACK'); throw error; }
+  }
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
+    health: () => ({ schemaVersion: sql.prepare("PRAGMA user_version").get().user_version, accessible: sql.prepare("SELECT 1 AS ok").get().ok === 1 }),
     blocked: (a, b) => !!sql.prepare('SELECT 1 FROM blocks WHERE (blockerId = ? AND blockedId = ?) OR (blockerId = ? AND blockedId = ?)').get(a, b, b, a),
     contacts: userId => sql.prepare('SELECT * FROM contacts WHERE lowId = ? OR highId = ?').all(userId, userId),
     blocks: userId => sql.prepare('SELECT blockedId FROM blocks WHERE blockerId = ?').all(userId),
@@ -70,7 +89,8 @@ export function openDatabase(filename) {
     events: userId => sql.prepare('SELECT id, event, severity, createdAt FROM audit WHERE userId = ? ORDER BY id DESC LIMIT 100').all(userId),
     userById: id => userById.get(id),
     userByName: name => userByName.get(name),
-    addUser: u => sql.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?)').run(u.id, u.username, u.displayName, u.salt, u.hash),
+    userByCode: code => sql.prepare("SELECT * FROM users WHERE lcCode = ?").get(code),
+    addUser: u => sql.prepare('INSERT INTO users (id, username, displayName, salt, hash, lcCode) VALUES (?, ?, ?, ?, ?, ?)').run(u.id, u.username, u.displayName, u.salt, u.hash, allocateCode()),
     sessionUser: (hash, now) => sql.prepare('SELECT users.* FROM users JOIN sessions ON users.id = sessions.userId WHERE sessions.hash = ? AND sessions.expiresAt > ?').get(hash, now),
     addSession(hash, userId, expiresAt) {
       sql.exec('BEGIN IMMEDIATE');
@@ -90,7 +110,7 @@ export function openDatabase(filename) {
         sql.exec('COMMIT');
       } catch (error) { sql.exec('ROLLBACK'); throw error; }
     },
-    updateProfile: (userId, displayName) => sql.prepare('UPDATE users SET displayName = ? WHERE id = ?').run(displayName, userId),
+    updateProfile: (userId, displayName, bio) => sql.prepare('UPDATE users SET displayName = ?, bio = ? WHERE id = ?').run(displayName, bio, userId),
     revokeSession: hash => sql.prepare('DELETE FROM sessions WHERE hash = ?').run(hash),
     inbox: (id, cursor) => sql.prepare('SELECT * FROM envelopes WHERE recipientId = ? AND sequence > ? ORDER BY sequence LIMIT 100').all(id, cursor),
     addEnvelope(m) {

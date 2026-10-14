@@ -56,8 +56,8 @@ function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"
       <div className="space-y-3">
         <Button variant="primary" size="lg" block icon={LogIn} onClick={() => go("login")} data-testid="welcome-signin">Sign in</Button>
         <Button size="lg" block icon={UserPlus} onClick={() => go("register")} data-testid="welcome-register">Create an account</Button>
-        {adapter.mode === "preview" && <button onClick={() => go("local-intro")} data-testid="welcome-local" className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-4 text-left hover:bg-s1">
-          <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Media players, Photos and Remote viewer on this device</span></span><ArrowRight className="size-4 text-ink-3" />
+        {<button onClick={() => go("local-intro")} data-testid="welcome-local" className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-4 text-left hover:bg-s1">
+          <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Device media players and Photos</span></span><ArrowRight className="size-4 text-ink-3" />
         </button>}
       </div>
       {adapter.mode === "preview" && <button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
@@ -172,13 +172,14 @@ function Register({ back, done }: { back(): void; done(): void }) {
 }
 
 function LocalIntro({ back, done }: { back(): void; done(): void }) {
+  const { adapter } = useSession();
   return (
     <Frame onBack={back} step="Local device mode">
       <div className="mb-6 grid size-14 place-items-center rounded-2xl bg-s2"><HardDrive className="size-6 text-ember" /></div>
       <h1 className="text-2xl font-extrabold tracking-tight">Use Locat on this device only</h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-2">No account and no server. Nothing leaves this device.</p>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-ok/8 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ok">Works</p><ul className="space-y-1.5 text-[13px] text-ink-2"><li>Cinema & Music (device files)</li><li>Photos viewer & editor</li><li>Remote viewer</li><li>Diagnostics</li></ul></div>
+        <div className="rounded-2xl bg-ok/8 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ok">Works</p><ul className="space-y-1.5 text-[13px] text-ink-2"><li>Cinema & Music (device files)</li><li>Photos viewer & editor</li>{adapter.mode === "preview" && <li>Remote viewer</li>}<li>Browser diagnostics</li></ul></div>
         <div className="rounded-2xl bg-s1 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ink-3">Needs an account</p><ul className="space-y-1.5 text-[13px] text-ink-3"><li>Messages & contacts</li><li>Devices / Link</li><li>Vault, Secrets, Sentinel</li><li>Server media libraries</li></ul></div>
       </div>
       <Button variant="primary" size="lg" block className="mt-8" onClick={done} data-testid="local-continue">Continue on this device</Button>
@@ -216,13 +217,13 @@ export function LockScreen({ onPreviewContinue }: { onPreviewContinue(): void })
 export function EntryFlow() {
   const s = useSession();
   const enterDemo = () => { if (s.adapter.mode !== "preview") return; s.setUser(FIXTURE_USER); s.setConnection({ ...s.connection, mode: "server", server: "connected", origin: s.connection.origin ?? FIXTURE_USER.serverOrigin }); s.setStage("app"); };
-  const enterLocal = async () => { if (s.adapter.mode !== "preview") return; await s.adapter.auth.enterLocalMode(); s.setUser(null); s.setConnection({ mode: "local-only", server: "not-configured", pendingOutbox: 0 }); s.setStage("app"); };
+  const enterLocal = async () => { const result = await s.adapter.auth.enterLocalMode(); if (result.status !== "ok" || s.adapter.mode === "live") return; s.setUser(null); s.setConnection({ mode: "local-only", server: "not-configured", pendingOutbox: 0 }); s.setStage("app"); };
   const home = () => s.setStage("welcome");
   switch (s.stage) {
     case "login": return <SignIn back={home} done={enterDemo} />;
     case "register": return <Register back={home} done={enterDemo} />;
     case "server": return <ServerSetup back={home} />;
-    case "local-intro": return s.adapter.mode === "preview" ? <LocalIntro back={home} done={enterLocal} /> : <Welcome go={(x) => s.setStage(x)} />;
+    case "local-intro": return <LocalIntro back={home} done={enterLocal} />;
     case "locked": return <LockScreen onPreviewContinue={() => { if (s.adapter.mode === "preview") s.setStage("app"); }} />;
     default: return <Welcome go={(x) => s.setStage(x)} />;
   }

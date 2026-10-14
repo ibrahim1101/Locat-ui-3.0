@@ -93,3 +93,8 @@ credentials.json
 /backend/
 /tests/
 /test_result.md
+
+# Operator-provided TLS material
+certs/
+*.pem
+*.key

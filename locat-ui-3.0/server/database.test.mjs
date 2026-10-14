@@ -46,13 +46,17 @@ test('schema v1 upgrades preserve accounts and reject unknown future versions', 
   const file = join(dir, 'app.sqlite');
   let db;
   try {
-    db = openDatabase(file);
-    db.addUser({ id: 'a', username: 'alice', displayName: 'Alice', salt: 'salt', hash: 'hash' });
-    db.close(); db = null;
     let raw = new DatabaseSync(file);
-    raw.exec('DROP TABLE preferences; DROP TABLE audit; DROP TABLE contacts; DROP TABLE blocks; PRAGMA user_version = 1;'); raw.close();
+    raw.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, displayName TEXT NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL);
+      CREATE TABLE sessions (hash TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id), expiresAt INTEGER NOT NULL);
+      CREATE TABLE envelopes (sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, senderId TEXT NOT NULL REFERENCES users(id), recipientId TEXT NOT NULL REFERENCES users(id), ciphertext TEXT NOT NULL, nonce TEXT NOT NULL, algorithm TEXT NOT NULL, createdAt INTEGER NOT NULL);
+      INSERT INTO users VALUES ('a', 'alice', 'Alice', 'salt', 'hash'); PRAGMA user_version = 1;`);
+    raw.close();
     db = openDatabase(file);
     assert.equal(db.userById('a').username, 'alice');
+    const identity = db.userById('a').lcCode; assert.match(identity, /^[1-9][0-9]{3}$/);
+    assert.equal(db.userByCode(identity).id, 'a');
+    db.close(); db = openDatabase(file); assert.equal(db.userById('a').lcCode, identity);
     db.savePreferences('a', { theme: 'graphite' });
     assert.equal(db.preferences('a').theme, 'graphite');
     db.audit('a', 'test.event');

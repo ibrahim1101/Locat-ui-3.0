@@ -7,6 +7,7 @@ import { EntryFlow } from "./screens/auth/Entry";
 import { StateView, Button } from "./ui";
 import { ContextMenuProvider } from "./ui/ContextMenuProvider";
 import { DropProvider } from "./app/DropProvider";
+import { LiveDiagnostics } from "./integration/LiveDiagnostics";
 import { LiveContacts } from "./integration/LiveContacts";
 import { LiveOverview } from "./integration/LiveOverview";
 import { LiveSentinel } from "./integration/LiveSentinel";
@@ -66,8 +67,8 @@ export function App() {
             <Route path="search" element={live ? <LiveOverview kind="search" /> : <Search />} />
             <Route path="hub" element={live ? <LiveModuleNotice title="Hub" /> : <Hub />} />
             <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />
-            <Route path="diagnostics" element={live ? <LiveModuleNotice title="Diagnostics" /> : <Diagnostics />} />
-            <Route path="offline" element={live ? <LiveModuleNotice title="Offline" /> : <Offline />} />
+            <Route path="diagnostics" element={live ? <LiveDiagnostics /> : <Diagnostics />} />
+            <Route path="offline" element={live ? <LiveDiagnostics offline /> : <Offline />} />
             <Route path="workspace" element={live ? <LiveModuleNotice title="workspace" /> : <Planned id="workspace" />} />
             <Route path="calendar" element={live ? <LiveModuleNotice title="calendar" /> : <Planned id="calendar" />} />
             <Route path="automate" element={live ? <LiveModuleNotice title="automate" /> : <Planned id="automate" />} />

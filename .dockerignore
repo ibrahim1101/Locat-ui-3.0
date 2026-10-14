@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/server/data
+**/dist
+**/.env*
+**/*.log
+certs/
+**/*.pem
+**/*.key

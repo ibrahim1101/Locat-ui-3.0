@@ -12,7 +12,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "test:server": "node --test server/*.test.mjs",
     "test:all": "npm run test && npm run test:server",
-    "backup:server": "node server/backup.mjs"
+    "backup:server": "node server/backup.mjs",
+    "start": "node server/index.mjs",
+    "dev:server": "node server/index.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

@@ -56,3 +56,29 @@ Validation: frontend helper, UI and IndexedDB suites; backend authorization, set
 | Link / Remote / Vault / Secrets / native apps | No fabricated live state | Original implementation adaptation and validation |
 
 Next dependencies remain server media access, reviewed messaging protocol integration, Link/Remote platform ports, encrypted private storage and native packaging. All original integrations are not yet ported.
+
+## 2026-10-14 — Remaining media, self-hosting and identity requirements
+
+Starting remote checkpoint f4e99014e736daf5dc06e1ff2d21c971441ea2e7. Read the original Locat feature register, platform roadmap, media integration and later login/section/local-mode additions. Preserved all 49 original requirements in ORIGINAL_LOCAT_REQUIREMENTS.md as a historical reference, explicitly separate from this app's completion status.
+
+Implemented:
+- Read-only operator-approved server media indexing and authenticated GET/HEAD byte-range streaming; opaque IDs, bounded scans, skipped symlinks/hidden files, per-request containment and Linux opened-inode checks. Connected device/server source selection, real image/video/audio streams and per-account browser metadata to UI 3.0.
+- Built UI served by the Node API, direct TLS listener, Secure cookies, strict configured public origin, trusted Host checks and a restricted SPA/static asset server with CSP. Added non-root Docker/Compose templates and self-hosting instructions; no deployment executed.
+- Schema v4 migrates existing users to stable unique LC-1234 directory codes and a public bio. Exact code discovery and immutable profile identity validation are live.
+- Real diagnostics/SQLite health/media status, browser storage estimates and a 15-second readiness monitor. Local media mode has no account identity, performs no server-library requests and uses a separate device scope. Unauthenticated live entry defaults to login; successful login opens Home.
+- Local WebVTT track loading/selection through the existing premium Cinema controls; validates header and 2 MB size bound, keeps subtitles client-local and cleans object URLs.
+
+Verification: TypeScript check, zero-error/zero-warning ESLint, 63 frontend tests in 19 files, 9 backend tests, and Vite production build passed. Backend suites exercise media full/ranged/HEAD responses, invalid IDs/ranges, unauthorized access, escaping symlinks and swapped media paths, LC discovery/bio/identity rejection, migration from actual v1 schema, trusted-CA TLS auth/cookies, untrusted Host/Origin rejection and static symlink containment. UI boot tests distinguish local tools from verified accounts. OpenSSL generates disposable test material. Docker/Cargo are unavailable; no native or Docker runtime acceptance claimed. FFmpeg is present but transcoding/HLS have not been ported or tested.
+
+Failure fixed: the TLS test's intentionally hostile Host initially changed Node's inferred TLS server name and failed before reaching the HTTP Host guard. The test now explicitly verifies the certificate for localhost while sending the hostile HTTP Host; both TLS verification and HTTP rejection are exercised. React media URL dependencies were corrected to avoid unnecessary reloads and lint warnings.
+
+### Current remaining dependency order
+
+1. Reviewed messaging protocol/library evaluation and authenticated device keys, then chat lifecycle, offline delivery, encrypted attachments, groups/replies/reactions and scheduling. Original custom encrypted-envelope code is not sufficient evidence of a reviewed E2EE protocol.
+2. FFprobe/FFmpeg remux and HLS adaptation with authorized opened files, concurrency limits, cleanup and actual codec/signal tests; media metadata/artwork/playlists and background audio.
+3. Session-bound Link pairing/proof, directional chunk transfer and clipboard; then approved Remote capture/control and platform consent.
+4. Client-encrypted Vault/Secrets plus recovery, Sentinel webhook/alert workflow, roles/admin controls and profile privacy/avatars.
+5. Calendar/Automate/Workspace/Share/Extensions require real authorization/encryption/isolation; preserve planned status until connected.
+6. Android/Windows platform adapters, HTTPS onboarding, secure storage, native lifecycle/permissions, reproducible CI packaging and physical acceptance.
+
+Passkeys, MFA, calls, disappearing/view-limited messages, widgets, account closure and receive-share targets remain open original requirements, not silently discarded. Preserve original accounts/data through additive migrations; never equate source presence, a preview, or a container template with runtime completion.
