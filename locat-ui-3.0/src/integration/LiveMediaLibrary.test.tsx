@@ -5,6 +5,7 @@ import { LiveMediaLibrary } from "./LiveMediaLibrary";
 const { state } = vi.hoisted(() => ({ state: { items: [] as unknown[], loading: false, error: "", importFiles: vi.fn(), update: vi.fn(), remove: vi.fn() } }));
 vi.mock("../app/session", () => ({ useSession: () => ({ user: { id: "test-media-account" }, connection: { mode: "server" } }) }));
 vi.mock("./liveMedia", () => ({ useLiveMedia: () => state }));
+vi.mock("./LiveVideoPlayer", () => ({ LiveVideoPlayer: ({ item, onEnded, autoStart }: { item: { name: string }; onEnded(): void; autoStart: boolean }) => <div><p>{item.name} · {autoStart ? "auto" : "manual"}</p><button onClick={onEnded}>Finish video</button></div> }));
 beforeEach(() => { state.items = []; state.error = ""; vi.clearAllMocks(); localStorage.clear(); });
 it("renders truthful empty live libraries without preview titles", () => {
   render(<MemoryRouter><LiveMediaLibrary kind="video" /></MemoryRouter>);
@@ -50,4 +51,31 @@ it("creates a per-account playlist from actual filtered results", () => {
   fireEvent.click(screen.getByRole("button", { name: "Confirm playlist deletion" }));
   expect(JSON.parse(localStorage.getItem("locat-ui3-playlists:test-media-account")!)).toEqual([]);
   expect(state.remove).not.toHaveBeenCalled();
+});
+it("stages playlist order and membership until save without deleting files", () => {
+  state.items = ["a", "b", "c"].map((id, index) => ({ id, kind: "audio", name: id + ".mp3", file: new Blob(), size: 5, album: "Imported", favorite: false, position: 0, addedAt: index }));
+  const key = "locat-ui3-playlists:test-media-account";
+  localStorage.setItem(key, JSON.stringify([{ id: "queue", name: "My queue", kind: "audio", itemIds: ["a", "b"] }]));
+  render(<MemoryRouter><LiveMediaLibrary kind="audio" /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText("Playlist filter"), { target: { value: "queue" } });
+  fireEvent.click(screen.getByRole("button", { name: "Manage playlist" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move item 2 up" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remove item 2 from playlist" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add c.mp3 to playlist" }));
+  expect(JSON.parse(localStorage.getItem(key)!)[0].itemIds).toEqual(["a", "b"]);
+  fireEvent.click(screen.getByRole("button", { name: "Save playlist items" }));
+  expect(JSON.parse(localStorage.getItem(key)!)[0].itemIds).toEqual(["b", "c"]);
+  expect(state.remove).not.toHaveBeenCalled();
+});
+
+it("continues an explicitly enabled video playlist and stops at its end", () => {
+  state.items = ["a", "b"].map((id, index) => ({ id, kind: "video", name: id + ".mp4", file: new Blob(), size: 5, album: "Imported", favorite: false, position: 0, addedAt: index }));
+  localStorage.setItem("locat-ui3-playlists:test-media-account", JSON.stringify([{ id: "series", name: "Series", kind: "video", itemIds: ["a", "b"] }]));
+  render(<MemoryRouter><LiveMediaLibrary kind="video" /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText("Playlist filter"), { target: { value: "series" } });
+  fireEvent.click(screen.getByRole("switch", { name: "Continue video playlist" }));
+  fireEvent.click(screen.getByRole("button", { name: /a.mp4/ }));
+  expect(screen.getByText("a.mp4 · manual")).toBeVisible();fireEvent.click(screen.getByRole("button", { name: "Finish video" }));
+  expect(screen.getByText("b.mp4 · auto")).toBeVisible();fireEvent.click(screen.getByRole("button", { name: "Finish video" }));
+  expect(screen.getByText("b.mp4 · auto")).toBeVisible();
 });

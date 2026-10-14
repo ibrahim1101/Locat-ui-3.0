@@ -64,3 +64,9 @@ Cinema > Quality > Playback options opens the UI 3.0 compatibility sheet. GET /a
 Worker stdin is connected to an authorized open file handle. Containers requiring random access (for example some MP4 layouts) may not inspect or convert successfully via this progressive input path. Errors are explicit; no universal-codec guarantee is made. FFmpeg failures after headers have begun terminate the stream and surface as player errors.
 
 Playlists, album overrides, favorites, EQ presets and resume pointers remain scoped to this browser/account (or explicit local device mode). Playlists contain references, not file copies; removing a playlist does not delete its files. They are not synchronized or included in SQLite server backups.
+
+## Browser media editing
+
+Manage playlist supports staged membership/order edits; save applies them, and closing discards them. Missing media references are retained until explicitly removed. Cinema's Continue video playlist switch applies only to the selected filtered playlist, advances after completion and stops at its last item. It attempts browser playback rather than bypassing autoplay policy; any denied attempt is shown as a playback error. Closing stops playback.
+
+Photo crop/text controls render the same composition for preview and exported JPEG copies. Export retains the maximum 1600-pixel edge and bounded JPEG size inherited from the original helper. The host/device original remains unchanged. Canvas color-filter support varies by browser; unsupported adjustments fail explicitly. Freehand drawing, undo history and real browser pixel acceptance remain pending.

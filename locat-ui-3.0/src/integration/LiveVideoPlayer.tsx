@@ -7,7 +7,7 @@ import type { PlaybackView, VideoItemView } from "../contracts";
 import { PlayerChrome } from "../screens/cinema/VideoPlayer";
 import { useLiveMedia } from "./liveMedia";
 import type { LocalMediaItem } from "./localMediaStore";
-export function LiveVideoPlayer({ item, onClose }: { item: LocalMediaItem; onClose(): void }) {
+export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: { item: LocalMediaItem; onClose(): void; onEnded?(): void; autoStart?: boolean }) {
   const [delivery, setDelivery] = useState<DeliveryMode>("direct");
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
   const [audioIndex, setAudioIndex] = useState<number | null>(null);
@@ -63,9 +63,9 @@ export function LiveVideoPlayer({ item, onClose }: { item: LocalMediaItem; onClo
       });
     }} />
     <PlayerChrome onLoadSubtitle={() => subtitleInput.current?.click()} video={metadata} state={state} onClose={() => { checkpoint(); onClose(); }} surface={<video ref={video} src={url || undefined} className="h-full w-full" style={{ objectFit: state.fit }} playsInline
-      onLoadedMetadata={event => { const element = event.currentTarget; if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: Number.isFinite(element.duration) ? element.duration : probe?.durationSeconds ?? 1 }); }}
+      onLoadedMetadata={event => { const element = event.currentTarget; if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: Number.isFinite(element.duration) ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart) void perform(() => element.play()); }}
       onTimeUpdate={event => { const element = event.currentTarget; set({ positionSec: element.currentTime, bufferedSec: element.buffered.length ? element.buffered.end(element.buffered.length - 1) : 0 }); }}
-      onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { set({ state: "paused" }); checkpoint(); }} onEnded={() => { set({ state: "ended" }); checkpoint(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
+      onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { set({ state: "paused" }); checkpoint(); }} onEnded={() => { set({ state: "ended" }); checkpoint(); onEnded?.(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
       onError={() => set({ state: "error", error: { code: "codec", message: "This browser cannot decode this file. Try an MP4/H.264 or WebM file." } })}>{subtitle && <track key={subtitle.url} src={subtitle.url} kind="subtitles" label={subtitle.name} default onLoad={() => { if (video.current?.textTracks[0]) video.current.textTracks[0].mode = "showing"; }} />}</video>}
       cb={{ onTogglePlay: () => { const element = video.current; if (element) { if (element.paused) void perform(() => element.play()); else element.pause(); } },
         onSeek: sec => { if (delivery === "direct" && video.current) video.current.currentTime = Math.max(0, Math.min(sec, state.durationSec)); },

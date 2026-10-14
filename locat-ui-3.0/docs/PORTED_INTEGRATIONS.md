@@ -17,3 +17,7 @@ Original api/mediaRange and mediaTypes policies now drive the Node server's auth
 ### Sentinel continuation
 
 Adapted the original scoped-token/webhook/incident workflow to the new SQLite authentication service and premium UI. Generic, nScout and PipelineGuard normalization, per-account source/fingerprint deduplication, severity escalation, status lifecycle, notes/history, revocable digest-only integration tokens and one-time token display are live. UI controls use shared sheets/buttons/fields. No external alerts are sent. Real vendor emitters, native host monitoring, notifications, retention/redaction and encryption of incident metadata remain pending.
+
+### Media editing continuation
+
+Playlist membership/order editing and opt-in sequential Cinema playback are now live in UI 3.0. The original photo renderer now powers the actual crop/text preview and edited-copy export, including crop preset/position/zoom, rotation, both flips and color adjustments. Browser/account data stays scoped; references do not copy/delete files. Browser visual/media acceptance, freehand drawing/undo, tags/artwork, synchronization and native background playback remain pending.

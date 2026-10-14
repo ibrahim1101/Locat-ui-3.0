@@ -21,3 +21,14 @@ export function addPlaylist(existing: MediaPlaylist[], name: string, kind: Local
   if (!itemIds.length || itemIds.length > 1000) throw new Error("Choose 1–1000 media items for a playlist");
   return [...existing, { id: crypto.randomUUID(), name: name.trim(), kind, itemIds: [...new Set(itemIds)] }];
 }
+
+export function replacePlaylistItems(existing: MediaPlaylist[], id: string, itemIds: string[]): MediaPlaylist[] {
+  if (!existing.some(row => row.id === id)) throw new Error("Playlist is unavailable");
+  if (itemIds.length > 1000 || itemIds.some(value => typeof value !== "string" || !value || value.length > 120)) throw new Error("Choose up to 1000 valid media items");
+  return existing.map(row => row.id === id ? { ...row, itemIds: [...new Set(itemIds)] } : row);
+}
+export function movePlaylistItem(itemIds: string[], index: number, direction: -1 | 1): string[] {
+  const next = [...itemIds]; const target = index + direction;
+  if (!Number.isInteger(index) || index < 0 || index >= next.length || target < 0 || target >= next.length) return next;
+  [next[index], next[target]] = [next[target], next[index]]; return next;
+}
