@@ -25,7 +25,7 @@ async function load() {
 }
 async function persist() {
   await mkdir(dirname(file), { recursive: true });
-  const temp = file + ".tmp";
+  const temp = file + "." + process.pid + "." + randomBytes(6).toString("hex") + ".tmp";
   await writeFile(temp, JSON.stringify(db), { mode: 0o600 });
   await rename(temp, file);
 }
@@ -93,7 +93,7 @@ async function handle(req, res) {
     const sender = sessionUser(req);
     if (!sender) return json(res, 401, { error: "Not authenticated" });
     const input = await body(req);
-    if (!input || typeof input !== "object" || "text" in input || "plaintext" in input) return json(res, 400, { error: "Only encrypted envelopes accepted" });
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(k => !["recipientId", "ciphertext", "nonce", "algorithm"].includes(k))) return json(res, 400, { error: "Only encrypted envelopes accepted" });
     const { recipientId, ciphertext, nonce, algorithm } = input;
     if (typeof recipientId !== "string" || typeof ciphertext !== "string" || typeof nonce !== "string" || algorithm !== "client-e2ee-v1" ||
         ciphertext.length < 24 || ciphertext.length > 12000 || nonce.length < 16 || nonce.length > 128 ||
@@ -126,6 +126,7 @@ async function handle(req, res) {
       return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
     }
     const input = await body(req);
+    if (!input || typeof input !== "object" || Array.isArray(input)) return json(res, 400, { error: "Invalid request" });
     const username = typeof input.username === "string" ? input.username.trim().toLowerCase() : "";
     const password = typeof input.password === "string" ? input.password : "";
     if (!/^[a-z0-9_]{3,32}$/.test(username) || password.length < 15 || password.length > 256) {
