@@ -15,7 +15,7 @@ This tracker supersedes the earlier migration-preparation plan. The approved fre
 | Devices/Link | Browser identity persistence, session-bound key proof, dual approval/pinned peers, encrypted payloads/chunks/receipts/cancellation/revocation | Real two-device/native acceptance, LAN/mDNS/P2P, cross-device media discovery/approvals and large-file memory/resume improvements |
 | Hosting | Same-origin Node UI/API, trusted Host/Origin, TLS, SQLite online backups, Docker templates and three-OS checks | Actual Docker/ARM/Pi/native operation, signed artifacts and recovery drills |
 | Messaging | Opaque envelope transport and live contacts only | Reviewed protocol/library gate, authenticated keys, chat lifecycle/outbox/history and all dependent messaging requirements |
-| Remote | Unavailable live state | Pair-authorized signaling, explicit capture/control consent, encrypted media/input and native policies |
+| Remote | Experimental paired browser screen viewing, explicit source picker/consent, encrypted signaling, cleanup and expiry | Two-device WebRTC/TURN acceptance, authenticated native capture/input agent and platform permissions |
 | Productivity/admin | Planned live states | Actual roles/admin, Hub, Calendar, Automate, Workspace, Share, Extensions and their authorization/encryption contracts |
 
 ## Full roadmap remains active

@@ -56,6 +56,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     mode: "live",
     moduleAvailability: (id, ctx) => {
       if (ctx.connection.mode === "local-only") return ["home", "cinema", "music", "photos", "search", "modules", "settings", "offline", "diagnostics"].includes(id) ? { availability: "available" } : { availability: "offline", reason: "Requires an authenticated account and live backend integration" };
+      if (id === "remote") return { availability: "experimental", reason: "Consented browser screen viewing; native control and connectivity acceptance pending" };
       if (id === "devices") return { availability: "beta", reason: "Browser key proof, pairing and encrypted Link payloads; native acceptance pending" };
       if (id === "messages") return { availability: "beta", reason: "Live contacts; private messaging awaits verified E2EE" };
       if (["vault", "secrets"].includes(id)) return { availability: "beta", reason: "Experimental client-encrypted private storage; native storage and independent review pending" };

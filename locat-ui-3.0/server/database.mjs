@@ -14,7 +14,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 8) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 9) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -81,6 +81,12 @@ export function openDatabase(filename) {
     CREATE INDEX link_payload_owner ON linkPayloads(userId,createdAt);
     CREATE TABLE linkPayloadChunks (payloadId TEXT NOT NULL REFERENCES linkPayloads(id), seq INTEGER NOT NULL, envelope TEXT NOT NULL, PRIMARY KEY(payloadId,seq));
     PRAGMA user_version = 8; COMMIT;`);
+  if (version < 9) sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE remoteSessions (id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),pairId TEXT NOT NULL,viewer INTEGER NOT NULL REFERENCES linkDevices(id),host INTEGER NOT NULL REFERENCES linkDevices(id),status TEXT NOT NULL CHECK(status IN ('pending','active','denied','closed','expired')),createdAt INTEGER NOT NULL,expiresAt INTEGER NOT NULL,CHECK(viewer!=host));
+    CREATE INDEX remote_sessions_owner ON remoteSessions(userId,createdAt);
+    CREATE TABLE remoteSignals (sequence INTEGER PRIMARY KEY AUTOINCREMENT,sessionId TEXT NOT NULL REFERENCES remoteSessions(id),signalId TEXT NOT NULL UNIQUE,fromDevice INTEGER NOT NULL REFERENCES linkDevices(id),kind TEXT NOT NULL CHECK(kind IN ('offer','answer','candidate')),envelope TEXT NOT NULL);
+    CREATE INDEX remote_signals_session ON remoteSignals(sessionId,sequence);
+    PRAGMA user_version = 9; COMMIT;`);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {

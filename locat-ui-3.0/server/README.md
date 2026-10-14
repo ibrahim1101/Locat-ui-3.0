@@ -98,3 +98,7 @@ Schema v6 adds privateStores/privateObjects. GET /api/private/vault or /api/priv
 ### Devices and Link
 
 Schema v7/v8 connects /api/link/register, challenge, prove, devices, heartbeat, rename, pair, confirm and revoke. Protected commands additionally require X-Locat-Device-Proof bound to the valid account cookie/session. Payload routes create immutable metadata, upload bounded encrypted chunks, list/get owned device deliveries and acknowledge/cancel. Roles, pair verification, quota, exact lengths and terminal state are enforced; pair rejection/revocation purges queued chunks. See docs/LINK_INTEGRATION.md for client crypto, readable metadata, restart/expiry and native limits.
+
+### Browser Remote signaling
+
+Schema v9 extends protected /api/link/remote routes with source-decided sessions and encrypted signaling. Account/session/device proof and verified pairs remain mandatory. Roles gate offers/answers, expiry/close/revocation purge signals, and no server capture/control endpoint exists. See docs/REMOTE_INTEGRATION.md for browser consent, direct connectivity and native limitations.

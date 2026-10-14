@@ -29,3 +29,7 @@ Vault/Secrets now adapt the original wrapping/envelope/quota/revision architectu
 ### Devices and Link continuation
 
 Original Link proof, pairing and directional transfer policies now have SQLite/authenticated UI3 paths and themed controls. Browser identities/peer pins, dual confirmation, encrypted text/URL/explicit clipboard/files, quotas, receipts, cancellation and revocation are connected. LINK_INTEGRATION.md records exact limits and original-data/domain differences; native/LAN/Remote and independent protocol acceptance remain open.
+
+### Paired browser Remote continuation
+
+Added a UI3-native experimental browser viewing flow using the new Link account/device proof/pins. Source consent, browser display picker, authenticated encrypted signaling, expiry and resource cleanup are connected. Original standalone Remote files remain a native-host reference; mouse/keyboard control, Android capture, TURN and actual two-device acceptance are unfinished. See REMOTE_INTEGRATION.md.
