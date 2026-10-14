@@ -37,7 +37,7 @@ LOCAT_MEDIA_AUTHORIZED_ROOTS is a platform-delimited list (semicolon on Windows,
 
 GET /api/media lists library status and opaque item IDs. GET/HEAD /api/media/stream/<id> requires the current session and supports full/suffix/open-ended byte ranges. Existing sessions are rechecked on each request; revocation cannot recall bytes already sent or cancel an already authorized stream. Files cannot be modified/deleted via these endpoints.
 
-Linux checks containment again against the opened file descriptor; other operating systems still have directory replacement race limitations and need platform hardening before use with an untrusted multi-user filesystem. No client-native playback tickets, FFmpeg remux/HLS, or per-account media-root ACLs are connected yet. Decoder support still depends on the browser.
+Linux checks containment again against the opened file descriptor; other operating systems still have directory replacement race limitations and need platform hardening before use with an untrusted multi-user filesystem. FFprobe inspection and progressive FFmpeg remux/transcoding are connected. Client-native playback tickets, HLS and per-account media-root ACLs are not connected. Decoder support still depends on the browser.
 
 Server-media favorites/albums/resume are device/account-scoped browser metadata. They do not modify host files and currently do not synchronize between clients. Edited server photos export new browser downloads.
 
@@ -54,3 +54,13 @@ The image builds the frontend and runs Node as a non-root user. SQLite uses the 
 ## Backups
 
 See server/README.md for consistent SQLite online backups and recovery. Browser media, server host files and certificates are not included in SQLite backups. Preserve those separately. Unknown newer database schemas fail closed, and migrations preserve existing account IDs and sessions.
+
+## Playback conversion
+
+Install FFmpeg/FFprobe on PATH, or set LOCAT_FFMPEG_PATH and LOCAT_FFPROBE_PATH to trusted operator-owned executables. The updated Docker runtime installs FFmpeg, but this image has not been executed locally.
+
+Cinema > Quality > Playback options opens the UI 3.0 compatibility sheet. GET /api/media/probe/<id> inspects only authorized media. A direct stream remains the default. mode=remux copies eligible H.264/audio streams into fragmented MP4; mode=transcode converts to software H.264/AAC at no more than 1920x1080 without enlarging small inputs. An optional audio=<stream-index> selects a validated audio stream for converted playback. Neither progressive mode supports seeking, resuming, adaptive quality or HLS. Conversion starts from zero and uses at most two workers, with cancellation and a four-hour deadline. Native/browser decoding and performance acceptance remain separate.
+
+Worker stdin is connected to an authorized open file handle. Containers requiring random access (for example some MP4 layouts) may not inspect or convert successfully via this progressive input path. Errors are explicit; no universal-codec guarantee is made. FFmpeg failures after headers have begun terminate the stream and surface as player errors.
+
+Playlists, album overrides, favorites, EQ presets and resume pointers remain scoped to this browser/account (or explicit local device mode). Playlists contain references, not file copies; removing a playlist does not delete its files. They are not synchronized or included in SQLite server backups.

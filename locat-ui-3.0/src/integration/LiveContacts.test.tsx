@@ -1,0 +1,20 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, expect, it, vi } from "vitest";
+import { LiveContacts } from "./LiveContacts";
+afterEach(() => vi.unstubAllGlobals());
+it("submits LC discovery and sends an actual friend request from the live form", async () => {
+  const user = { id: "b".repeat(32), username: "bob", displayName: "Bob", lcCode: "LC-1234" };
+  const response = (data: object) => ({ ok: true, json: async () => data });
+  const fetch = vi.fn().mockResolvedValueOnce(response({ contacts: [], blocked: [] })).mockResolvedValueOnce(response({ users: [user] })).mockResolvedValueOnce(response({ ok: true })).mockResolvedValueOnce(response({ contacts: [{ user, status: "pending", direction: "outgoing" }], blocked: [] }));
+  vi.stubGlobal("fetch", fetch);
+  render(<MemoryRouter><LiveContacts /></MemoryRouter>);
+  await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByPlaceholderText("Exact username or LC code"), { target: { value: "LC-1234" } });
+  fireEvent.click(screen.getByRole("button", { name: "Find contact" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send friend request" }));
+  await screen.findByText("outgoing request");
+  expect(fetch.mock.calls[1][0]).toBe("/api/users/search?q=LC-1234");
+  expect(fetch.mock.calls[2][0]).toBe("/api/contacts/request");
+  expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual({ userId: user.id });
+});

@@ -35,10 +35,14 @@ export function SessionProvider({ adapter, initialUser, initialConnection, platf
 
   useEffect(() => {
     const root = document.documentElement;
-    const theme = prefs.theme === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "daylight" : "obsidian") : prefs.theme;
-    root.dataset.theme = theme;
+    const query = prefs.theme === "system" ? matchMedia("(prefers-color-scheme: light)") : null;
+    const apply = () => { root.dataset.theme = query ? (query.matches ? "daylight" : "obsidian") : prefs.theme; };
+    apply();
     root.dataset.textScale = prefs.textScale;
     root.dataset.motion = prefs.motion;
+    if (query?.addEventListener) query.addEventListener("change", apply);
+    else query?.addListener(apply);
+    return () => { if (query?.removeEventListener) query.removeEventListener("change", apply); else query?.removeListener(apply); };
   }, [prefs]);
 
   const availability = useCallback((id: ModuleId) =>

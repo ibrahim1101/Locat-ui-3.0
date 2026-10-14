@@ -65,7 +65,7 @@ Recovery: stop the API, preserve the current database and its `-wal`/`-shm` side
 
 Authentication mutations allow 20 attempts per minute per socket IP, with Retry-After responses. This per-process development limiter is not a distributed policy; behind a proxy all requests may share a bucket. Audit storage retention is pending.
 
-Device media uses browser IndexedDB, separate from server SQLite and backups. Import is not server upload. Files are not encrypted, and clearing browser storage removes copies. Native background music, tags/artwork, server transcoding and screen control remain pending. Test actual codec playback manually; unit tests cannot prove a browser decoder supports a particular file.
+Device media uses browser IndexedDB, separate from server SQLite and backups. Import is not server upload. Files are not encrypted, and clearing browser storage removes copies. Native background music, tags/artwork, HLS/adaptive streaming and screen control remain pending. Test actual codec playback manually; unit tests cannot prove a browser decoder supports a particular file.
 
 ## New server/media and directory scope
 
@@ -76,3 +76,9 @@ Schema v4 adds immutable unique four-digit LC directory codes and public bio met
 `GET /api/diagnostics` requires authentication and exposes service/SQLite/media status without credentials or absolute host paths. The app polls readiness every 15 seconds while open. Login-first entry and the default Home landing match Locat's later navigation requirement; explicit local mode opens browser media without a fake account. Server actions remain unavailable there. Local mode is not offline password authentication and must be reselected after reload.
 
 The real TLS integration test requires OpenSSL on PATH; it creates temporary keys/certificates and validates using that temporary CA. No production key is read by tests. Docker files are templates and were not executed locally.
+
+## Media compatibility runtime
+
+GET /api/media/probe/<id> requires authentication and bounded FFprobe inspection. GET /api/media/stream/<id>?mode=remux or mode=transcode runs an authorized progressive FFmpeg worker; optional audio=<index> must identify a real audio stream. HEAD and non-initial byte ranges are rejected for conversion. Direct streaming continues to support ranges. File handles remain open through inspection/conversion and close on completion or cancellation. No shell interpolation or arbitrary client path is used. See docs/SELF_HOSTING.md for executable configuration, limits and progressive-input limitations.
+
+Backend tests now require FFmpeg/FFprobe as well as OpenSSL. CI includes source/test/build jobs for Linux, Windows and macOS, but these jobs are not native app builds and their results must be checked before claiming cross-platform runtime acceptance.

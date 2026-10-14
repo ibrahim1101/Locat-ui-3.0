@@ -76,6 +76,15 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal((await request(movie.streamUrl)).status, 401);
     assert.equal((await request("/api/media/stream/invalid", "GET", undefined, aliceCookie)).status, 400);
     assert.equal((await request("/api/media/stream/" + "0".repeat(64), "GET", undefined, aliceCookie)).status, 404);
+    const probeUrl = movie.streamUrl.replace('/stream/', '/probe/');
+    assert.equal((await request(probeUrl)).status, 401);
+    assert.equal((await request('/api/media/probe/invalid', 'GET', undefined, aliceCookie)).status, 400);
+    assert.equal((await request(movie.streamUrl + '?mode=shell', 'GET', undefined, aliceCookie)).status, 400);
+    assert.equal((await request(movie.streamUrl + '?audio=2', 'GET', undefined, aliceCookie)).status, 400);
+    assert.equal((await request(movie.streamUrl + '?mode=remux', 'HEAD', undefined, aliceCookie)).status, 405);
+    assert.equal((await request(movie.streamUrl + '?mode=remux', 'GET', undefined, aliceCookie, { Range: 'bytes=5-' })).status, 416);
+    const invalidProbe = await request(probeUrl, 'GET', undefined, aliceCookie);
+    assert.equal(invalidProbe.status, 503); assert.ok(!(await invalidProbe.text()).includes(mediaDir));
     if (supportsSymlinks) {
       await rm(join(mediaDir, "movie.mp4")); await symlink(outside, join(mediaDir, "movie.mp4"));
       assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie)).status, 404);

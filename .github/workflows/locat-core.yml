@@ -5,7 +5,12 @@ on:
   pull_request:
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: locat-ui-3.0
@@ -16,6 +21,20 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: locat-ui-3.0/package-lock.json
+      - name: Install Linux media and TLS test tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg openssl
+      - name: Install Windows media and TLS test tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ffmpeg openssl --yes --no-progress
+          "$env:ProgramFiles\OpenSSL-Win64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Install macOS media and TLS test tools
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg openssl@3
+          echo "$(brew --prefix openssl@3)/bin" >> "$GITHUB_PATH"
       - run: npm ci
       - run: npm run check
       - run: npm run lint

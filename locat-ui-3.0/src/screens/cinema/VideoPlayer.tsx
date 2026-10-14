@@ -25,8 +25,8 @@ export function PlayerChrome({ video, state: s, cb, onClose, surface, onLoadSubt
     const on = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT") return;
       if (e.key === " " || e.key === "k") { e.preventDefault(); cb.onTogglePlay(); }
-      if (e.key === "ArrowRight") cb.onSeek(s.positionSec + 10);
-      if (e.key === "ArrowLeft") cb.onSeek(s.positionSec - 10);
+      if (s.seekable !== false && e.key === "ArrowRight") cb.onSeek(s.positionSec + 10);
+      if (s.seekable !== false && e.key === "ArrowLeft") cb.onSeek(s.positionSec - 10);
       if (e.key === "f") cb.onFullscreen();
       if (e.key === "m") cb.onMute();
       poke();
@@ -52,19 +52,19 @@ export function PlayerChrome({ video, state: s, cb, onClose, surface, onLoadSubt
       <div className={cn("absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/70 via-transparent to-black/80 transition-opacity duration-300", shown ? "opacity-100" : "pointer-events-none opacity-0")}>
         <div className="flex items-center gap-2 px-3 pt-safe md:px-5 md:pt-4">
           <IconButton icon={ArrowLeft} label="Close player" onClick={onClose} className="text-white hover:bg-white/10" data-testid="player-close" />
-          <div className="min-w-0 flex-1"><p className="truncate text-[15px] font-bold">{video.title}</p><p className="text-xs text-white/60">{video.source === "server" ? `Server · ${video.delivery === "hls" ? "HLS (experimental)" : video.delivery === "remux" ? "Remuxed stream" : "Direct · byte-range"}` : "This device · direct"}</p></div>
+          <div className="min-w-0 flex-1"><p className="truncate text-[15px] font-bold">{video.title}</p><p className="text-xs text-white/60">{video.source === "server" ? `Server · ${video.delivery === "hls" ? "HLS (experimental)" : video.delivery === "remux" ? "Remuxed stream" : video.delivery === "transcode" ? "Converted stream" : "Direct · byte-range"}` : "This device · direct"}</p></div>
           {quality && <Badge className="bg-white/15 text-white">{quality.label}</Badge>}
           <IconButton icon={Settings} label="Stream info" onClick={() => setMenu("info")} className="text-white hover:bg-white/10" />
         </div>
         <div className="flex items-center justify-center gap-6">
-          <IconButton icon={RotateCcw} label="Back 10 seconds" size="lg" onClick={() => cb.onSeek(s.positionSec - 10)} className="text-white hover:bg-white/10" />
+          <IconButton icon={RotateCcw} label="Back 10 seconds" disabledReason={s.seekable === false ? "Progressive conversion cannot seek" : undefined} size="lg" onClick={() => cb.onSeek(s.positionSec - 10)} className="text-white hover:bg-white/10" />
           <button onClick={cb.onTogglePlay} aria-label={s.state === "playing" ? "Pause" : "Play"} data-testid="player-play-toggle" className="grid size-[76px] place-items-center rounded-full bg-white/95 text-black shadow-xl active:scale-95">{s.state === "playing" ? <Pause className="size-8 fill-current" /> : <Play className="ml-1 size-8 fill-current" />}</button>
-          <IconButton icon={RotateCw} label="Forward 10 seconds" size="lg" onClick={() => cb.onSeek(s.positionSec + 10)} className="text-white hover:bg-white/10" />
+          <IconButton icon={RotateCw} label="Forward 10 seconds" disabledReason={s.seekable === false ? "Progressive conversion cannot seek" : undefined} size="lg" onClick={() => cb.onSeek(s.positionSec + 10)} className="text-white hover:bg-white/10" />
         </div>
         <div className="px-4 pb-safe md:px-6 md:pb-5" style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
           <div className="relative mb-2">
             <div className="pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/25" style={{ width: `${(s.bufferedSec / s.durationSec) * 100}%` }} />
-            <Slider label="Seek" min={0} max={s.durationSec} value={s.positionSec} onChange={cb.onSeek} format={formatDuration} className="relative" />
+            <Slider disabled={s.seekable === false} label="Seek" min={0} max={s.durationSec} value={s.positionSec} onChange={cb.onSeek} format={formatDuration} className="relative" />
           </div>
           <div className="flex items-center gap-1">
             <span className="mr-2 font-mono text-xs tabular text-white/80">{formatDuration(s.positionSec)} / {formatDuration(s.durationSec)}</span>

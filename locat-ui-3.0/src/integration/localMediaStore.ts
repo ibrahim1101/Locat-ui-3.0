@@ -5,7 +5,7 @@ export function mediaKind(file: Pick<File, "type" | "name">): LocalMediaKind | n
   if (file.type.startsWith("audio/")) return "audio";
   if (["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/bmp"].includes(file.type)) return "photo";
   const extension = file.name.split(".").at(-1)?.toLowerCase();
-  if (["mp4", "webm", "mkv", "mov", "m4v"].includes(extension ?? "")) return "video";
+  if (["mp4", "webm", "mkv", "mov", "m4v", "avi"].includes(extension ?? "")) return "video";
   if (["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus"].includes(extension ?? "")) return "audio";
   if (["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"].includes(extension ?? "")) return "photo";
   return null;

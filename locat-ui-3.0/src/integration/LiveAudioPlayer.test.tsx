@@ -1,0 +1,21 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { LiveAudioPlayer } from "./LiveAudioPlayer";
+vi.mock("../app/session", () => ({ useSession: () => ({ user: { id: "audio-account" } }) }));
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); localStorage.clear(); });
+it("saves EQ presets through UI 3.0 controls and renders themed playback", () => {
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+  vi.stubGlobal("URL", { createObjectURL: () => "blob:audio-fixture", revokeObjectURL: vi.fn() });
+  const item = { id: "one", name: "My song.mp3", file: new Blob(), kind: "audio" as const, size: 1, album: "Imported", position: 0, addedAt: 1, favorite: false };
+  const { unmount } = render(<LiveAudioPlayer items={[item]} initialId="one" onClose={() => {}} />);
+  expect(screen.getByRole("button", { name: /^Play$/ })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Save EQ preset" }));
+  expect(screen.getByRole("dialog", { name: "Save equalizer preset" })).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Preset name"), { target: { value: "My sound" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
+  expect(JSON.parse(localStorage.getItem("locat-ui3-eq:audio-account")!)[0].name).toBe("My sound");
+  unmount();
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledOnce();
+  expect(HTMLMediaElement.prototype.load).toHaveBeenCalledOnce();
+});

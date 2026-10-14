@@ -23,7 +23,7 @@ export function LiveContacts() {
   return <Screen title="Messages" subtitle="Contacts and friend requests">
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="rounded-2xl bg-s2 p-5 hairline"><h2 className="font-semibold">Private messaging is not enabled yet</h2><p className="mt-2 text-sm text-ink-3">Contacts are live. Encryption key exchange and verification must be validated before conversations can open.</p></div>
-      <form onSubmit={search} className="flex gap-3"><SearchField value={query} onChange={setQuery} placeholder="Exact username or LC code" /><Button disabled={busy}>Find contact</Button></form>
+      <form onSubmit={search} className="flex gap-3"><SearchField value={query} onChange={setQuery} placeholder="Exact username or LC code" /><Button type="submit" disabled={busy}>Find contact</Button></form>
       {error && <p className="text-danger" role="alert">{error}</p>}
       {users.map(user => <div key={user.id} className="flex items-center justify-between rounded-xl bg-s1 p-4 hairline"><span>{user.displayName} · @{user.username} · {user.lcCode}</span><Button disabled={busy} onClick={() => void operation("/api/contacts/request", { userId: user.id })}>Send friend request</Button></div>)}
       <h2 className="font-semibold">Your contacts</h2>

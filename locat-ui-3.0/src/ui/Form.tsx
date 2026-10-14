@@ -80,12 +80,12 @@ export function ChipRow<T extends string>({ value, onChange, options, label, cla
   );
 }
 
-export function Slider({ value, min, max, step = 1, onChange, label, format, vertical, className }: { value: number; min: number; max: number; step?: number; onChange(v: number): void; label: string; format?: (v: number) => string; vertical?: boolean; className?: string }) {
+export function Slider({ value, min, max, step = 1, onChange, label, format, vertical, className, disabled }: { disabled?: boolean; value: number; min: number; max: number; step?: number; onChange(v: number): void; label: string; format?: (v: number) => string; vertical?: boolean; className?: string }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
-    <input type="range" aria-label={label} aria-valuetext={format?.(value)} min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))}
+    <input type="range" disabled={disabled} aria-label={label} aria-valuetext={format?.(value)} min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))}
       style={{ background: `linear-gradient(to right, rgb(var(--ember)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`, ...(vertical ? { writingMode: "vertical-lr", direction: "rtl" } : {}) }}
-      className={cn("h-1.5 cursor-pointer appearance-none rounded-full accent-[rgb(var(--ember))] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white",
+      className={cn("h-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 appearance-none rounded-full accent-[rgb(var(--ember))] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white",
         vertical ? "h-32 w-1.5" : "w-full", className)} />
   );
 }

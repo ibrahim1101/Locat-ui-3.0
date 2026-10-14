@@ -75,11 +75,20 @@ async function handle(req, res) {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
     return json(res, 200, await mediaLibrary.refresh());
   }
+  if (url.pathname.startsWith("/api/media/probe/") && req.method === "GET") {
+    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    const id = url.pathname.slice("/api/media/probe/".length);
+    if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
+    return json(res, 200, await mediaLibrary.stream(req, res, id, { probeOnly: true }));
+  }
   if (url.pathname.startsWith("/api/media/stream/") && ["GET", "HEAD"].includes(req.method)) {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
     const id = url.pathname.slice("/api/media/stream/".length);
     if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
-    return mediaLibrary.stream(req, res, id);
+    const mode = url.searchParams.get("mode") ?? "direct";
+    const audio = url.searchParams.get("audio");
+    if (!["direct", "remux", "transcode"].includes(mode) || (audio !== null && (!/^\d{1,3}$/.test(audio) || mode === "direct"))) return json(res, 400, { error: "Invalid playback mode or audio track" });
+    return mediaLibrary.stream(req, res, id, { mode, audioIndex: audio === null ? null : Number(audio) });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);
@@ -266,7 +275,7 @@ async function handle(req, res) {
 const tlsOptions = config.tls ? { key: await readFile(config.key), cert: await readFile(config.cert), minVersion: "TLSv1.2" } : null;
 const listener = (req, res) => {
   Promise.resolve(handle(req, res)).catch(error => {
-    if (!res.headersSent) json(res, error.status ?? 500, { error: error.status ? error.message : "Internal server error" });
+    if (!res.headersSent) json(res, error.status ?? 500, { error: error.status ? error.message : "Internal server error" }, error.retryAfter ? { "Retry-After": String(error.retryAfter) } : {});
     else res.end();
     if (!error.status) console.error(error);
   });

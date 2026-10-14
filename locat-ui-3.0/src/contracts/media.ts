@@ -8,7 +8,7 @@ export type VideoItemView = {
   posterHue: number; // fixture-only gradient seed; real artwork comes from integration
   progressSec?: number; lastPlayedAt?: Timestamp;
   /** Server decision from Locat mediaProbe: direct, remux or HLS. */
-  delivery?: "direct" | "remux" | "hls" | "unsupported";
+  delivery?: "direct" | "remux" | "transcode" | "hls" | "unsupported";
 };
 
 export type QualityOption = { id: string; label: string; height?: number; experimental?: boolean };
@@ -16,6 +16,7 @@ export type QualityOption = { id: string; label: string; height?: number; experi
 /** Player is purely presentational: Locat LocalCinemaPlayer / CinemaHlsPlayer own playback. */
 export type PlaybackView = {
   state: "idle" | "loading" | "buffering" | "playing" | "paused" | "ended" | "reconnecting" | "error";
+  seekable?: boolean;
   positionSec: number; durationSec: number; bufferedSec: number; rate: number; muted: boolean; volume: number;
   fit: "contain" | "cover" | "fill"; subtitles: { id: string; label: string }[]; activeSubtitle?: string;
   qualities: QualityOption[]; activeQuality?: string; pip: "available" | "active" | "unsupported";
