@@ -3,3 +3,8 @@ dist
 *.log
 .DS_Store
 *.tsbuildinfo
+
+# Local development credentials and transient auth data
+server/data/
+server/*.tmp
+.env.local
