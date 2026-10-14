@@ -15,7 +15,7 @@ function Frame({ children, onBack, step }: { children: ReactNode; onBack?: () =>
         <div className="relative flex items-center gap-3"><LocatMark size={40} /><span className="text-xl font-extrabold tracking-tight">Locat</span></div>
         <div className="relative">
           <p className="text-[40px] font-extrabold leading-[1.05] tracking-tight">Your messages, media and devices.<br /><span className="text-ember">On a server you own.</span></p>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-2">End-to-end encrypted conversations, a private media hub and secure device links — running on your own hardware, on your own network.</p>
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-2">A self-hosted home for messages, media and devices. Features become available as their secure integrations are completed.</p>
         </div>
         <ul className="relative grid grid-cols-3 gap-3 text-xs text-ink-2">
           {[[ShieldCheck, "E2EE identity on your device"], [Network, "Same-LAN first, Tailscale optional"], [HardDrive, "Local tools work offline"]].map(([I, t], i) => {
@@ -47,7 +47,7 @@ function PendingNotice({ result, onContinue }: { result: OperationResult; onCont
 }
 
 function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"): void }) {
-  const { connection } = useSession();
+  const { connection, adapter } = useSession();
   return (
     <Frame>
       <div className="mb-10 flex flex-col items-start lg:hidden"><LocatMark size={56} /><h1 className="mt-6 text-[32px] font-extrabold leading-tight tracking-tight">Private by<br />design. <span className="text-ember">Yours.</span></h1></div>
@@ -56,15 +56,15 @@ function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"
       <div className="space-y-3">
         <Button variant="primary" size="lg" block icon={LogIn} onClick={() => go("login")} data-testid="welcome-signin">Sign in</Button>
         <Button size="lg" block icon={UserPlus} onClick={() => go("register")} data-testid="welcome-register">Create an account</Button>
-        <button onClick={() => go("local-intro")} data-testid="welcome-local" className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-4 text-left hover:bg-s1">
+        {adapter.mode === "preview" && <button onClick={() => go("local-intro")} data-testid="welcome-local" className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-4 text-left hover:bg-s1">
           <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Media players, Photos and Remote viewer on this device</span></span><ArrowRight className="size-4 text-ink-3" />
-        </button>
+        </button>}
       </div>
-      <button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
+      {adapter.mode === "preview" && <button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
         <ServerCog className="size-5 text-ember" />
         <span className="min-w-0 flex-1"><span className="block text-2xs font-bold uppercase tracking-wider text-ink-3">Server</span><span className="block truncate font-mono text-[13px]">{connection.origin ?? "Not configured"}</span></span>
         <span className="text-xs font-semibold text-ember">Change</span>
-      </button>
+      </button>}
     </Frame>
   );
 }
