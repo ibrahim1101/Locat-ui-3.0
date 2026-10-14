@@ -13,6 +13,7 @@ import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } fr
 import { promisify } from "node:util";
 import { createMediaLibrary } from "./media.mjs";
 import { createRateLimiter } from "./rateLimit.mjs";
+import { createSentinelHandler } from "./sentinel.mjs";
 import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
@@ -34,14 +35,15 @@ function json(res, status, body, headers = {}) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers });
   res.end(JSON.stringify(body));
 }
-async function body(req) {
-  let text = "";
+async function body(req, maximum = 16384) {
+  const chunks=[]; let size=0;
   for await (const chunk of req) {
-    text += chunk;
-    if (text.length > 16384) throw Object.assign(new Error("Request too large"), { status: 413 });
+    size += chunk.length;
+    if(size > maximum) throw Object.assign(new Error("Request too large"), {status:413});
+    chunks.push(chunk);
   }
-  try { return JSON.parse(text); }
-  catch { throw Object.assign(new Error("Invalid JSON"), { status: 400 }); }
+  try { return JSON.parse(new TextDecoder("utf-8", {fatal:true}).decode(Buffer.concat(chunks))); }
+  catch { throw Object.assign(new Error("Invalid JSON or UTF-8"), {status:400}); }
 }
 function publicUser(user) { return { id: user.id, username: user.username, displayName: user.displayName, lcCode: "LC-" + user.lcCode, bio: user.bio }; }
 function cookie(req) {
@@ -57,6 +59,7 @@ function sessionUser(req) {
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.tls ? "; Secure" : "");
 }
+const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
@@ -65,6 +68,7 @@ async function handle(req, res) {
     const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
+  if (await sentinelHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });

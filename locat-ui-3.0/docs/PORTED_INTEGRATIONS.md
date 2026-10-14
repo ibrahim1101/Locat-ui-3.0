@@ -13,3 +13,7 @@ The original reviewed source branch also contains chat, Link, Sentinel, private 
 ## Additional ports
 
 Original api/mediaRange and mediaTypes policies now drive the Node server's authenticated direct streaming; scanner behavior is adapted from mediaRouter with global scan bounds and opaque IDs. Original contracts/userCode plus its tests are ported. Direct media is connected; original FFprobe/remux/HLS and native-ticket features remain future adaptations. ORIGINAL_LOCAT_REQUIREMENTS.md preserves the original all-49 register and ecosystem scope; its historical test results do not certify UI 3.0.
+
+### Sentinel continuation
+
+Adapted the original scoped-token/webhook/incident workflow to the new SQLite authentication service and premium UI. Generic, nScout and PipelineGuard normalization, per-account source/fingerprint deduplication, severity escalation, status lifecycle, notes/history, revocable digest-only integration tokens and one-time token display are live. UI controls use shared sheets/buttons/fields. No external alerts are sent. Real vendor emitters, native host monitoring, notifications, retention/redaction and encryption of incident metadata remain pending.

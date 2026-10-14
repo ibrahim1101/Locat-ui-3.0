@@ -57,7 +57,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     moduleAvailability: (id, ctx) => {
       if (ctx.connection.mode === "local-only") return ["home", "cinema", "music", "photos", "search", "modules", "settings", "offline", "diagnostics"].includes(id) ? { availability: "available" } : { availability: "offline", reason: "Requires an authenticated account and live backend integration" };
       if (id === "messages") return { availability: "beta", reason: "Live contacts; private messaging awaits verified E2EE" };
-      if (id === "sentinel") return { availability: "beta", reason: "Account audit events; device monitoring pending" };
+      if (id === "sentinel") return { availability: "beta", reason: "Owned incidents, webhook adapters and account audit; device monitoring pending" };
       if (["cinema", "music", "photos", "search", "modules", "diagnostics", "offline"].includes(id)) return { availability: "available" };
       if (id !== "settings" && id !== "profile" && id !== "home") return { availability: "planned", reason: "Live backend module not yet implemented" };
       return liveModuleAvailability(id, ctx);
