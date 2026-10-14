@@ -1,34 +1,22 @@
 /**
  * Locat 3.0 development authentication service.
  * Run with Node 22+: node server/index.mjs
- * Uses built-in modules only; local JSON persistence is temporary until SQLite migration.
+ * Uses built-in modules and versioned SQLite persistence (Node 24+).
  * Never expose this development service directly to the public internet.
  */
 import { createServer } from "node:http";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
-import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
-const file = resolve(process.env.LOCAT_DATA_FILE ?? "./server/data/dev-auth.json");
+if (process.env.LOCAT_DATA_FILE) throw new Error("LOCAT_DATA_FILE is retired; set LOCAT_DATABASE_FILE to a new SQLite path. Legacy JSON is never overwritten.");
+const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
 const host = process.env.LOCAT_HOST ?? "127.0.0.1";
 const port = Number(process.env.LOCAT_PORT ?? 8787);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
-let db = { users: [], sessions: [], envelopes: [] };
 let queue = Promise.resolve();
 
-async function load() {
-  try { db = JSON.parse(await readFile(file, "utf8")); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
-  db.envelopes ??= [];
-}
-async function persist() {
-  await mkdir(dirname(file), { recursive: true });
-  const temp = file + "." + process.pid + "." + randomBytes(6).toString("hex") + ".tmp";
-  await writeFile(temp, JSON.stringify(db), { mode: 0o600 });
-  await rename(temp, file);
-}
 function serialized(fn) {
   const next = queue.then(fn);
   queue = next.catch(() => {});
@@ -56,8 +44,7 @@ function sessionUser(req) {
   const token = cookie(req);
   if (!token) return null;
   const digest = createHash("sha256").update(token).digest("hex");
-  const session = db.sessions.find(s => s.hash === digest && s.expiresAt > Date.now());
-  return session ? db.users.find(u => u.id === session.userId) ?? null : null;
+  return db.sessionUser(digest, Date.now()) ?? null;
 }
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge;
@@ -69,12 +56,48 @@ async function handle(req, res) {
     const user = sessionUser(req);
     return json(res, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not authenticated" });
   }
+  if (url.pathname === "/api/auth/sessions" && req.method === "GET") {
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const currentHash = createHash("sha256").update(cookie(req)).digest("hex");
+    return json(res, 200, { sessions: db.sessions(user.id, Date.now()).map(s => ({ ...s, current: s.id === currentHash })) });
+  }
+  if (["/api/auth/sessions/revoke", "/api/auth/password", "/api/profile"].includes(url.pathname) && req.method === "POST") {
+    if (req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const input = await body(req);
+    if (!input || typeof input !== "object" || Array.isArray(input)) return json(res, 400, { error: "Invalid request" });
+    if (url.pathname === "/api/auth/sessions/revoke") {
+      if (typeof input.id !== "string" || !/^[a-f0-9]{64}$/.test(input.id)) return json(res, 400, { error: "Invalid session ID" });
+      db.revokeOwnedSession(input.id, user.id);
+      return json(res, 200, { ok: true });
+    }
+    if (url.pathname === "/api/profile") {
+      const displayName = typeof input.displayName === "string" ? input.displayName.trim() : "";
+      if (!displayName || displayName.length > 80) return json(res, 400, { error: "Invalid display name" });
+      db.updateProfile(user.id, displayName);
+      return json(res, 200, { user: publicUser(db.userById(user.id)) });
+    }
+    const { currentPassword, newPassword } = input;
+    if (typeof currentPassword !== "string" || currentPassword.length > 256 || typeof newPassword !== "string" || newPassword.length < 15 || newPassword.length > 256) return json(res, 400, { error: "Invalid password; new password must be 15–256 characters" });
+    const candidate = await scrypt(currentPassword, user.salt, 64);
+    return serialized(async () => {
+      const latest = db.userById(user.id);
+      if (!timingSafeEqual(candidate, Buffer.from(latest.hash, "hex"))) return json(res, 401, { error: "Invalid credentials" });
+      const salt = randomBytes(16).toString("hex");
+      const hash = (await scrypt(newPassword, salt, 64)).toString("hex");
+      db.changePassword(user.id, salt, hash);
+      return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
+    });
+  }
   if (req.method === "GET" && url.pathname === "/api/users/search") {
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });
     const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     if (!/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires 3-32 username characters" });
-    const users = db.users.filter(u => u.username === query && u.id !== viewer.id).slice(0, 1).map(publicUser);
+    const found = db.userByName(query);
+    const users = found && found.id !== viewer.id ? [publicUser(found)] : [];
     return json(res, 200, { users });
   }
   // Ciphertext-only transport. The server never accepts a plaintext message field.
@@ -84,7 +107,7 @@ async function handle(req, res) {
     if (!user) return json(res, 401, { error: "Not authenticated" });
     const cursor = Number(url.searchParams.get("after") ?? 0);
     if (!Number.isSafeInteger(cursor) || cursor < 0) return json(res, 400, { error: "Invalid cursor" });
-    const messages = db.envelopes.filter(m => m.recipientId === user.id && m.sequence > cursor).slice(0, 100);
+    const messages = db.inbox(user.id, cursor);
     return json(res, 200, { messages, nextCursor: messages.at(-1)?.sequence ?? cursor });
   }
   if (url.pathname === "/api/messages" && req.method === "POST") {
@@ -101,11 +124,9 @@ async function handle(req, res) {
       return json(res, 400, { error: "Invalid encrypted envelope" });
     }
     return serialized(async () => {
-      if (!db.users.some(u => u.id === recipientId)) return json(res, 404, { error: "Recipient not found" });
-      const sequence = (db.envelopes.at(-1)?.sequence ?? 0) + 1;
-      const envelope = { id: randomBytes(16).toString("hex"), sequence, senderId: sender.id, recipientId, ciphertext, nonce, algorithm, createdAt: Date.now() };
-      db.envelopes.push(envelope);
-      await persist();
+      if (!db.userById(recipientId)) return json(res, 404, { error: "Recipient not found" });
+      const envelope = { id: randomBytes(16).toString("hex"), senderId: sender.id, recipientId, ciphertext, nonce, algorithm, createdAt: Date.now() };
+      const sequence = db.addEnvelope(envelope);
       return json(res, 201, { id: envelope.id, sequence });
     });
   }
@@ -119,8 +140,7 @@ async function handle(req, res) {
         const token = cookie(req);
         if (token) {
           const digest = createHash("sha256").update(token).digest("hex");
-          db.sessions = db.sessions.filter(s => s.hash !== digest);
-          await persist();
+          db.revokeSession(digest);
         }
       });
       return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
@@ -136,35 +156,37 @@ async function handle(req, res) {
       const displayName = typeof input.displayName === "string" ? input.displayName.trim() : "";
       if (!displayName || displayName.length > 80) return json(res, 400, { error: "Invalid display name" });
       return serialized(async () => {
-        if (db.users.some(u => u.username === username)) return json(res, 409, { error: "Username unavailable" });
+        if (db.userByName(username)) return json(res, 409, { error: "Username unavailable" });
         const salt = randomBytes(16).toString("hex");
         const hash = (await scrypt(password, salt, 64)).toString("hex");
         const user = { id: randomBytes(16).toString("hex"), username, displayName, salt, hash };
-        db.users.push(user);
-        await persist();
+        db.addUser(user);
         return json(res, 201, { user: publicUser(user) });
       });
     }
-    const user = db.users.find(u => u.username === username);
+    const user = db.userByName(username);
     const salt = user?.salt ?? "00000000000000000000000000000000";
     const candidate = await scrypt(password, salt, 64);
     const stored = Buffer.from(user?.hash ?? "00".repeat(64), "hex");
     if (!user || !timingSafeEqual(candidate, stored)) return json(res, 401, { error: "Invalid credentials" });
     return serialized(async () => {
+      if (db.userById(user.id)?.hash !== user.hash) return json(res, 401, { error: "Invalid credentials" });
       const token = randomBytes(32).toString("hex");
-      db.sessions = db.sessions.filter(s => s.expiresAt > Date.now());
-      db.sessions.push({ hash: createHash("sha256").update(token).digest("hex"), userId: user.id, expiresAt: Date.now() + SESSION_MS });
-      await persist();
+      db.addSession(createHash("sha256").update(token).digest("hex"), user.id, Date.now() + SESSION_MS);
       return json(res, 200, { user: publicUser(user) }, { "Set-Cookie": setCookie(token, SESSION_MS / 1000) });
     });
   }
   return json(res, 404, { error: "Not found" });
 }
-await load();
-createServer((req, res) => {
+const server = createServer((req, res) => {
   Promise.resolve(handle(req, res)).catch(error => {
     if (!res.headersSent) json(res, error.status ?? 500, { error: error.status ? error.message : "Internal server error" });
     else res.end();
     if (!error.status) console.error(error);
   });
 }).listen(port, host, () => console.log("Locat development API listening on " + host + ":" + port));
+
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => {
+  server.close(() => { db.close(); process.exit(0); });
+  server.closeIdleConnections();
+});

@@ -20,7 +20,7 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
   const origin = "http://127.0.0.1:" + port;
   const child = spawn(process.execPath, ["server/index.mjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_DATA_FILE: join(dir, "auth.json") },
+    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: join(dir, "auth.sqlite") },
     stdio: "ignore",
   });
   async function request(path, method = "GET", data, cookie) {
@@ -59,6 +59,24 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal(bobInbox.messages.length, 1);
     assert.equal(bobInbox.messages[0].ciphertext, payload.ciphertext);
     assert.equal((await request("/api/messages?after=" + bobInbox.nextCursor, "GET", undefined, bobCookie)).status, 200);
+    assert.equal((await request("/api/auth/sessions")).status, 401);
+    const aliceSessions = (await (await request("/api/auth/sessions", "GET", undefined, aliceCookie)).json()).sessions;
+    assert.equal(aliceSessions.length, 1);
+    assert.equal(aliceSessions[0].current, true);
+    const bobSessions = (await (await request("/api/auth/sessions", "GET", undefined, bobCookie)).json()).sessions;
+    await request("/api/auth/sessions/revoke", "POST", { id: bobSessions[0].id }, aliceCookie);
+    assert.equal((await request("/api/auth/me", "GET", undefined, bobCookie)).status, 200);
+    assert.equal((await request("/api/profile", "POST", { displayName: "Alice Updated" }, aliceCookie)).status, 200);
+    assert.equal((await (await request("/api/auth/me", "GET", undefined, aliceCookie)).json()).user.displayName, "Alice Updated");
+    assert.equal((await request("/api/auth/password", "POST", { currentPassword: "incorrect", newPassword: "new-long-password-123" }, aliceCookie)).status, 401);
+    assert.equal((await request("/api/auth/password", "POST", { currentPassword: password, newPassword: "new-long-password-123" }, aliceCookie)).status, 200);
+    assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
+    assert.equal((await request("/api/auth/login", "POST", { username: "alice", password })).status, 401);
+    const updatedLogin = await request("/api/auth/login", "POST", { username: "alice", password: "new-long-password-123" });
+    assert.equal(updatedLogin.status, 200);
+    const updatedCookie = updatedLogin.headers.get("set-cookie").split(";")[0];
+    assert.equal((await request("/api/auth/logout", "POST", undefined, updatedCookie)).status, 200);
+    assert.equal((await request("/api/auth/me", "GET", undefined, updatedCookie)).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
   } finally {

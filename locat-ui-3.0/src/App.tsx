@@ -39,7 +39,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error?: Error }
 
 export function App() {
   const { stage, prefs, adapter } = useSession();
-  if (stage !== "app") return <EntryFlow />;\n  if (adapter.mode === "live") return <LiveModuleNotice title="Locat 3.0" />;
+  if (stage !== "app") return <EntryFlow />;
+  if (adapter.mode === "live") return <LiveModuleNotice title="Locat 3.0" />;
   const root = prefs.startup === "home" ? "/home" : "/messages";
   return (
     <BackProvider rootPath={root}>

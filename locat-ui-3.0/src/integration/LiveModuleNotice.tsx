@@ -1,3 +1,4 @@
+import { LiveAccountSettings } from "./LiveAccountSettings";
 import { useSession } from "../app/session";
 
 /** Live mode never renders preview conversations, contacts or media as real data. */
@@ -8,6 +9,7 @@ export function LiveModuleNotice({ title }: { title: string }) {
     <p className="text-ink-2">Signed in as <strong>{user?.displayName ?? "Unknown account"}</strong> (@{user?.username ?? "unknown"}).</p>
     <p className="text-ink-2">This module is not connected to the live backend yet. Preview messages, files, devices and security events are deliberately hidden in live mode.</p>
     <p className="text-sm text-ink-3">Backend: {connection.server}. Account sessions are real; end-to-end encryption and other modules are not enabled.</p>
+    <LiveAccountSettings />
     <button type="button" className="rounded-lg bg-ember px-5 py-3 font-semibold text-ember-ink" onClick={() => void adapter.auth.signOut()}>Sign out</button>
   </main>;
 }

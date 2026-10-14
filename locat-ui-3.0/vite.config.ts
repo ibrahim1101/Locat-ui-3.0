@@ -11,5 +11,5 @@ export default defineConfig({
     target: "es2022",
     rollupOptions: { output: { manualChunks: { react: ["react", "react-dom", "react-router"] } } },
   },
-  test: { environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: false },
+  test: { include: ["src/**/*.{test,spec}.{ts,tsx}"], environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: false },
 });

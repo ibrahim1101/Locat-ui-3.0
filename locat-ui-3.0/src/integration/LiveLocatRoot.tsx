@@ -14,17 +14,23 @@ function view(account: AuthenticatedAccount): SessionUserView {
   return { id: account.id, username: account.username, displayName: account.displayName, lcCode: "", isAdmin: false, serverOrigin: origin };
 }
 
+async function loadSession(): Promise<LiveSessionSnapshot> {
+  const account = await liveAuthApi.currentAccount();
+  const reachable = await fetch("/api/ready", { cache: "no-store", credentials: "omit" })
+    .then(async (response) => response.ok && (await response.json()).app === "Locat")
+    .catch(() => false);
+  const connection = { ...disconnected, server: reachable ? "connected" as const : "unreachable" as const };
+  return { authStatus: account ? "ready" : "signedOut", user: account ? view(account) : null, connection };
+}
+
 export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   const [session, setSession] = useState<LiveSessionSnapshot>({ authStatus: "loading", user: null, connection: disconnected });
-  const refresh = async () => {
-    const account = await liveAuthApi.currentAccount();
-    const reachable = await fetch("/api/ready", { cache: "no-store", credentials: "omit" })
-      .then(async (response) => response.ok && (await response.json()).app === "Locat")
-      .catch(() => false);
-    const connection = { ...disconnected, server: reachable ? "connected" as const : "unreachable" as const };
-    setSession({ authStatus: account ? "ready" : "signedOut", user: account ? view(account) : null, connection });
-  };
-  useEffect(() => { void refresh(); }, []);
+  const refresh = async () => { setSession(await loadSession()); };
+  useEffect(() => {
+    let active = true;
+    void loadSession().then(snapshot => { if (active) setSession(snapshot); });
+    return () => { active = false; };
+  }, []);
 
   const adapter = useMemo<LocatUiAdapter>(() => ({
     ...previewAdapter,
