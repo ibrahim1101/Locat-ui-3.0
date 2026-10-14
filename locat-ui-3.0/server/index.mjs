@@ -69,6 +69,14 @@ async function handle(req, res) {
     const user = sessionUser(req);
     return json(res, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not authenticated" });
   }
+  if (req.method === "GET" && url.pathname === "/api/users/search") {
+    const viewer = sessionUser(req);
+    if (!viewer) return json(res, 401, { error: "Not authenticated" });
+    const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires 3-32 username characters" });
+    const users = db.users.filter(u => u.username === query && u.id !== viewer.id).slice(0, 1).map(publicUser);
+    return json(res, 200, { users });
+  }
   // Ciphertext-only transport. The server never accepts a plaintext message field.
   // Clients must independently implement and verify their E2EE protocol.
   if (url.pathname === "/api/messages" && req.method === "GET") {
