@@ -1,3 +1,4 @@
+import { privateStore } from './privateStore.mjs';
 import { sentinelStore } from './sentinel.mjs';
 import { randomInt } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
@@ -12,7 +13,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 5) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 6) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -66,10 +67,15 @@ export function openDatabase(filename) {
     CREATE TABLE sentinelEvents (id INTEGER PRIMARY KEY AUTOINCREMENT, incidentId TEXT NOT NULL REFERENCES sentinelIncidents(id), action TEXT NOT NULL, note TEXT NOT NULL, createdAt INTEGER NOT NULL);
     CREATE INDEX sentinel_events_incident ON sentinelEvents(incidentId,id);
     PRAGMA user_version = 5; COMMIT;`);
+  if (version < 6) sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE privateStores (userId TEXT NOT NULL REFERENCES users(id), module TEXT NOT NULL CHECK(module IN ('vault','secrets')), config TEXT NOT NULL, PRIMARY KEY(userId,module));
+    CREATE TABLE privateObjects (userId TEXT NOT NULL, module TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, envelope TEXT NOT NULL, bytes INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(userId,module,id), FOREIGN KEY(userId,module) REFERENCES privateStores(userId,module));
+    PRAGMA user_version = 6; COMMIT;`);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
     sentinel: sentinelStore(sql),
+    privateStore: privateStore(sql),
     health: () => ({ schemaVersion: sql.prepare("PRAGMA user_version").get().user_version, accessible: sql.prepare("SELECT 1 AS ok").get().ok === 1 }),
     blocked: (a, b) => !!sql.prepare('SELECT 1 FROM blocks WHERE (blockerId = ? AND blockedId = ?) OR (blockerId = ? AND blockedId = ?)').get(a, b, b, a),
     contacts: userId => sql.prepare('SELECT * FROM contacts WHERE lowId = ? OR highId = ?').all(userId, userId),

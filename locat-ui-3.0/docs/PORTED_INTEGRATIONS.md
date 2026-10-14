@@ -21,3 +21,7 @@ Adapted the original scoped-token/webhook/incident workflow to the new SQLite au
 ### Media editing continuation
 
 Playlist membership/order editing and opt-in sequential Cinema playback are now live in UI 3.0. The original photo renderer now powers the actual crop/text preview and edited-copy export, including crop preset/position/zoom, rotation, both flips and color adjustments. Browser/account data stays scoped; references do not copy/delete files. Browser visual/media acceptance, freehand drawing/undo, tags/artwork, synchronization and native background playback remain pending.
+
+### Client-encrypted private storage continuation
+
+Vault/Secrets now adapt the original wrapping/envelope/quota/revision architecture to UI3's SQLite/authentication service and shared UI theme. File/credential/note operations, encrypted metadata, client-only search/folders, locking, generator, clipboard, encrypted backup and missing-only restore are connected. See PRIVATE_STORAGE.md for exact scope, verification and original-data compatibility limits. This remains experimental and separately requires browser/native acceptance and independent security review.

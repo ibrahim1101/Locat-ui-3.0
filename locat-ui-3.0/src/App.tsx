@@ -10,6 +10,7 @@ import { DropProvider } from "./app/DropProvider";
 import { LiveDiagnostics } from "./integration/LiveDiagnostics";
 import { LiveContacts } from "./integration/LiveContacts";
 import { LiveOverview } from "./integration/LiveOverview";
+import { LivePrivateStore } from "./integration/LivePrivateStore";
 import { LiveSentinel } from "./integration/LiveSentinel";
 import { LiveMediaLibrary } from "./integration/LiveMediaLibrary";
 import { LiveModuleNotice } from "./integration/LiveModuleNotice";
@@ -62,8 +63,8 @@ export function App() {
             <Route path="devices" element={live ? <LiveModuleNotice title="Devices" /> : <Devices />} />
             <Route path="remote/*" element={live ? <LiveModuleNotice title="Remote" /> : <Remote />} />
             <Route path="sentinel" element={live ? <LiveSentinel /> : <Sentinel />} />
-            <Route path="vault" element={live ? <LiveModuleNotice title="Vault" /> : <PrivateStore kind="vault" />} />
-            <Route path="secrets" element={live ? <LiveModuleNotice title="Secrets" /> : <PrivateStore kind="secrets" />} />
+            <Route path="vault" element={live ? <LivePrivateStore key="vault" kind="vault" /> : <PrivateStore kind="vault" />} />
+            <Route path="secrets" element={live ? <LivePrivateStore key="secrets" kind="secrets" /> : <PrivateStore kind="secrets" />} />
             <Route path="search" element={live ? <LiveOverview kind="search" /> : <Search />} />
             <Route path="hub" element={live ? <LiveModuleNotice title="Hub" /> : <Hub />} />
             <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />

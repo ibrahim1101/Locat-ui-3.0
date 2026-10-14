@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 RUN mkdir -p /data && chown node:node /data
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/LICENSE ./LICENSE
 USER node
 ENV LOCAT_HOST=0.0.0.0 LOCAT_PORT=8787 LOCAT_DATABASE_FILE=/data/locat.sqlite LOCAT_STATIC_DIR=/app/dist
