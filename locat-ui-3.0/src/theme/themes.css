@@ -1,0 +1,70 @@
+/* Locat UI 3.0 — "Titanium Ember" token sheet.
+   Values are space-separated RGB channels so Tailwind alpha modifiers work.
+   The official Locat logo is never recolored by any theme. */
+
+:root,
+[data-theme="obsidian"] {
+  color-scheme: dark;
+  --canvas: 10 10 11;        /* #0A0A0B matte obsidian */
+  --surface-1: 17 17 19;     /* #111113 */
+  --surface-2: 24 24 27;     /* #18181B */
+  --surface-3: 33 33 37;     /* #212125 */
+  --line: 38 38 43;
+  --line-strong: 58 58 64;
+  --ink: 244 244 246;
+  --ink-2: 168 168 176;
+  --ink-3: 112 112 120;
+  --ember: 232 107 44;       /* #E86B2C burnt orange, Locat brand accent */
+  --ember-ink: 20 10 4;
+  --ember-soft: 62 32 18;
+  --titanium: 182 188 196;   /* brushed titanium */
+  --ok: 74 201 140;
+  --warn: 236 178 64;
+  --danger: 236 84 84;
+  --info: 96 160 240;
+  --planned: 150 140 220;
+}
+
+[data-theme="graphite"] {
+  color-scheme: dark;
+  --canvas: 19 20 23;
+  --surface-1: 26 27 31;
+  --surface-2: 34 35 40;
+  --surface-3: 44 45 51;
+  --line: 52 53 60;
+  --line-strong: 72 73 82;
+  --ink: 238 239 242;
+  --ink-2: 170 172 182;
+  --ink-3: 120 122 132;
+  --ember: 240 122 60;
+  --ember-ink: 24 12 4;
+  --ember-soft: 70 38 22;
+  --titanium: 190 196 206;
+  --ok: 80 205 146;
+  --warn: 238 182 72;
+  --danger: 238 92 92;
+  --info: 104 166 242;
+  --planned: 156 146 224;
+}
+
+[data-theme="daylight"] {
+  color-scheme: light;
+  --canvas: 244 243 240;
+  --surface-1: 255 255 255;
+  --surface-2: 248 247 245;
+  --surface-3: 236 234 230;
+  --line: 226 223 218;
+  --line-strong: 204 200 194;
+  --ink: 20 20 22;
+  --ink-2: 82 82 90;
+  --ink-3: 120 120 128;
+  --ember: 200 82 20;
+  --ember-ink: 255 248 242;
+  --ember-soft: 252 228 212;
+  --titanium: 96 102 112;
+  --ok: 22 140 86;
+  --warn: 168 112 0;
+  --danger: 200 44 44;
+  --info: 36 104 200;
+  --planned: 96 84 180;
+}

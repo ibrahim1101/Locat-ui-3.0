@@ -86,3 +86,10 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Platform starter template (Expo / FastAPI) — not part of the Locat UI 3.0 deliverable.
+# Kept on disk for the hosting environment, excluded from the GitHub export.
+/frontend/
+/backend/
+/tests/
+/test_result.md

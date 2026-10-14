@@ -1,0 +1,39 @@
+@import "./theme/themes.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply m-0 bg-canvas text-ink antialiased font-sans;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  html[data-text-scale="large"] { font-size: 112.5%; }
+  html[data-text-scale="xl"] { font-size: 125%; }
+  button, input, textarea, select { touch-action: manipulation; font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid rgb(var(--ember)); outline-offset: 2px; border-radius: 8px; }
+  ::selection { background: rgb(var(--ember) / 0.35); }
+  @media (max-width: 767px) { input, textarea { font-size: 16px; } }
+  * { scrollbar-width: thin; scrollbar-color: rgb(var(--line-strong)) transparent; }
+}
+
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .mesh { background-image: radial-gradient(rgb(var(--ink) / 0.05) 1px, transparent 1px); background-size: 18px 18px; }
+  .hairline { box-shadow: inset 0 0 0 1px rgb(var(--line)); }
+  .titanium-edge { background: linear-gradient(180deg, rgb(var(--ink) / 0.06), transparent 40%); }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important;
+}

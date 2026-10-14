@@ -18,7 +18,18 @@ Standalone Vite project at `/app/locat-ui-3.0` (its own git repo, pushed with "S
 - Every module and all 49 requirements are mapped. M12/M13 are left unresolved and unnamed.
 - Gates pass: tsc, eslint, 12 vitest tests and vite build. Testing agent iteration 1: all checks pass.
 
+## Preview.2 (2026-10-14)
+- Huge libraries: `ui/Virtual.tsx` (VirtualList/VirtualGrid), 5k messages / 10k songs / 20k photos / 2k videos stress fixtures.
+- Desktop polish: cursor-anchored context menus, drag-and-drop presentation, keyboard roving, command palette.
+- Component Gallery at `/gallery`.
+- Passes Locat root ESLint config (react-hooks v7 + react-refresh): providers split into `*Provider.tsx`, hooks in sibling `.ts`.
+- Gates: tsc, eslint (0 warnings), 18 vitest tests, vite build. Testing agent iteration 2: pass.
+
+## Export fix (2026-10-14)
+- `locat-ui-3.0/` was a nested git repo (gitlink), so the GitHub export contained only the Expo/FastAPI starter. Now tracked as regular files (97).
+- Starter `frontend/`, `backend/`, `tests/` untracked via .gitignore (kept on disk for the platform). Nested history preserved in `memory/locat-ui-3.0-history.bundle`.
+- Destination: ibrahim1101/Locat-ui-3.0 `main` (user pushes via Emergent). Do NOT push to ibrahim1101/Locat.
+
 ## Backlog
-- P0: implement `LiveLocatAdapter` inside the Locat repo and replace fixture imports with projection hooks.
-- P1: list virtualization, a cursor-anchored desktop context menu, a global drag-and-drop overlay, a real drawing canvas wired to LocalPhotoEditor.
-- P2: Storybook-style component gallery, visual regression tests, i18n strings extraction.
+- P0: implement `LiveLocatAdapter` inside the Locat repo (deferred by user).
+- P2: visual regression tests, i18n strings extraction.
