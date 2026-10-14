@@ -1,0 +1,35 @@
+{
+  "summary": "Regression test of Locat UI 3.0 (standalone Vite preview at http://localhost:5173) after react-hooks v7 refactor. Verified: app shell with 21 desktop sidebar items and 5 mobile bottom-tabs (tab-chats/tab-media/tab-home/tab-devices/tab-more); Ctrl+K command palette (input auto-focus, live filter, Esc close, fresh mount on reopen resets query); deep-link /devices?pair=1 via palette opens data-testid=pair-sheet and clears the URL param on close; /messages?compose=1 via direct URL opens data-testid=new-conversation-sheet; opening a conversation (conversation-c-mira) renders virtual list and keyboard roving focus works (End key); desktop context menu (data-testid=context-menu, 3+ ctx-* items) opens near right/bottom edge and stays inside viewport (clamping OK), ArrowDown + Esc close works; on mobile 390x844 the desktop context menu is NOT rendered and an ActionMenu sheet (role=dialog) appears instead; drop-overlay (data-testid=drop-overlay) appears on window dragenter with Files; Settings → Appearance theme switch works (obsidian → graphite reflected on documentElement[data-theme]); Component Gallery (/gallery) renders cleanly with Foundations/Actions/Inputs/Status/States/Lists/Overlays/Messaging tabs; module tour across home/cinema/music/photos/devices/remote/sentinel/vault/search/hub/offline/modules produced ZERO console errors. ESLint on src/**/*.{ts,tsx} is clean (0 warnings, 0 errors). One infra blocker was fixed: Vite dev server had a stale in-memory module graph still pointing to pre-refactor .tsx paths (/src/app/back.tsx, /src/app/session.tsx, /src/ui/Toast.tsx all 404 even though the files are now .ts); restarting the Vite process from /app/locat-ui-3.0 cleared this and the app renders cleanly. No source code was changed.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Command palette → 'new conversation' action",
+        "issue": "Typing 'new conversation' in the palette does NOT match the compose action (its keywords are 'new chat message compose'), so pressing Enter does not navigate to /messages?compose=1. Direct URL navigation to /messages?compose=1 correctly opens the new-conversation-sheet, so the deep-link itself is intact; only the palette keyword list is incomplete. Suggest adding 'conversation' to the k-string of the new-chat action in /app/locat-ui-3.0/src/layouts/CommandPalette.tsx line 27.",
+        "affected_testIDs": ["command-input", "new-conversation-sheet"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json"],
+  "action_items": [
+    "Optional (minor): extend the compose action's keywords in src/layouts/CommandPalette.tsx so that typing 'new conversation' in Ctrl+K also opens /messages?compose=1 (currently only 'compose', 'chat', or 'message' match). All other deep-link flows are functioning.",
+    "Dev-ops: whenever source files are renamed .tsx↔.ts in /app/locat-ui-3.0, restart the Vite dev server (kill the running npx vite PIDs and relaunch `npx vite --host 0.0.0.0 --port 5173`); the stale module graph will otherwise serve 404s for the old extension forever. This is Vite-standard behaviour, not a code bug."
+  ],
+  "critical_code_review_comments": [
+    "CommandPalette is correctly refactored to mount a fresh <Palette> only when `open` is true, so query/selection state is reset without an effect — matches the request. useEffect with 20ms timeout for input focus is clean, cleaned up on unmount.",
+    "ContextMenuProvider.CursorMenu uses useLayoutEffect to position via placeMenu(x, y, w, h, innerWidth, innerHeight) which correctly clamps the popover inside the viewport; verified with right-click at (vw-20, vh-20): popover's right/bottom stayed <= viewport. On widths <768 it falls back to <ActionMenu> sheet (role=dialog) — verified at 390 wide.",
+    "DropProvider uses stackRef (updated via useLayoutEffect) to read the latest target inside stable DOM listeners — no stale closures, no sync setState in effect. Overlay is portal-mounted with data-testid=drop-overlay.",
+    "Virtual.tsx keyboard handler is pure (uses focusIdx ref, no setState in render), scrollToIndex is memoized, Edge case: non-input targets only — correctly ignores keystrokes inside input/textarea.",
+    "ESLint under react-hooks v7 rules passes with zero errors/warnings; no Date.now() in render, no refs read during render, no sync setState in useEffect across the files of reference."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (fixtures only)", "frontend": "~95% (12/13 flows pass; palette-keyword gap on 'new conversation' is the only miss; deep link itself works via direct URL)" },
+  "seed_data_creation": "None. All data served by src/fixtures/previewAdapter.ts (c-mira, c-studio with largeLibraries=5000, FIXTURE_PHOTOS, etc.).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Vite dev server runs at http://localhost:5173 (NOT managed by supervisor — it's launched manually via `cd /app/locat-ui-3.0 && npx vite --host 0.0.0.0 --port 5173 &`). After any .tsx↔.ts rename on disk, kill all vite PIDs and relaunch to clear the stale module graph (symptom: 404s on /src/app/back.tsx, /src/app/session.tsx, /src/ui/Toast.tsx). Entry flow: welcome-signin → login-username/password (focus wrapper, then keyboard.type) → login-submit → continue-demo-button. Correct testIDs: `conversation-${id}` (NOT conv-${id}), `theme-${id}` (obsidian/graphite/daylight/system), `tab-chats|tab-media|tab-home|tab-devices|tab-more` on mobile, `nav-${id}` on desktop. Settings pages are at /settings/${id}; appearance exposes theme-* buttons. page.goto() resets session back to welcome because session state is in-memory only (by design) — use in-app clicks or re-enter via Entry flow after each goto.",
+  "rca_of_issue": "During the first automation pass the app rendered a blank page and the browser console showed 404s on /src/app/back.tsx, /src/app/session.tsx, /src/ui/Toast.tsx. On disk those files exist only as .ts — a rename was done as part of the refactor. The already-running Vite dev process had cached the transformed /src/ui/index.ts re-exports with the old .tsx paths and the stale ?t= timestamps served from before the rename. curl /src/ui/index.ts confirmed `export * from \"/src/ui/Toast.tsx\"` (stale) was being served; after restarting vite the same URL served `export * from \"/src/ui/Toast.ts\"` (correct). No source change was required. Mitigation: either `touch /app/locat-ui-3.0/src/ui/index.ts` to invalidate the module in HMR, or kill+restart the vite PIDs. This is an environment artefact, not a bug in the Locat UI code."
+}
