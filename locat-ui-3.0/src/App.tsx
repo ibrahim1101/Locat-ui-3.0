@@ -7,6 +7,10 @@ import { EntryFlow } from "./screens/auth/Entry";
 import { StateView, Button } from "./ui";
 import { ContextMenuProvider } from "./ui/ContextMenuProvider";
 import { DropProvider } from "./app/DropProvider";
+import { LiveContacts } from "./integration/LiveContacts";
+import { LiveOverview } from "./integration/LiveOverview";
+import { LiveSentinel } from "./integration/LiveSentinel";
+import { LiveMediaLibrary } from "./integration/LiveMediaLibrary";
 import { LiveModuleNotice } from "./integration/LiveModuleNotice";
 
 const Home = lazy(() => import("./screens/home/Home"));
@@ -40,7 +44,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error?: Error }
 export function App() {
   const { stage, prefs, adapter } = useSession();
   if (stage !== "app") return <EntryFlow />;
-  if (adapter.mode === "live") return <LiveModuleNotice title="Locat 3.0" />;
+  const live = adapter.mode === "live";
   const root = prefs.startup === "home" ? "/home" : "/messages";
   return (
     <BackProvider rootPath={root}>
@@ -48,29 +52,29 @@ export function App() {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to={root} replace />} />
-            <Route path="home" element={<Home />} />
-            <Route path="modules" element={<Modules />} />
-            <Route path="messages/*" element={<Messages />} />
-            <Route path="cinema/*" element={<Cinema />} />
-            <Route path="music" element={<Music />} />
-            <Route path="photos/*" element={<Photos />} />
-            <Route path="devices" element={<Devices />} />
-            <Route path="remote/*" element={<Remote />} />
-            <Route path="sentinel" element={<Sentinel />} />
-            <Route path="vault" element={<PrivateStore kind="vault" />} />
-            <Route path="secrets" element={<PrivateStore kind="secrets" />} />
-            <Route path="search" element={<Search />} />
-            <Route path="hub" element={<Hub />} />
-            <Route path="admin" element={<Admin />} />
-            <Route path="diagnostics" element={<Diagnostics />} />
-            <Route path="offline" element={<Offline />} />
-            <Route path="workspace" element={<Planned id="workspace" />} />
-            <Route path="calendar" element={<Planned id="calendar" />} />
-            <Route path="automate" element={<Planned id="automate" />} />
-            <Route path="share" element={<Planned id="share" />} />
-            <Route path="extensions" element={<Planned id="extensions" />} />
+            <Route path="home" element={live ? <LiveOverview kind="home" /> : <Home />} />
+            <Route path="modules" element={live ? <LiveOverview kind="modules" /> : <Modules />} />
+            <Route path="messages/*" element={live ? <LiveContacts /> : <Messages />} />
+            <Route path="cinema/*" element={live ? <LiveMediaLibrary kind="video" /> : <Cinema />} />
+            <Route path="music" element={live ? <LiveMediaLibrary kind="audio" /> : <Music />} />
+            <Route path="photos/*" element={live ? <LiveMediaLibrary kind="photo" /> : <Photos />} />
+            <Route path="devices" element={live ? <LiveModuleNotice title="Devices" /> : <Devices />} />
+            <Route path="remote/*" element={live ? <LiveModuleNotice title="Remote" /> : <Remote />} />
+            <Route path="sentinel" element={live ? <LiveSentinel /> : <Sentinel />} />
+            <Route path="vault" element={live ? <LiveModuleNotice title="Vault" /> : <PrivateStore kind="vault" />} />
+            <Route path="secrets" element={live ? <LiveModuleNotice title="Secrets" /> : <PrivateStore kind="secrets" />} />
+            <Route path="search" element={live ? <LiveOverview kind="search" /> : <Search />} />
+            <Route path="hub" element={live ? <LiveModuleNotice title="Hub" /> : <Hub />} />
+            <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />
+            <Route path="diagnostics" element={live ? <LiveModuleNotice title="Diagnostics" /> : <Diagnostics />} />
+            <Route path="offline" element={live ? <LiveModuleNotice title="Offline" /> : <Offline />} />
+            <Route path="workspace" element={live ? <LiveModuleNotice title="workspace" /> : <Planned id="workspace" />} />
+            <Route path="calendar" element={live ? <LiveModuleNotice title="calendar" /> : <Planned id="calendar" />} />
+            <Route path="automate" element={live ? <LiveModuleNotice title="automate" /> : <Planned id="automate" />} />
+            <Route path="share" element={live ? <LiveModuleNotice title="share" /> : <Planned id="share" />} />
+            <Route path="extensions" element={live ? <LiveModuleNotice title="extensions" /> : <Planned id="extensions" />} />
             {adapter.mode === "preview" && <Route path="gallery" element={<Gallery />} />}
-            <Route path="settings/*" element={<Settings />} />
+            <Route path="settings/*" element={live ? <LiveModuleNotice title="Settings" /> : <Settings />} />
             <Route path="profile" element={<Navigate to="/settings/profile" replace />} />
             <Route path="*" element={<Navigate to={root} replace />} />
           </Route>

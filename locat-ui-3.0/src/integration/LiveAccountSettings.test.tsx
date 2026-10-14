@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveAccountSettings } from "./LiveAccountSettings";
 const { signOut } = vi.hoisted(() => ({ signOut: vi.fn() }));
-vi.mock("../app/session", () => ({ useSession: () => ({ user: { displayName: "Alice" }, adapter: { auth: { signOut } } }) }));
+vi.mock("../app/session", () => ({ useSession: () => ({ user: { displayName: "Alice" }, prefs: { theme: "obsidian" }, setPrefs: vi.fn(), adapter: { auth: { signOut } } }) }));
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 describe("live account settings", () => {
   it("renders server sessions and revokes another session", async () => {

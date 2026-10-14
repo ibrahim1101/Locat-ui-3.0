@@ -1,3 +1,4 @@
+import { once } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -59,6 +60,19 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal(bobInbox.messages.length, 1);
     assert.equal(bobInbox.messages[0].ciphertext, payload.ciphertext);
     assert.equal((await request("/api/messages?after=" + bobInbox.nextCursor, "GET", undefined, bobCookie)).status, 200);
+    const alice = (await (await request("/api/auth/me", "GET", undefined, aliceCookie)).json()).user;
+    assert.equal((await request("/api/contacts")).status, 401);
+    assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 200);
+    assert.equal((await request("/api/contacts/respond", "POST", { userId: bob.id, accept: true }, aliceCookie)).status, 404);
+    assert.equal((await request("/api/contacts/respond", "POST", { userId: alice.id, accept: true }, bobCookie)).status, 200);
+    const friends = (await (await request("/api/contacts", "GET", undefined, aliceCookie)).json()).contacts;
+    assert.equal(friends.length, 1); assert.equal(friends[0].status, "accepted");
+    assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: true }, bobCookie)).status, 200);
+    assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 403);
+    assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 403);
+    assert.deepEqual((await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users, []);
+    assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: false }, bobCookie)).status, 200);
+    assert.deepEqual((await (await request("/api/contacts", "GET", undefined, aliceCookie)).json()).contacts, []);
     assert.equal((await request("/api/auth/sessions")).status, 401);
     const aliceSessions = (await (await request("/api/auth/sessions", "GET", undefined, aliceCookie)).json()).sessions;
     assert.equal(aliceSessions.length, 1);
@@ -75,12 +89,25 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     const updatedLogin = await request("/api/auth/login", "POST", { username: "alice", password: "new-long-password-123" });
     assert.equal(updatedLogin.status, 200);
     const updatedCookie = updatedLogin.headers.get("set-cookie").split(";")[0];
+    assert.equal((await request("/api/preferences", "POST", { theme: "graphite", startup: "home" }, updatedCookie)).status, 200);
+    assert.equal((await request("/api/preferences", "POST", { largeLibraries: true }, updatedCookie)).status, 400);
+    assert.equal((await (await request("/api/preferences", "GET", undefined, updatedCookie)).json()).preferences.theme, "graphite");
+    assert.deepEqual((await (await request("/api/preferences", "GET", undefined, bobCookie)).json()).preferences, {});
+    const events = (await (await request("/api/security/events", "GET", undefined, updatedCookie)).json()).events;
+    assert.ok(events.some(event => event.event === "password.changed"));
+    assert.ok(events.some(event => event.event === "login.failed"));
+    assert.equal((await request("/api/security/events")).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, updatedCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, updatedCookie)).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
+    let limited;
+    for (let i = 0; i < 25; i++) limited = await request("/api/auth/login", "POST", { username: "x", password: "x" });
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers.get("retry-after")) > 0);
+    assert.equal((await request("/api/ready")).status, 200);
   } finally {
-    child.kill();
+    if (child.exitCode === null && child.signalCode === null) { child.kill(); await once(child, "exit"); }
     await rm(dir, { recursive: true, force: true });
   }
 });

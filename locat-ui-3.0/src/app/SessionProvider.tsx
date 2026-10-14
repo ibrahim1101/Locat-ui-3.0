@@ -18,8 +18,20 @@ export function SessionProvider({ adapter, initialUser, initialConnection, platf
   const effectiveUser = adapter.mode === "live" ? (liveSession!.authStatus === "ready" ? liveSession!.user : null) : user;
   const effectiveConnection = adapter.mode === "live" ? liveSession!.connection : connection;
   const effectiveStage: EntryStage = adapter.mode === "live" ? (liveSession!.authStatus === "ready" && effectiveUser ? "app" : liveSession!.authStatus === "needsKeyRestore" ? "locked" : stage === "app" ? "login" : stage) : stage;
-  const [prefs, setPrefsState] = useState<Preferences>({ theme: "obsidian", textScale: "default", motion: "system", startup: "messages", density: "comfortable", largeLibraries: false });
+  const [prefs, setPrefsState] = useState<Preferences>({ theme: "obsidian", textScale: "default", motion: "system", startup: adapter.mode === "live" ? "home" : "messages", density: "comfortable", largeLibraries: false });
   const setPrefs = useCallback((p: Partial<Preferences>) => setPrefsState((old) => ({ ...old, ...p })), []);
+
+  const effectiveUserId = effectiveUser?.id;
+  useEffect(() => {
+    if (adapter.mode !== "live" || !effectiveUserId) return;
+    let active = true;
+    void fetch("/api/preferences", { credentials: "same-origin", cache: "no-store" }).then(async response => {
+      if (!response.ok) return;
+      const data = await response.json();
+      if (active) setPrefsState(old => ({ ...old, ...data.preferences, largeLibraries: false }));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [adapter.mode, effectiveUserId]);
 
   useEffect(() => {
     const root = document.documentElement;

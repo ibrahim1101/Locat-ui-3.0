@@ -10,7 +10,7 @@ async function api(path: string, data?: object) {
 }
 
 export function LiveAccountSettings() {
-  const { user, adapter } = useSession();
+  const { user, adapter, prefs, setPrefs } = useSession();
   const [name, setName] = useState(user?.displayName ?? "");
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [message, setMessage] = useState("");
@@ -38,6 +38,10 @@ export function LiveAccountSettings() {
   const inputClass = "w-full rounded-lg border border-white/10 bg-transparent p-3";
   const buttonClass = "rounded-lg bg-ember px-4 py-2 font-semibold text-ember-ink disabled:opacity-50";
   return <section className="space-y-6" aria-label="Account settings">
+    <label className="block">Theme<select className={inputClass} value={prefs.theme} onChange={event => {
+      const theme = event.target.value as typeof prefs.theme;
+      void action(async () => { await api("/api/preferences", { theme }); setPrefs({ theme }); setMessage("Theme saved."); });
+    }}><option value="obsidian">Obsidian</option><option value="graphite">Graphite</option><option value="daylight">Daylight</option><option value="system">System</option></select></label>
     <h2 className="text-xl font-semibold">Account settings</h2>
     <form className="space-y-3" onSubmit={event => { event.preventDefault(); void action(async () => { await api("/api/profile", { displayName: name }); setMessage("Display name saved. Reload to refresh your account heading."); }); }}>
       <label className="block">Display name<input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={80} /></label>

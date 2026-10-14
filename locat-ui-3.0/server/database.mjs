@@ -10,7 +10,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 1) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 3) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -25,9 +25,49 @@ export function openDatabase(filename) {
       PRAGMA user_version = 1;
       COMMIT;`);
   }
+  if (version < 2) {
+    sql.exec(`BEGIN IMMEDIATE;
+      CREATE TABLE preferences (userId TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, value TEXT NOT NULL);
+      CREATE TABLE audit (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT REFERENCES users(id), event TEXT NOT NULL, severity TEXT NOT NULL, createdAt INTEGER NOT NULL);
+      CREATE INDEX audit_user ON audit(userId, id);
+      PRAGMA user_version = 2;
+      COMMIT;`);
+  }
+  if (version < 3) {
+    sql.exec(`BEGIN IMMEDIATE;
+      CREATE TABLE contacts (lowId TEXT NOT NULL REFERENCES users(id), highId TEXT NOT NULL REFERENCES users(id), requesterId TEXT NOT NULL REFERENCES users(id), status TEXT NOT NULL CHECK(status IN ('pending','accepted')), PRIMARY KEY(lowId,highId), CHECK(lowId < highId));
+      CREATE TABLE blocks (blockerId TEXT NOT NULL REFERENCES users(id), blockedId TEXT NOT NULL REFERENCES users(id), PRIMARY KEY(blockerId,blockedId), CHECK(blockerId != blockedId));
+      PRAGMA user_version = 3;
+      COMMIT;`);
+  }
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
+    blocked: (a, b) => !!sql.prepare('SELECT 1 FROM blocks WHERE (blockerId = ? AND blockedId = ?) OR (blockerId = ? AND blockedId = ?)').get(a, b, b, a),
+    contacts: userId => sql.prepare('SELECT * FROM contacts WHERE lowId = ? OR highId = ?').all(userId, userId),
+    blocks: userId => sql.prepare('SELECT blockedId FROM blocks WHERE blockerId = ?').all(userId),
+    requestContact(a, b) {
+      const [low, high] = [a, b].sort();
+      sql.prepare("INSERT INTO contacts VALUES (?, ?, ?, 'pending') ON CONFLICT(lowId,highId) DO NOTHING").run(low, high, a);
+    },
+    respondContact(a, b, accept) {
+      const [low, high] = [a, b].sort();
+      return accept ? sql.prepare("UPDATE contacts SET status = 'accepted' WHERE lowId = ? AND highId = ? AND requesterId != ? AND status = 'pending'").run(low, high, a) : sql.prepare("DELETE FROM contacts WHERE lowId = ? AND highId = ? AND requesterId != ? AND status = 'pending'").run(low, high, a);
+    },
+    block(a, b, enabled) {
+      if (!enabled) return sql.prepare('DELETE FROM blocks WHERE blockerId = ? AND blockedId = ?').run(a, b);
+      const [low, high] = [a, b].sort();
+      sql.exec('BEGIN IMMEDIATE');
+      try {
+        sql.prepare('INSERT INTO blocks VALUES (?, ?) ON CONFLICT DO NOTHING').run(a, b);
+        sql.prepare('DELETE FROM contacts WHERE lowId = ? AND highId = ?').run(low, high);
+        sql.exec('COMMIT');
+      } catch (error) { sql.exec('ROLLBACK'); throw error; }
+    },
+    preferences: userId => JSON.parse(sql.prepare('SELECT value FROM preferences WHERE userId = ?').get(userId)?.value ?? '{}'),
+    savePreferences: (userId, value) => sql.prepare('INSERT INTO preferences VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET value = excluded.value').run(userId, JSON.stringify(value)),
+    audit: (userId, event, severity = 'info') => sql.prepare('INSERT INTO audit (userId, event, severity, createdAt) VALUES (?, ?, ?, ?)').run(userId, event, severity, Date.now()),
+    events: userId => sql.prepare('SELECT id, event, severity, createdAt FROM audit WHERE userId = ? ORDER BY id DESC LIMIT 100').all(userId),
     userById: id => userById.get(id),
     userByName: name => userByName.get(name),
     addUser: u => sql.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?)').run(u.id, u.username, u.displayName, u.salt, u.hash),

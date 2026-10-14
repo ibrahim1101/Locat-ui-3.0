@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LiveMediaProvider } from "./LiveMediaProvider";
 import { App } from "../App";
 import { SessionProvider, type LiveSessionSnapshot } from "../app/SessionProvider";
 import { PlayerProvider } from "../app/PlayerProvider";
@@ -36,6 +37,9 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     ...previewAdapter,
     mode: "live",
     moduleAvailability: (id, ctx) => {
+      if (id === "messages") return { availability: "beta", reason: "Live contacts; private messaging awaits verified E2EE" };
+      if (id === "sentinel") return { availability: "beta", reason: "Account audit events; device monitoring pending" };
+      if (["cinema", "music", "photos", "search", "modules"].includes(id)) return { availability: "available" };
       if (id !== "settings" && id !== "profile" && id !== "home") return { availability: "planned", reason: "Live backend module not yet implemented" };
       return liveModuleAvailability(id, ctx);
     },
@@ -63,6 +67,6 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   }), []);
 
   return <SessionProvider adapter={adapter} initialUser={null} initialConnection={disconnected} platform={platform} liveSession={session}>
-    <PlayerProvider><App /></PlayerProvider>
+    <LiveMediaProvider key={session.user?.id ?? "signed-out"}><PlayerProvider><App /></PlayerProvider></LiveMediaProvider>
   </SessionProvider>;
 }

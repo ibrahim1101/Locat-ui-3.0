@@ -7,6 +7,7 @@
 import { createServer } from "node:http";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
+import { createRateLimiter } from "./rateLimit.mjs";
 import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
@@ -14,6 +15,7 @@ if (process.env.LOCAT_DATA_FILE) throw new Error("LOCAT_DATA_FILE is retired; se
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
 const host = process.env.LOCAT_HOST ?? "127.0.0.1";
 const port = Number(process.env.LOCAT_PORT ?? 8787);
+const authLimit = createRateLimiter();
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -51,10 +53,58 @@ function setCookie(token, maxAge) {
 }
 async function handle(req, res) {
   const url = new URL(req.url ?? "/", "http://localhost");
+  if (req.method === "POST" && ["/api/auth/login", "/api/auth/register", "/api/auth/password"].includes(url.pathname)) {
+    const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
+    if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
+  }
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);
     return json(res, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not authenticated" });
+  }
+  if (url.pathname === "/api/contacts" && req.method === "GET") {
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const contacts = db.contacts(user.id).map(row => ({ user: publicUser(db.userById(row.lowId === user.id ? row.highId : row.lowId)), status: row.status, direction: row.requesterId === user.id ? "outgoing" : "incoming" }));
+    const blocked = db.blocks(user.id).map(row => publicUser(db.userById(row.blockedId)));
+    return json(res, 200, { contacts, blocked });
+  }
+  if (["/api/contacts/request", "/api/contacts/respond", "/api/contacts/block"].includes(url.pathname) && req.method === "POST") {
+    if (req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const input = await body(req);
+    if (!input || typeof input.userId !== "string" || !/^[a-f0-9]{32}$/.test(input.userId) || input.userId === user.id) return json(res, 400, { error: "Invalid contact" });
+    if (!db.userById(input.userId)) return json(res, 404, { error: "Contact unavailable" });
+    if (url.pathname === "/api/contacts/block") {
+      if (typeof input.blocked !== "boolean") return json(res, 400, { error: "Invalid block state" });
+      db.block(user.id, input.userId, input.blocked);
+      db.audit(user.id, input.blocked ? "contact.blocked" : "contact.unblocked");
+      return json(res, 200, { ok: true });
+    }
+    if (db.blocked(user.id, input.userId)) return json(res, 403, { error: "Contact unavailable" });
+    if (url.pathname === "/api/contacts/request") db.requestContact(user.id, input.userId);
+    else {
+      if (typeof input.accept !== "boolean") return json(res, 400, { error: "Invalid response" });
+      if (!db.respondContact(user.id, input.userId, input.accept).changes) return json(res, 404, { error: "Incoming request not found" });
+    }
+    return json(res, 200, { ok: true });
+  }
+  if (url.pathname === "/api/security/events" && req.method === "GET") {
+    const user = sessionUser(req);
+    return json(res, user ? 200 : 401, user ? { events: db.events(user.id) } : { error: "Not authenticated" });
+  }
+  if (url.pathname === "/api/preferences" && ["GET", "POST"].includes(req.method)) {
+    if (req.method === "POST" && req.headers.origin !== "http://" + (req.headers.host ?? "")) return json(res, 403, { error: "Origin mismatch" });
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    if (req.method === "GET") return json(res, 200, { preferences: db.preferences(user.id) });
+    const input = await body(req);
+    const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"] };
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.entries(input).some(([key, value]) => !allowed[key]?.includes(value))) return json(res, 400, { error: "Invalid preferences" });
+    const preferences = { ...db.preferences(user.id), ...input };
+    db.savePreferences(user.id, preferences);
+    return json(res, 200, { preferences });
   }
   if (url.pathname === "/api/auth/sessions" && req.method === "GET") {
     const user = sessionUser(req);
@@ -70,7 +120,8 @@ async function handle(req, res) {
     if (!input || typeof input !== "object" || Array.isArray(input)) return json(res, 400, { error: "Invalid request" });
     if (url.pathname === "/api/auth/sessions/revoke") {
       if (typeof input.id !== "string" || !/^[a-f0-9]{64}$/.test(input.id)) return json(res, 400, { error: "Invalid session ID" });
-      db.revokeOwnedSession(input.id, user.id);
+      const revoked = db.revokeOwnedSession(input.id, user.id);
+      if (revoked.changes) db.audit(user.id, "session.revoked", "warn");
       return json(res, 200, { ok: true });
     }
     if (url.pathname === "/api/profile") {
@@ -88,6 +139,7 @@ async function handle(req, res) {
       const salt = randomBytes(16).toString("hex");
       const hash = (await scrypt(newPassword, salt, 64)).toString("hex");
       db.changePassword(user.id, salt, hash);
+      db.audit(user.id, "password.changed", "warn");
       return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
     });
   }
@@ -97,7 +149,7 @@ async function handle(req, res) {
     const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     if (!/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires 3-32 username characters" });
     const found = db.userByName(query);
-    const users = found && found.id !== viewer.id ? [publicUser(found)] : [];
+    const users = found && found.id !== viewer.id && !db.blocked(viewer.id, found.id) ? [publicUser(found)] : [];
     return json(res, 200, { users });
   }
   // Ciphertext-only transport. The server never accepts a plaintext message field.
@@ -125,6 +177,7 @@ async function handle(req, res) {
     }
     return serialized(async () => {
       if (!db.userById(recipientId)) return json(res, 404, { error: "Recipient not found" });
+      if (db.blocked(sender.id, recipientId)) return json(res, 403, { error: "Recipient unavailable" });
       const envelope = { id: randomBytes(16).toString("hex"), senderId: sender.id, recipientId, ciphertext, nonce, algorithm, createdAt: Date.now() };
       const sequence = db.addEnvelope(envelope);
       return json(res, 201, { id: envelope.id, sequence });
@@ -161,6 +214,7 @@ async function handle(req, res) {
         const hash = (await scrypt(password, salt, 64)).toString("hex");
         const user = { id: randomBytes(16).toString("hex"), username, displayName, salt, hash };
         db.addUser(user);
+        db.audit(user.id, "account.registered");
         return json(res, 201, { user: publicUser(user) });
       });
     }
@@ -168,10 +222,14 @@ async function handle(req, res) {
     const salt = user?.salt ?? "00000000000000000000000000000000";
     const candidate = await scrypt(password, salt, 64);
     const stored = Buffer.from(user?.hash ?? "00".repeat(64), "hex");
-    if (!user || !timingSafeEqual(candidate, stored)) return json(res, 401, { error: "Invalid credentials" });
+    if (!user || !timingSafeEqual(candidate, stored)) {
+      if (user) db.audit(user.id, "login.failed", "warn");
+      return json(res, 401, { error: "Invalid credentials" });
+    }
     return serialized(async () => {
       if (db.userById(user.id)?.hash !== user.hash) return json(res, 401, { error: "Invalid credentials" });
       const token = randomBytes(32).toString("hex");
+      db.audit(user.id, "login.succeeded");
       db.addSession(createHash("sha256").update(token).digest("hex"), user.id, Date.now() + SESSION_MS);
       return json(res, 200, { user: publicUser(user) }, { "Set-Cookie": setCookie(token, SESSION_MS / 1000) });
     });

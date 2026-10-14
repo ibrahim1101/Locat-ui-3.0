@@ -23,7 +23,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        {import.meta.env.VITE_LOCAT_LIVE === "true" ? <LiveLocatRoot platform={platform} /> : <SessionProvider adapter={previewAdapter} initialUser={FIXTURE_USER} platform={platform}
+        {import.meta.env.VITE_LOCAT_LIVE !== "false" ? <LiveLocatRoot platform={platform} /> : <SessionProvider adapter={previewAdapter} initialUser={FIXTURE_USER} platform={platform}
           initialConnection={{ mode: "server", server: "connected", origin: FIXTURE_USER.serverOrigin, route: "same-lan", pendingOutbox: 0, lastSyncAt: Date.now() }}>
           <PlayerProvider><App /></PlayerProvider>
         </SessionProvider>}

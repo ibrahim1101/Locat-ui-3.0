@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Captions, FlaskConical, Gauge, Maximize, Pause, PictureInPicture2, Play, RectangleHorizontal, RotateCcw, RotateCw, Settings, Volume2, VolumeX, WifiOff, AlertTriangle } from "lucide-react";
 import type { PlaybackView, PlayerCallbacks, VideoItemView } from "@/contracts/media";
 import { useBackLayer } from "@/app/back";
@@ -9,7 +9,7 @@ import { ActionMenu, Badge, IconButton, Slider, Sheet, Button, cn, formatDuratio
  * LocalCinemaPlayer / CinemaHlsPlayer <video> into `surface` and maps its
  * events into PlaybackView; this component never decodes media.
  */
-export function PlayerChrome({ video, state: s, cb, onClose }: { video: VideoItemView; state: PlaybackView; cb: PlayerCallbacks; onClose(): void }) {
+export function PlayerChrome({ video, state: s, cb, onClose, surface }: { surface?: ReactNode; video: VideoItemView; state: PlaybackView; cb: PlayerCallbacks; onClose(): void }) {
   const [shown, setShown] = useState(true);
   const [menu, setMenu] = useState<"speed" | "subs" | "quality" | "fit" | "info" | null>(null);
   const hide = useRef<number>(0);
@@ -37,7 +37,7 @@ export function PlayerChrome({ video, state: s, cb, onClose }: { video: VideoIte
   return (
     <div className="fixed inset-0 z-30 bg-black text-white md:relative md:z-auto md:h-full" onMouseMove={poke} onClick={poke} data-testid="video-player">
       <div className="absolute inset-0 grid place-items-center" style={{ background: hueGradient(video.posterHue) }}>
-        <div className={cn("absolute inset-0 bg-black/30", s.fit === "cover" && "scale-110")} />
+        {surface ? <div className="absolute inset-0">{surface}</div> : <div className={cn("absolute inset-0 bg-black/30", s.fit === "cover" && "scale-110")} />}
         {s.state === "buffering" && <span className="relative size-12 animate-spin rounded-full border-2 border-white/20 border-t-white" role="status" aria-label="Buffering" />}
         {s.state === "error" && s.error && (
           <div className="relative mx-6 max-w-md rounded-2xl bg-black/70 p-5 text-center backdrop-blur" role="alert" data-testid="player-error">
@@ -46,7 +46,7 @@ export function PlayerChrome({ video, state: s, cb, onClose }: { video: VideoIte
             <p className="mt-1.5 text-sm text-white/70">{s.error.message}</p>
           </div>)}
         {s.state === "reconnecting" && <div className="relative flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm"><WifiOff className="size-4" />Reconnecting…</div>}
-        <p className="pointer-events-none absolute bottom-28 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1 text-2xs font-semibold text-white/80"><FlaskConical className="size-3" />Preview surface — Locat's player engine mounts here</p>
+        {!surface && <p className="pointer-events-none absolute bottom-28 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1 text-2xs font-semibold text-white/80"><FlaskConical className="size-3" />Preview surface — Locat's player engine mounts here</p>}
       </div>
 
       <div className={cn("absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/70 via-transparent to-black/80 transition-opacity duration-300", shown ? "opacity-100" : "pointer-events-none opacity-0")}>

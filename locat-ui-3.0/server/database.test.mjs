@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from "node:sqlite";
 import { openDatabase } from './database.mjs';
 
 test('SQLite durability, constraints, recipient cursors and consistent backup', async () => {
@@ -38,4 +39,26 @@ test('SQLite durability, constraints, recipient cursors and consistent backup', 
     db?.close(); restored?.close();
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('schema v1 upgrades preserve accounts and reject unknown future versions', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'locat-upgrade-'));
+  const file = join(dir, 'app.sqlite');
+  let db;
+  try {
+    db = openDatabase(file);
+    db.addUser({ id: 'a', username: 'alice', displayName: 'Alice', salt: 'salt', hash: 'hash' });
+    db.close(); db = null;
+    let raw = new DatabaseSync(file);
+    raw.exec('DROP TABLE preferences; DROP TABLE audit; DROP TABLE contacts; DROP TABLE blocks; PRAGMA user_version = 1;'); raw.close();
+    db = openDatabase(file);
+    assert.equal(db.userById('a').username, 'alice');
+    db.savePreferences('a', { theme: 'graphite' });
+    assert.equal(db.preferences('a').theme, 'graphite');
+    db.audit('a', 'test.event');
+    assert.equal(db.events('a')[0].event, 'test.event');
+    db.close(); db = null;
+    raw = new DatabaseSync(file); raw.exec('PRAGMA user_version = 999;'); raw.close();
+    assert.throws(() => openDatabase(file), /newer/);
+  } finally { db?.close(); await rm(dir, { recursive: true, force: true }); }
 });
