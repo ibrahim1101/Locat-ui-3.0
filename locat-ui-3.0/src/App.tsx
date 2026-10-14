@@ -7,6 +7,7 @@ import { EntryFlow } from "./screens/auth/Entry";
 import { StateView, Button } from "./ui";
 import { ContextMenuProvider } from "./ui/ContextMenuProvider";
 import { DropProvider } from "./app/DropProvider";
+import { LiveModuleNotice } from "./integration/LiveModuleNotice";
 
 const Home = lazy(() => import("./screens/home/Home"));
 const Modules = lazy(() => import("./screens/home/Modules"));
@@ -38,7 +39,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error?: Error }
 
 export function App() {
   const { stage, prefs, adapter } = useSession();
-  if (stage !== "app") return <EntryFlow />;
+  if (stage !== "app") return <EntryFlow />;\n  if (adapter.mode === "live") return <LiveModuleNotice title="Locat 3.0" />;
   const root = prefs.startup === "home" ? "/home" : "/messages";
   return (
     <BackProvider rootPath={root}>
