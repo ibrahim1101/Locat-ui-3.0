@@ -1,32 +1,43 @@
-# Locat 3.0 development backend
+# Locat 3.0 development API
 
-This backend is an **experimental local-only** authentication service. It is not the full Locat backend and is not ready for production.
+**Status: local-only development service, not production-ready.** Run from the `locat-ui-3.0/` directory using Node.js 22+.
 
-## Start
-
-From `locat-ui-3.0/`, run the backend and Vite in separate terminals:
-
+In PowerShell terminal 1:
 ```powershell
 node server/index.mjs
+```
+
+In PowerShell terminal 2:
+```powershell
+$env:VITE_LOCAT_LIVE="true"
 npm run dev
 ```
 
-The backend listens on `127.0.0.1:8787`; Vite listens on `127.0.0.1:5173` and proxies `/api` to the backend. Check `http://127.0.0.1:5173/api/ready`. No hosted server or Tailscale is required for desktop development.
+Open http://127.0.0.1:5173. Vite proxies /api to 127.0.0.1:8787. Run `npm run test:server` for the backend integration test and `npm run test:all` for frontend plus backend tests. These commands must be executed before claiming a passing build.
 
-## Scope
+## Implemented development endpoints
 
-- `POST /api/auth/register` creates a new development account.
-- `POST /api/auth/login` issues an HttpOnly, SameSite=Strict session cookie.
-- `GET /api/auth/me` validates the session.
-- `POST /api/auth/logout` revokes the session.
-- `GET /api/ready` returns Locat readiness.
+| Method | Route | Purpose |
+|---|---|---|
+| GET | /api/ready | Health probe |
+| POST | /api/auth/register | Create account |
+| POST | /api/auth/login | Issue session cookie |
+| GET | /api/auth/me | Current authenticated account |
+| POST | /api/auth/logout | Revoke session |
+| GET | /api/users/search?q=username | Exact username lookup (authenticated) |
+| GET | /api/messages?after=0 | Read current user's encrypted envelopes |
+| POST | /api/messages | Submit encrypted envelope to recipient |
 
-All state-changing requests require the matching `Origin` header. The browser API client uses same-origin credentials. Data is written to `server/data/dev-auth.json` by default. Do not commit this file.
+Message submissions accept only `recipientId`, `ciphertext`, `nonce`, and `algorithm: "client-e2ee-v1"`. **This is a ciphertext transport contract, not E2EE implementation.** There is no client key exchange, key verification, message encryption/decryption, group messaging, or production message lifecycle. Do not submit real confidential messages or assume arbitrary ciphertext is secure.
 
-**Not yet implemented:** rate limiting, SQLite, encrypted messaging, device pairing, mobile access, account reset, or full UI 3.0 live adapter. This is a disposable development database. Do not expose the service outside the loopback interface.
+Sessions are HttpOnly SameSite=Strict cookies. Mutating requests require a matching HTTP Origin. Data is stored in `server/data/dev-auth.json` by default and is ignored by Git. No HTTPS termination, rate limiting, production-grade persistence, or encrypted key management is implemented. Keep the backend bound to loopback; do not expose it on a LAN or the internet.
 
-## Known limitations to resolve before wider testing
+The live UI currently supports account entry and a truthful signed-in placeholder. The full module UI remains preview-only until live integrations are built. Android, Windows native builds, and release packaging are not verified.
 
-The current registration endpoint does not automatically sign in. Passwords are hashed using scrypt, but no request throttling is in place yet. The development API does not generate cryptographic messaging identities, and the existing UI preview is still separate from the real backend. Do not describe login as end-to-end integrated until the live entrypoint is wired and tested.
+## Development checklist
 
-The live UI is opt-in. To return to the preview in PowerShell, run `Remove-Item Env:VITE_LOCAT_LIVE` before starting Vite. The backend must be running for live sign-in. This mode is currently **authentication integration testing**, not a production app: many signed-in screens still display preview fixture data and are not backed by real services. Do not treat displayed messages, media, or device state as real user data.\n
+1. Run `npm run check`, `npm run lint`, `npm run test:all`, and `npm run build`.
+2. Fix failing checks before integrating more features.
+3. Replace temporary JSON persistence with transactional SQLite and migrations.
+4. Implement a reviewed authenticated E2EE protocol with verified device keys before enabling real messaging.
+5. Add authorization, quotas, rate limiting, backups, and native integration tests before production use.
