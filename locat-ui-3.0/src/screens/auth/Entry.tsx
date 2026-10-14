@@ -36,7 +36,7 @@ function Frame({ children, onBack, step }: { children: ReactNode; onBack?: () =>
 
 /** Shown when the preview adapter declines a real auth operation. Never fakes success. */
 function PendingNotice({ result, onContinue }: { result: OperationResult; onContinue(): void }) {
-  if (result.status !== "integration-pending") return result.status === "error" ? <Banner tone="danger" icon={ShieldAlert} title={result.message} className="mt-4" /> : null;
+  if (result.status !== "integration-pending") return result.status === "error" ? <Banner tone="danger" icon={ShieldAlert} title={result.message} className="mt-4" /> : result.status === "ok" ? <Banner tone="info" icon={CheckCircle2} title="Account created" className="mt-4">You can now sign in with your new account.</Banner> : null;
   return (
     <div className="mt-5 rounded-2xl bg-planned/10 p-4" data-testid="auth-pending-notice">
       <p className="flex items-center gap-2 text-sm font-bold text-planned"><FlaskConical className="size-4" />Not signed in — this is a UI preview</p>
@@ -215,15 +215,15 @@ export function LockScreen({ onPreviewContinue }: { onPreviewContinue(): void })
 
 export function EntryFlow() {
   const s = useSession();
-  const enterDemo = () => { s.setUser(FIXTURE_USER); s.setConnection({ ...s.connection, mode: "server", server: "connected", origin: s.connection.origin ?? FIXTURE_USER.serverOrigin }); s.setStage("app"); };
-  const enterLocal = async () => { await s.adapter.auth.enterLocalMode(); s.setUser(null); s.setConnection({ mode: "local-only", server: "not-configured", pendingOutbox: 0 }); s.setStage("app"); };
+  const enterDemo = () => { if (s.adapter.mode !== "preview") return; s.setUser(FIXTURE_USER); s.setConnection({ ...s.connection, mode: "server", server: "connected", origin: s.connection.origin ?? FIXTURE_USER.serverOrigin }); s.setStage("app"); };
+  const enterLocal = async () => { if (s.adapter.mode !== "preview") return; await s.adapter.auth.enterLocalMode(); s.setUser(null); s.setConnection({ mode: "local-only", server: "not-configured", pendingOutbox: 0 }); s.setStage("app"); };
   const home = () => s.setStage("welcome");
   switch (s.stage) {
     case "login": return <SignIn back={home} done={enterDemo} />;
     case "register": return <Register back={home} done={enterDemo} />;
     case "server": return <ServerSetup back={home} />;
-    case "local-intro": return <LocalIntro back={home} done={enterLocal} />;
-    case "locked": return <LockScreen onPreviewContinue={() => s.setStage("app")} />;
+    case "local-intro": return s.adapter.mode === "preview" ? <LocalIntro back={home} done={enterLocal} /> : <Welcome go={(x) => s.setStage(x)} />;
+    case "locked": return <LockScreen onPreviewContinue={() => { if (s.adapter.mode === "preview") s.setStage("app"); }} />;
     default: return <Welcome go={(x) => s.setStage(x)} />;
   }
 }
