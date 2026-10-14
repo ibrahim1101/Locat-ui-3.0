@@ -36,7 +36,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
         if (result.status === "ok") await refresh();
         return result;
       },
-      register: async (input) => liveAuthApi.register(input),
+      register: async (input) => {\n        const created = await liveAuthApi.register(input);\n        if (created.status !== "ok") return created;\n        const signedIn = await liveAuthApi.signIn({ username: input.username, password: input.password });\n        if (signedIn.status === "ok") await refresh();\n        return signedIn;\n      },
       signOut: async () => {
         const result = await liveAuthApi.signOut();
         if (result.status === "ok") await refresh();
