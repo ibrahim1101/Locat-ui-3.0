@@ -94,3 +94,7 @@ Incident descriptions, notes and history are server-readable. Do not send creden
 ### Encrypted private-store API
 
 Schema v6 adds privateStores/privateObjects. GET /api/private/vault or /api/private/secrets returns only configuration and object metadata. GET /<module>/<UUID> returns an owned ciphertext envelope and revision. POST /<module>/initialize, /put and /remove require account cookies and the exact trusted Origin; no integration token grants access. Initialize is immutable, put/remove enforce expectedRevision, and quotas are transactional (128 objects/64 MiB ciphertext per account/module). Strict validators reject extra plaintext fields. See docs/PRIVATE_STORAGE.md for crypto, backup/recovery and scope limitations. SQLite backups contain encrypted configuration/objects, not the unlocking passphrase.
+
+### Devices and Link
+
+Schema v7/v8 connects /api/link/register, challenge, prove, devices, heartbeat, rename, pair, confirm and revoke. Protected commands additionally require X-Locat-Device-Proof bound to the valid account cookie/session. Payload routes create immutable metadata, upload bounded encrypted chunks, list/get owned device deliveries and acknowledge/cancel. Roles, pair verification, quota, exact lengths and terminal state are enforced; pair rejection/revocation purges queued chunks. See docs/LINK_INTEGRATION.md for client crypto, readable metadata, restart/expiry and native limits.

@@ -1,0 +1,36 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {openDatabase} from './database.mjs';import {validateLinkPublicKey,issueLinkChallenge,answerLinkChallenge,verifyLinkProof,revokeLinkProofs} from './linkProof.mjs';
+async function identity(){const keys=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);return {...keys,publicKeyB64:Buffer.from(await crypto.subtle.exportKey('spki',keys.publicKey)).toString('base64')};}
+export async function solve(identity,challenge){const pub=await crypto.subtle.importKey('spki',Buffer.from(challenge.publicKey,'base64'),{name:'ECDH',namedCurve:'P-256'},false,[]);const bits=await crypto.subtle.deriveBits({name:'ECDH',public:pub},identity.privateKey,256);const base=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);const context=new TextEncoder().encode(`locat-link-device-proof:ui3-v1:${challenge.userId}:${challenge.deviceId}:${challenge.id}`);const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:context,info:new TextEncoder().encode('challenge-response')},base,{name:'AES-GCM',length:256},false,['decrypt']);return Buffer.from(await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(challenge.iv,'base64'),additionalData:context},key,Buffer.from(challenge.data,'base64'))).toString('base64');}
+test('Link proofs require actual key possession, exact account/session, reject replay/expiry and canonical-key aliases',async()=>{
+ const owner=await identity(),attacker=await identity();await validateLinkPublicKey(owner.publicKeyB64);await assert.rejects(validateLinkPublicKey(' '+owner.publicKeyB64));
+ const challenge=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64);await assert.rejects(solve(attacker,challenge));await assert.rejects(solve(owner,{...challenge,deviceId:2}));
+ const answer=await solve(owner,challenge);const proof=answerLinkChallenge('owner','session',challenge.id,answer);assert.equal(verifyLinkProof('owner','session',proof.token),1);
+ assert.throws(()=>verifyLinkProof('other','session',proof.token));assert.throws(()=>verifyLinkProof('owner','other-session',proof.token));assert.throws(()=>answerLinkChallenge('owner','session',challenge.id,answer));
+ revokeLinkProofs('owner',1);assert.throws(()=>verifyLinkProof('owner','session',proof.token));
+ const expired=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64,1000);assert.throws(()=>answerLinkChallenge('owner','session',expired.id,answer,62000));
+ const failed=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64);assert.throws(()=>answerLinkChallenge('owner','bad-session',failed.id,'AAAA'));assert.throws(()=>answerLinkChallenge('owner','session',failed.id,answer));
+});
+test('Link pairing requires both actors; foreign devices, revocation and key reuse fail closed',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-link-'));const file=join(dir,'db.sqlite');let db;
+ try{db=openDatabase(file);for(const id of ['a','b'])db.addUser({id,username:id,displayName:id,salt:'s',hash:'h'});const one=await identity(),two=await identity(),three=await identity();
+ const a=db.link.register('a','First','web',one.publicKeyB64).id,b=db.link.register('a','Second','web',two.publicKeyB64).id,c=db.link.register('b','Foreign','web',three.publicKeyB64).id;
+ assert.equal(db.link.register('a','Other name','web',one.publicKeyB64).id,a);assert.throws(()=>db.link.startPair('a',a,c),/not found/);assert.throws(()=>db.link.startPair('a',a,a),/another/);
+ const pair=db.link.startPair('a',a,b);assert.equal(db.link.confirm('a',a,pair.id,true).verified,false);assert.equal(db.link.confirm('a',b,pair.id,true).verified,true);
+ assert.throws(()=>db.link.pair('b',c,pair.id),/not found/);assert.equal(db.link.list('a',a).pairs[0].status,'verified');
+ db.close();db=openDatabase(file);assert.equal(db.link.list('a',b).pairs[0].status,'verified');db.link.revoke('a',a,b);assert.equal(db.link.list('a',a).pairs[0].status,'rejected');assert.throws(()=>db.link.register('a','Reused','web',two.publicKeyB64),/revoked/);assert.throws(()=>db.link.confirm('a',a,pair.id,true),/revoked/);
+ }finally{db?.close();await rm(dir,{recursive:true,force:true});}
+});
+test('Link chunks enforce direction, verified pairs, exact lengths, idempotency, receipts and purge on rejection/revocation',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-link-chunks-'));let db;
+ try{db=openDatabase(join(dir,'db.sqlite'));db.addUser({id:'a',username:'a',displayName:'a',salt:'s',hash:'h'});const keys=await Promise.all([identity(),identity(),identity()]);const ids=keys.map((key,i)=>db.link.register('a','Device '+i,'web',key.publicKeyB64).id);const [a,b,c]=ids;const pair=db.link.startPair('a',a,b);
+ assert.throws(()=>db.link.payloads.create('a',a,{pairId:pair.id,peer:b,kind:'text',name:'Text',mime:'text/plain',size:4}),/verified/);db.link.confirm('a',a,pair.id,true);db.link.confirm('a',b,pair.id,true);
+ const payload=db.link.payloads.create('a',a,{pairId:pair.id,peer:b,kind:'file',name:'file.bin',mime:'application/octet-stream',size:256*1024+10});const chunk=size=>({v:1,iv:Buffer.alloc(12).toString('base64'),data:Buffer.alloc(size+16).toString('base64')});
+ assert.throws(()=>db.link.payloads.upload('a',b,payload.id,0,chunk(256*1024)),/source/);assert.throws(()=>db.link.payloads.get('a',c,payload.id),/another/);assert.throws(()=>db.link.payloads.upload('a',a,payload.id,0,chunk(1)),/length/);
+ db.link.payloads.upload('a',a,payload.id,0,chunk(256*1024));db.link.payloads.upload('a',a,payload.id,0,chunk(256*1024));assert.throws(()=>db.link.payloads.chunk('a',b,payload.id,0),/not ready/);
+ db.link.payloads.upload('a',a,payload.id,1,chunk(10));assert.equal(db.link.payloads.list('a',b)[0].status,'queued');assert.deepEqual(db.link.payloads.chunk('a',b,payload.id,1).envelope,chunk(10));assert.throws(()=>db.link.payloads.chunk('a',a,payload.id,1),/destination/);assert.throws(()=>db.link.payloads.finish('a',a,payload.id,'complete'),/destination/);
+ db.link.payloads.finish('a',b,payload.id,'complete');assert.equal(db.link.payloads.list('a',a)[0].receivedChunks,0);assert.throws(()=>db.link.payloads.upload('a',a,payload.id,0,chunk(256*1024)),/closed/);
+ const pending=db.link.payloads.create('a',a,{pairId:pair.id,peer:b,kind:'text',name:'Text',mime:'text/plain',size:4});db.link.payloads.upload('a',a,pending.id,0,chunk(4));db.link.confirm('a',a,pair.id,false);const cancelled=db.link.payloads.list('a',a).find(row=>row.id===pending.id);assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.receivedChunks,0);
+ const newPair=db.link.startPair('a',a,b);assert.notEqual(newPair.id,pair.id);db.link.confirm('a',a,newPair.id,true);db.link.confirm('a',b,newPair.id,true);const revoked=db.link.payloads.create('a',a,{pairId:newPair.id,peer:b,kind:'text',name:'Text',mime:'text/plain',size:4});db.link.payloads.upload('a',a,revoked.id,0,chunk(4));db.link.revoke('a',a,b);const result=db.link.payloads.list('a',a).find(row=>row.id===revoked.id);assert.equal(result.status,'cancelled');assert.equal(result.receivedChunks,0);
+ }finally{db?.close();await rm(dir,{recursive:true,force:true});}
+});

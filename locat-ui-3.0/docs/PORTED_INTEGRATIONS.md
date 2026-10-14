@@ -25,3 +25,7 @@ Playlist membership/order editing and opt-in sequential Cinema playback are now 
 ### Client-encrypted private storage continuation
 
 Vault/Secrets now adapt the original wrapping/envelope/quota/revision architecture to UI3's SQLite/authentication service and shared UI theme. File/credential/note operations, encrypted metadata, client-only search/folders, locking, generator, clipboard, encrypted backup and missing-only restore are connected. See PRIVATE_STORAGE.md for exact scope, verification and original-data compatibility limits. This remains experimental and separately requires browser/native acceptance and independent security review.
+
+### Devices and Link continuation
+
+Original Link proof, pairing and directional transfer policies now have SQLite/authenticated UI3 paths and themed controls. Browser identities/peer pins, dual confirmation, encrypted text/URL/explicit clipboard/files, quotas, receipts, cancellation and revocation are connected. LINK_INTEGRATION.md records exact limits and original-data/domain differences; native/LAN/Remote and independent protocol acceptance remain open.

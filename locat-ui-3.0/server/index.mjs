@@ -13,6 +13,7 @@ import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } fr
 import { promisify } from "node:util";
 import { createMediaLibrary } from "./media.mjs";
 import { createRateLimiter } from "./rateLimit.mjs";
+import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
 import { createSentinelHandler } from "./sentinel.mjs";
 import { openDatabase } from "./database.mjs";
@@ -60,6 +61,7 @@ function sessionUser(req) {
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.tls ? "; Secure" : "");
 }
+const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
 async function handle(req, res) {
@@ -70,6 +72,7 @@ async function handle(req, res) {
     const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
+  if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });

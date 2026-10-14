@@ -1,3 +1,4 @@
+import { linkStore } from './link.mjs';
 import { privateStore } from './privateStore.mjs';
 import { sentinelStore } from './sentinel.mjs';
 import { randomInt } from 'node:crypto';
@@ -13,7 +14,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 6) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 8) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -71,9 +72,19 @@ export function openDatabase(filename) {
     CREATE TABLE privateStores (userId TEXT NOT NULL REFERENCES users(id), module TEXT NOT NULL CHECK(module IN ('vault','secrets')), config TEXT NOT NULL, PRIMARY KEY(userId,module));
     CREATE TABLE privateObjects (userId TEXT NOT NULL, module TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, envelope TEXT NOT NULL, bytes INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(userId,module,id), FOREIGN KEY(userId,module) REFERENCES privateStores(userId,module));
     PRAGMA user_version = 6; COMMIT;`);
+  if (version < 7) sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE linkDevices (id INTEGER PRIMARY KEY AUTOINCREMENT, userId TEXT NOT NULL REFERENCES users(id), name TEXT NOT NULL, platform TEXT NOT NULL, publicKey TEXT NOT NULL, createdAt INTEGER NOT NULL, lastSeenAt INTEGER, revokedAt INTEGER, UNIQUE(userId,publicKey));
+    CREATE TABLE linkPairs (id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id), deviceA INTEGER NOT NULL REFERENCES linkDevices(id), deviceB INTEGER NOT NULL REFERENCES linkDevices(id), status TEXT NOT NULL CHECK(status IN ('pending','verified','rejected')), confirmedA INTEGER NOT NULL, confirmedB INTEGER NOT NULL, updatedAt INTEGER NOT NULL, UNIQUE(userId,deviceA,deviceB),CHECK(deviceA<deviceB));
+    PRAGMA user_version = 7; COMMIT;`);
+  if (version < 8) sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE linkPayloads (id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id), pairId TEXT NOT NULL, fromDevice INTEGER NOT NULL REFERENCES linkDevices(id), toDevice INTEGER NOT NULL REFERENCES linkDevices(id), kind TEXT NOT NULL CHECK(kind IN ('file','text','url','clipboard')), name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, chunkCount INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('uploading','queued','complete','cancelled')), createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL,CHECK(fromDevice!=toDevice));
+    CREATE INDEX link_payload_owner ON linkPayloads(userId,createdAt);
+    CREATE TABLE linkPayloadChunks (payloadId TEXT NOT NULL REFERENCES linkPayloads(id), seq INTEGER NOT NULL, envelope TEXT NOT NULL, PRIMARY KEY(payloadId,seq));
+    PRAGMA user_version = 8; COMMIT;`);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
+    link: linkStore(sql),
     sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
     health: () => ({ schemaVersion: sql.prepare("PRAGMA user_version").get().user_version, accessible: sql.prepare("SELECT 1 AS ok").get().ok === 1 }),
