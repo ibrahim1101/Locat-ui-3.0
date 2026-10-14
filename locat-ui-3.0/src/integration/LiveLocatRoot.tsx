@@ -26,7 +26,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     ...previewAdapter,
     mode: "live",
     moduleAvailability: (id, ctx) => {
-      if (id !== "settings" && id !== "profile") return { availability: "planned", reason: "Live backend module not yet implemented" };
+      if (id !== "settings" && id !== "profile" && id !== "home") return { availability: "planned", reason: "Live backend module not yet implemented" };
       return liveModuleAvailability(id, ctx);
     },
     auth: {
