@@ -18,7 +18,11 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   const [session, setSession] = useState<LiveSessionSnapshot>({ authStatus: "loading", user: null, connection: disconnected });
   const refresh = async () => {
     const account = await liveAuthApi.currentAccount();
-    setSession({ authStatus: account ? "ready" : "signedOut", user: account ? view(account) : null, connection: disconnected });
+    const reachable = await fetch("/api/ready", { cache: "no-store", credentials: "omit" })
+      .then(async (response) => response.ok && (await response.json()).app === "Locat")
+      .catch(() => false);
+    const connection = { ...disconnected, server: reachable ? "connected" as const : "unreachable" as const };
+    setSession({ authStatus: account ? "ready" : "signedOut", user: account ? view(account) : null, connection });
   };
   useEffect(() => { void refresh(); }, []);
 
