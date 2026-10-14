@@ -28,3 +28,5 @@ All state-changing requests require the matching `Origin` header. The browser AP
 ## Known limitations to resolve before wider testing
 
 The current registration endpoint does not automatically sign in. Passwords are hashed using scrypt, but no request throttling is in place yet. The development API does not generate cryptographic messaging identities, and the existing UI preview is still separate from the real backend. Do not describe login as end-to-end integrated until the live entrypoint is wired and tested.
+
+The live UI is opt-in. To return to the preview in PowerShell, run `Remove-Item Env:VITE_LOCAT_LIVE` before starting Vite. The backend must be running for live sign-in. This mode is currently **authentication integration testing**, not a production app: many signed-in screens still display preview fixture data and are not backed by real services. Do not treat displayed messages, media, or device state as real user data.\n
