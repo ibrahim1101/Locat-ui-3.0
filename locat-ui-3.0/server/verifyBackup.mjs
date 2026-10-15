@@ -18,7 +18,12 @@ const columns={
  matrixAccounts:['userId','matrixUserId','createdAt'],matrixBindings:['userId','linkDeviceId','matrixUserId','matrixDeviceId','publicKeys','tokenHash','sessionHash','expiresAt'],matrixRevocations:['userId','linkDeviceId','matrixUserId','matrixDeviceId','status','attempts','nextAttemptAt','leaseUntil','leaseToken','createdAt','updatedAt'],matrixManagedDevices:['userId','linkDeviceId','matrixUserId','matrixDeviceId','operationToken','operationUntil','createdAt','updatedAt'],
 };
 /** Verify an isolated copy; never open/migrate/restore the selected original database. */
-export async function verifyServerBackup(filename,{expectedSha256}={}){
+export async function verifyServerBackup(filename,options={}){
+ return withVerifiedServerBackup(filename,options,report=>report);
+}
+
+/** Internal operator helper: the private snapshot exists only during consume. */
+export async function withVerifiedServerBackup(filename,{expectedSha256}={},consume){
  if(groups.length!==DATABASE_SCHEMA_VERSION)throw new Error('Backup verifier schema manifest needs updating');
  if(typeof filename!=='string'||!filename)throw new Error('Select a completed standalone SQLite backup');
  if(expectedSha256!==undefined&&(typeof expectedSha256!=='string'||!/^[a-fA-F0-9]{64}$/.test(expectedSha256)))throw new Error('Expected SHA-256 must contain exactly 64 hexadecimal characters');
@@ -45,7 +50,9 @@ export async function verifyServerBackup(filename,{expectedSha256}={}){
    for(const column of required)if(!actual.has(column))throw new Error('Backup is missing required Locat columns');
   }
   const counts={};for(const name of ['users','envelopes','privateObjects','linkDevices','matrixBindings'])if(tables.has(name))counts[name]=sql.prepare('SELECT COUNT(*) AS n FROM '+name).get().n;
-  return {ok:true,schemaVersion,sizeBytes:bytes,sha256,expectedHashMatched:expectedSha256?true:null,integrity:'ok',foreignKeys:'ok',schemaCheck:'required-tables-and-columns',counts,scope:'standalone-locat-sqlite',checkedAt:new Date().toISOString()};
+  const report={ok:true,schemaVersion,sizeBytes:bytes,sha256,expectedHashMatched:expectedSha256?true:null,integrity:'ok',foreignKeys:'ok',schemaCheck:'required-tables-and-columns',counts,scope:'standalone-locat-sqlite',checkedAt:new Date().toISOString()};
+  sql.close();sql=undefined;
+  return await consume(report,snapshot);
  }catch(error){if(error.code)throw new Error('Backup could not be read or verified');throw error;}
  finally{try{sql?.close();}finally{try{await source?.close();}finally{if(working)await rm(working,{recursive:true,force:true});}}}
 }
