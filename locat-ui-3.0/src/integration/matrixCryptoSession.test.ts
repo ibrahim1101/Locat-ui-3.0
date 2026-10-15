@@ -34,6 +34,14 @@ it('checks returning device keys against existing pins before exposing a bindabl
  expect(stop).toHaveBeenCalledTimes(2);expect(linkRequest).not.toHaveBeenCalled();
 });
 
+it('aborts gateway transport on store close while retaining caller cancellation',async()=>{
+ vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
+ const fetch=vi.fn((_path:unknown,options:RequestInit)=>new Promise<Response>((_resolve,reject)=>options.signal?.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true})));vi.stubGlobal('fetch',fetch);
+ const value=await openMatrixCryptoSession(binding),transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch,caller=new AbortController();
+ const first=expect(transport(window.location.origin+'/_matrix/client/v3/sync',{signal:caller.signal})).rejects.toMatchObject({name:'AbortError'});await vi.waitFor(()=>expect(fetch).toHaveBeenCalledTimes(1));caller.abort();await first;expect(value.closed).toBe(false);
+ const second=expect(transport(window.location.origin+'/_matrix/client/v3/sync')).rejects.toMatchObject({name:'AbortError'});await vi.waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));await value.close();await second;expect(fetch.mock.calls[1][1].signal?.aborted).toBe(true);
+});
+
 it('holds the crypto store lock until an in-progress history import settles during close',async()=>{
  vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
  decryptHistory.mockResolvedValue({json:'[{}]',entries:1});let finish:()=>void=()=>{};crypto.importRoomKeysAsJson.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));

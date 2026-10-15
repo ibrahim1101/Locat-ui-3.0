@@ -48,3 +48,5 @@ Live verification checkpoint: UI3 now explicitly enables room-free verification 
 
 
 Current durable follow-on: schema 13 now queues cleanup of bound Matrix devices atomically with Link revocation. The managed worker retries and records confirmed/manual results, and UI3 renders that status. See MATRIX_DEVICE_REVOCATION.md for scope and remaining limits; the earlier separate-action description is historical.
+
+Real Chromium managed-device setup, native IndexedDB signing-key continuity, exclusive writer rejection, verification sync and confirmed logout/cleanup passed at 056b778 (workflow 38748818924). See BROWSER_FOUNDATION_ACCEPTANCE.md for exact evidence, certificate/network restrictions and later peer-SAS test status. Settings and transports now isolate account lifetimes and cancel on close; this does not enable conversations or certify full recovery/native clients.

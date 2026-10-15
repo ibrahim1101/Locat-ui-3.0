@@ -35,7 +35,8 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
     if(target.origin!==window.location.origin||!target.pathname.startsWith('/_matrix/'))throw new Error('Matrix transport must stay on the protected same-origin gateway.');
     if(closed)throw new Error('Messaging device closed');const proof=await link.connect();if(closed)throw new Error('Messaging device closed');
     const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Locat-Device-Proof',proof.token);headers.set('Authorization','Bearer '+binding.accessToken);
-    return fetch(input,{...init,headers,credentials:'same-origin',cache:'no-store'});
+    const callerSignal=init?.signal??(input instanceof Request?input.signal:undefined);
+    return fetch(input,{...init,headers,signal:callerSignal?AbortSignal.any([lifecycle.signal,callerSignal]):lifecycle.signal,credentials:'same-origin',cache:'no-store'});
    };
    client=createClient({fetchFn,baseUrl:window.location.origin,userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,verificationMethods:['m.sas.v1'],logger:quiet});
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'locat-ui3-matrix:'+scope});
@@ -48,6 +49,6 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
    await held;
   }finally{await verification?.close();closed=true;await Promise.allSettled([...pendingCrypto]);client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
  });
- void task.catch(error=>{closed=true;signal?.removeEventListener('abort',cancel);failed(error);});
+ void task.catch(error=>{closed=true;lifecycle.abort();link.close();signal?.removeEventListener('abort',cancel);failed(error);});
  return initialized;
 }
