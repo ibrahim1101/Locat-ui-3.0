@@ -1,3 +1,4 @@
+import {createSessionSecurityHandler} from './sessionSecurity.mjs';
 import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
 import {loadMatrixAppserviceFile} from './matrixAppserviceFile.mjs';
 import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
@@ -77,6 +78,7 @@ function sessionUser(req) {
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
+const sessionSecurity=createSessionSecurityHandler({db,sessionUser,sessionToken:cookie,body,json,scrypt,serialized});
 const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=verifyLinkProof(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
@@ -90,6 +92,7 @@ async function handle(req, res) {
     const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
+  if (await sessionSecurity(req,res,url,trustedOrigin)) return;
   if (await matrixGateway(req,res,url,trustedOrigin)) return;
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
@@ -217,13 +220,13 @@ async function handle(req, res) {
     const { currentPassword, newPassword } = input;
     if (typeof currentPassword !== "string" || currentPassword.length > 256 || typeof newPassword !== "string" || newPassword.length < 15 || newPassword.length > 256) return json(res, 400, { error: "Invalid password; new password must be 15–256 characters" });
     const candidate = await scrypt(currentPassword, user.salt, 64);
+    if (!timingSafeEqual(candidate, Buffer.from(user.hash, "hex"))) return json(res, 401, { error: "Invalid credentials" });
+    const salt = randomBytes(16).toString("hex");
+    const hash = (await scrypt(newPassword, salt, 64)).toString("hex");
+    const sessionHash=createHash('sha256').update(cookie(req)).digest('hex');
     return serialized(async () => {
-      const latest = db.userById(user.id);
-      if (!timingSafeEqual(candidate, Buffer.from(latest.hash, "hex"))) return json(res, 401, { error: "Invalid credentials" });
-      const salt = randomBytes(16).toString("hex");
-      const hash = (await scrypt(newPassword, salt, 64)).toString("hex");
-      db.changePassword(user.id, salt, hash);
-      db.audit(user.id, "password.changed", "warn");
+      if(req.aborted||res.destroyed)throw Object.assign(new Error('Password change disconnected'),{status:401});
+      db.changePassword(user.id, salt, hash, {sessionHash,expectedPasswordHash:user.hash});
       return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
     });
   }

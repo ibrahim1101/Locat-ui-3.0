@@ -172,11 +172,27 @@ export function openDatabase(filename) {
     },
     sessions: (userId, now) => sql.prepare('SELECT hash AS id, expiresAt FROM sessions WHERE userId = ? AND expiresAt > ? ORDER BY expiresAt DESC').all(userId, now),
     revokeOwnedSession: (hash, userId) => sql.prepare('DELETE FROM sessions WHERE hash = ? AND userId = ?').run(hash, userId),
-    changePassword(userId, salt, hash) {
+    revokeOtherSessions(userId,currentHash,expectedPasswordHash,now) {
+      sql.exec('BEGIN IMMEDIATE');try {
+        now??=Date.now();
+        const current=sql.prepare('SELECT u.hash FROM users u JOIN sessions s ON s.userId=u.id WHERE u.id=? AND s.hash=? AND s.expiresAt>?').get(userId,currentHash,now);
+        if(!current||current.hash!==expectedPasswordHash)throw Object.assign(new Error('Session or credentials changed; sign in again'),{status:401});
+        sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=? AND sessionHash IN (SELECT hash FROM sessions WHERE userId=? AND hash<>? AND expiresAt>?)').run(userId,userId,currentHash,now);
+        const revokedCount=sql.prepare('DELETE FROM sessions WHERE userId=? AND hash<>? AND expiresAt>?').run(userId,currentHash,now).changes;
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES (?,?,?,?)').run(userId,'session.others.revoked','warn',now);
+        sql.exec('COMMIT');return revokedCount;
+      }catch(error){sql.exec('ROLLBACK');throw error;}
+    },
+    changePassword(userId, salt, hash, {sessionHash,expectedPasswordHash}, now) {
       sql.exec('BEGIN IMMEDIATE');
       try {
+        now??=Date.now();
+        const current=sql.prepare('SELECT u.hash FROM users u JOIN sessions s ON s.userId=u.id WHERE u.id=? AND s.hash=? AND s.expiresAt>?').get(userId,sessionHash,now);
+        if(!current||current.hash!==expectedPasswordHash)throw Object.assign(new Error('Session or credentials changed; sign in again'),{status:401});
         sql.prepare('UPDATE users SET salt = ?, hash = ? WHERE id = ?').run(salt, hash, userId);
+        sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=?').run(userId);
         sql.prepare('DELETE FROM sessions WHERE userId = ?').run(userId);
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES (?,?,?,?)').run(userId,'password.changed','warn',now);
         sql.exec('COMMIT');
       } catch (error) { sql.exec('ROLLBACK'); throw error; }
     },

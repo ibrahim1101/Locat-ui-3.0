@@ -1,3 +1,4 @@
+import WebSocket from 'ws';
 /** Synthetic loopback acceptance of the production HTTPS/auth/proof boundary.
  * This is a Node client, not browser persistence or UI acceptance. */
 import assert from 'node:assert/strict';
@@ -82,6 +83,10 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   const secondLogin=await api('/api/auth/login',{method:'POST',data:{username:alice.username,password:alice.password}});assert.equal(secondLogin.status,200);
   const secondCookie=secondLogin.headers.get('set-cookie').split(';')[0];assert.equal((await api(protectedPath,{...alice.auth,cookie:secondCookie,headers:bearer})).status,403,'Device proof is bound to the exact login session');
   assert.equal((await api('/api/link/matrix/provision',{...alice.auth,method:'POST',data:{},headers:{Origin:'https://untrusted.invalid'}})).status,403,'Wrong mutation origin must fail');
+  assert.equal((await api('/api/auth/sessions/revoke-others',{...alice.auth,method:'POST',data:{currentPassword:'incorrect-password'}})).status,401,'Bulk sign-out requires password confirmation');
+  assert.equal((await api('/api/auth/sessions/revoke-others',{...alice.auth,method:'POST',data:{currentPassword:alice.password},headers:{Origin:'https://foreign.invalid'}})).status,403,'Bulk sign-out requires exact mutation Origin');
+  const otherSocket=new WebSocket(origin.replace('https:','wss:')+'/api/connect/socket',{ca,headers:{Origin:origin,Cookie:secondCookie}});
+  try{await once(otherSocket,'message');const result=await json('/api/auth/sessions/revoke-others',{...alice.auth,method:'POST',data:{currentPassword:alice.password}});assert.equal(result.revokedCount,1);assert.equal((await api('/api/auth/me',alice.auth)).status,200);assert.equal((await api('/api/auth/me',{cookie:secondCookie})).status,401);assert.equal((await api('/api/auth/me',bob.auth)).status,200);const closed=once(otherSocket,'close');otherSocket.send(JSON.stringify({type:'ping',id:'revoked-session'}));const [code]=await Promise.race([closed,pause(15000).then(()=>{throw new Error('Revoked HTTPS session socket stayed open');})]);assert.equal(code,4001);}finally{otherSocket.terminate();}
   await Promise.all([alice.controller.start(),bob.controller.start()]);await bob.controller.devices(alice.user.id);
   await alice.controller.request(bob.user.id,bob.issued.deviceId);await until(()=>bob.state().phase==='requested','HTTPS incoming verification');await bob.controller.accept();
   await until(()=>alice.state().phase==='comparing'&&bob.state().phase==='comparing','HTTPS SAS comparison');assert.deepEqual(alice.state().decimal,bob.state().decimal);assert.deepEqual(alice.state().emoji,bob.state().emoji);
@@ -101,7 +106,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken]))assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, unbound-device cleanup, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}

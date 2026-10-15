@@ -14,3 +14,6 @@ This is production server integration acceptance with synthetic accounts, a Node
 
 
 The schema 14 follow-on also creates two managed devices that never bind: the first is explicitly revoked with only its Locat proof and no token in the command; the second is revoked through Link and its durable cleanup job. Their actual upstream tokens must return 401, their unbound gateway remains 403, and raw-secret database/WAL checks include these accounts.
+
+
+Session-policy follow-on: the real HTTPS server rejects wrong-password and foreign-Origin bulk sign-out, preserves the current/foreign accounts, rejects the other login cookie after success and closes its actual WSS health connection with 4001 on the next message. This is local session revocation; Matrix account-wide token deletion remains separate.
