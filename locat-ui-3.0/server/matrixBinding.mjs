@@ -36,6 +36,7 @@ export function matrixBindingStore(sql,devices){
  const peer=(userId,peerId)=>acceptedPeer.get(userId,userId,peerId,userId,userId);
  return {current,
  peer(userId,actor,peerId){devices.owned(userId,actor);const value=peer(userId,peerId);if(!value)fail(404,'Messaging contact is unavailable');return {...value,verification:'requires-client-verification'};},
+ permitsMatrixDevice(userId,matrixUserId,deviceId){const target=sql.prepare('SELECT b.userId FROM matrixBindings b JOIN linkDevices d ON d.id=b.linkDeviceId AND d.userId=b.userId WHERE b.matrixUserId=? AND b.matrixDeviceId=? AND b.expiresAt>? AND d.revokedAt IS NULL').get(matrixUserId,deviceId,Date.now());return !!target&&(target.userId===userId||!!peer(userId,target.userId));},
  permitsMatrixPeer(userId,matrixUserId){const value=sql.prepare('SELECT userId FROM matrixAccounts WHERE matrixUserId=?').get(matrixUserId);return !!value&&!!peer(userId,value.userId);},
  status(userId,actor){devices.owned(userId,actor);const account=sql.prepare('SELECT matrixUserId FROM matrixAccounts WHERE userId=?').get(userId);const binding=current(userId,actor);return {matrixUserId:account?.matrixUserId??null,device:binding?{deviceId:binding.matrixDeviceId,publicKeys:JSON.parse(binding.publicKeys),expiresAt:binding.expiresAt}:null};},
  bind(userId,actor,sessionHash,input,remote){

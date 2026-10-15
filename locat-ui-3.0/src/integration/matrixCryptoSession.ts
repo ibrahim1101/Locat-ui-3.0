@@ -35,7 +35,7 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
     const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Locat-Device-Proof',proof.token);
     return fetch(input,{...init,headers,credentials:'same-origin',cache:'no-store'});
    };
-   client=sdk.createClient({fetchFn,baseUrl:window.location.origin,userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,logger:quiet});
+   client=sdk.createClient({fetchFn,baseUrl:window.location.origin,userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,verificationMethods:['m.sas.v1'],logger:quiet});
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'locat-ui3-matrix:'+scope});
    if(closed)throw new Error('Messaging initialization cancelled.');
    const crypto=client.getCrypto();if(!crypto)throw new Error('Reviewed messaging encryption is unavailable.');

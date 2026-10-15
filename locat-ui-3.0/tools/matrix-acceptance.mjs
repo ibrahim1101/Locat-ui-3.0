@@ -1,3 +1,4 @@
+import {verificationRoute,validateMatrixVerification} from '../server/matrixVerification.mjs';
 import {inspectHistoryFile,inspectHistoryKeys} from '../shared/matrixHistoryFormat.mjs';
 import 'fake-indexeddb/auto';
 import {createManagedMatrixProvisioner} from '../server/matrixProvisioning.mjs';
@@ -22,9 +23,9 @@ const version=await exec(python,['-c','import synapse;print(synapse.__version__)
 const dir=await mkdtemp(join(tmpdir(),'locat-matrix-acceptance-'));let child,locat;const clients=[];
 const quiet={trace(){},debug(){},info(){},warn(){},error(){},getChild(){return this;}};
 const {logger}=await import('matrix-js-sdk/lib/logger.js');for(const level of ['trace','debug','info','warn','error','log'])logger[level]=()=>{};logger.getChild=()=>quiet;
-const networks=new Map();
+const networks=new Map(),verificationEvents=new Set();let verificationValidationError=null;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(test,label,ms=30000){const end=Date.now()+ms;while(Date.now()<end){if(await test())return;await pause(100);}throw new Error('Timed out: '+label);}
+async function until(test,label,ms=30000){const end=Date.now()+ms;while(Date.now()<end){if(verificationValidationError)throw verificationValidationError;if(await test())return;await pause(100);}throw new Error('Timed out: '+label);}
 try{
  locat=openDatabase(join(dir,'locat-binding.sqlite'));
  const registration=join(dir,'appservice.json'),appservice=createMatrixAppserviceRegistration(locat.serverId,'locat-test.invalid'),asToken=appservice.as_token;
@@ -42,7 +43,7 @@ try{
  }
  const provider=matrixProvider({LOCAT_MATRIX_UPSTREAM:baseUrl,LOCAT_MATRIX_SERVER_NAME:'locat-test.invalid'});
  const provisioner=createManagedMatrixProvisioner({provider,serviceToken:asToken,serverId:locat.serverId,store:locat.matrixBindings});
- async function client(account){const network={online:true,pending:new Set()};networks.set(account.user_id,network);const fetchFn=async(input,init)=>{if(!network.online)throw new Error('Synthetic offline client');const control=new AbortController();network.pending.add(control);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([init.signal,control.signal]):control.signal});}finally{network.pending.delete(control);}};const c=createClient({fetchFn,baseUrl,accessToken:account.access_token,userId:account.user_id,deviceId:account.device_id,logger:quiet});clients.push(c);await c.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'synthetic-locat-'+account.user_id+'-'+account.device_id});const rust=await import('@matrix-org/matrix-sdk-crypto-wasm');new rust.Tracing(rust.LoggerLevel.Error).turnOff();
+ async function client(account){const network={online:true,pending:new Set()};networks.set(account.user_id,network);const fetchFn=async(input,init)=>{const requestPath=new URL(String(input)).pathname,route=verificationRoute(requestPath);if(requestPath.startsWith('/_matrix/client/v3/sendToDevice/m.key.verification.'))assert.ok(route,'Every actual SAS event must match the protected routing shape');if(route){try{const target=validateMatrixVerification(route.event,JSON.parse(init.body),{matrixDeviceId:account.device_id});assert.ok(locat.matrixBindings.permitsMatrixDevice(account.locatAccountId,target.userId,target.deviceId),'Actual SAS recipient must pass Locat device scope');verificationEvents.add(route.event);}catch(error){verificationValidationError=new Error('Protected SAS '+route.event+': '+error.message);return new Response(JSON.stringify({errcode:'M_BAD_JSON',error:error.message}),{status:error.status??400,headers:{'Content-Type':'application/json'}});}}if(!network.online)throw new Error('Synthetic offline client');const control=new AbortController();network.pending.add(control);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([init.signal,control.signal]):control.signal});}finally{network.pending.delete(control);}};const c=createClient({fetchFn,baseUrl,accessToken:account.access_token,userId:account.user_id,deviceId:account.device_id,verificationMethods:['m.sas.v1'],logger:quiet});clients.push(c);await c.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'synthetic-locat-'+account.user_id+'-'+account.device_id});const rust=await import('@matrix-org/matrix-sdk-crypto-wasm');new rust.Tracing(rust.LoggerLevel.Error).turnOff();
  const accountId=account.locatAccountId,device=account.linkDeviceId;
  const publicKeys=await c.getCrypto().getOwnDeviceKeys(),binding={userId:account.user_id,deviceId:account.device_id,accessToken:account.access_token,publicKeys};const inspected=await provider.inspect(account.access_token);locat.matrixBindings.bind(accountId,device,matrixTokenHash('synthetic-locat-session'),binding,inspected);assert.equal(locat.matrixBindings.authorize(accountId,device,matrixTokenHash('synthetic-locat-session'),account.access_token).matrixDeviceId,account.device_id);
  await c.startClient({initialSyncLimit:20});await until(()=>c.getSyncState()==='PREPARED'||c.getSyncState()==='SYNCING','client initial sync');return c;}
@@ -67,6 +68,7 @@ try{
  }
  await sasRound(false);assert.notEqual((await alice.getCrypto().getDeviceVerificationStatus(bob.getUserId(),bob.getDeviceId())).isVerified(),true);assert.notEqual((await bob.getCrypto().getDeviceVerificationStatus(alice.getUserId(),alice.getDeviceId())).isVerified(),true);
  await sasRound(true);await until(async()=>{const a=await alice.getCrypto().getDeviceVerificationStatus(bob.getUserId(),bob.getDeviceId()),b=await bob.getCrypto().getDeviceVerificationStatus(alice.getUserId(),alice.getDeviceId());return a?.isVerified()===true&&b?.isVerified()===true;},'SAS verified trust persistence');
+ assert.deepEqual([...verificationEvents].sort(),['accept','cancel','done','key','mac','ready','request','start'],'All SAS message shapes must pass the production validator');
  // Synthetic out-of-band comparison: never mark a device trusted merely because the homeserver says so.
  async function verify(observer,peer){const devices=await observer.getCrypto().getUserDeviceInfo([peer.getUserId()],true);const own=await peer.getCrypto().getOwnDeviceKeys();const remote=devices.get(peer.getUserId())?.get(peer.getDeviceId());assert.ok(remote,'Peer device published');assert.equal(remote.getFingerprint(),own.ed25519);await observer.getCrypto().setDeviceVerified(peer.getUserId(),peer.getDeviceId(),true);assert.equal((await observer.getCrypto().getDeviceVerificationStatus(peer.getUserId(),peer.getDeviceId())).isVerified(),true);}
  await verify(alice,bob);await verify(bob,alice);alice.getCrypto().globalBlacklistUnverifiedDevices=true;bob.getCrypto().globalBlacklistUnverifiedDevices=true;
