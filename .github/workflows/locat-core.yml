@@ -57,3 +57,33 @@ jobs:
         env:
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-matrix-python/bin/python
         run: npm run test:matrix
+
+  browser-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: locat-ui-3.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: locat-ui-3.0/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: Install isolated Chromium test runtime
+        run: npx playwright install --with-deps chromium
+      - name: Built UI and browser storage foundation
+        run: npm run test:browser
+      - name: Browser acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-foundation-report
+          path: locat-ui-3.0/test-results/browser-results.json
+          if-no-files-found: warn
+          retention-days: 7
