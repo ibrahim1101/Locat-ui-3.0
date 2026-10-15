@@ -80,3 +80,11 @@ Diagnostic workflow 38774568776 at e649ea7, job 116558747407, identified the pee
 Workflow 38775163620 at d3879a09601fbd64025b47b3705c71a3a76b3bd9, browser job 116560800040, passed all six main tests (28.9 seconds) and then all three foreground foundation repetitions (10.3 seconds): https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/38775163620 . This includes actual Contacts UI search/request/acceptance before SAS, account Settings lifetime changes and expected-owner headers on private/Sentinel calls. It does not prove the original isolated missing-notice failure's cause or certify arbitrary background behavior; visibility auto-lock remains active.
 
 A seventh Photos target now exercises real native Chromium canvas/PNG/JPEG and browser-local import: pixel restoration on undo, redo geometry/annotations, edited-copy download and byte-identical original-file download, with history cleared on close/reopen. See PHOTO_EDITING.md. This new target is pending until its own observed successful run and does not certify all image codecs/native applications.
+
+## Photos drawing acceptance observed
+
+The preceding undo-only Photos revision 812058a0cfec55424827f071ded531c3ff2723f4 passed workflow 38776082498 on all three OS verification jobs; browser job 116563960019 passed seven tests (37.1 seconds) plus three foundation repetitions (12.4 seconds).
+
+Drawing revision 03a8805 / workflow 38777466494 passed all OS verification jobs but its browser job 116568715798 failed Photos when a raw mouse-down did not activate a draft after lower-page controls. Six other scenarios passed; repetitions were skipped. The fixture now explicitly scrolls to the canvas and checks its center hit target before using actual mouse input.
+
+Corrected revision b44cdaeb30d4d4381d50f52c827bbb91493aac91 / workflow 38778141307 / browser job 116571028417 passed seven tests in 40.1 seconds, then three foundation repetitions in 11.4 seconds. Photos checks actual green stroke pixels, one-step undo/redo, cancelled draft/export gating, undoable clearing, JPEG export and unchanged original PNG bytes. This is desktop Chromium acceptance, not physical touchscreen/stylus or native application certification. The subsequent Photo information disclosure assertion requires its own observed run.

@@ -2,7 +2,7 @@ import { safeMediaUrl } from "./mediaSource";
 import { useCallback, useEffect, useReducer, useRef, useState, type PointerEvent, type SetStateAction } from "react";
 import { defaultPhotoEdit, renderPhotoEdit } from "../lib/photoEditing";
 import { editedImageFile } from "../lib/imageEditing";
-import { Button, Slider, TextField } from "../ui";
+import { Button, Slider, TextField, formatBytes } from "../ui";
 import type { LocalMediaItem } from "./localMediaStore";
 import {createPhotoEditHistory,photoEditHistory,PHOTO_UNDO_LIMIT} from '../lib/photoEditHistory';
 import type {PhotoEdit,PhotoStroke} from '../lib/photoEditing';
@@ -11,6 +11,7 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
   const image = useRef<HTMLImageElement>(null);
   const preview = useRef<HTMLCanvasElement>(null);
   const [decoded, setDecoded] = useState(false);
+  const [sourceDimensions,setSourceDimensions]=useState<{width:number;height:number}|null>(null);
   const [caption, setCaption] = useState("");
   const [captionColor, setCaptionColor] = useState("#ffffff");
   const [tool, setTool] = useState("crop");
@@ -56,9 +57,10 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
   }
   return <section className="mb-6 space-y-4 rounded-2xl bg-s2 p-5 hairline" aria-label="Photo editor">
     <div className="flex items-center justify-between"><h2 className="font-semibold">{item.name}</h2><Button variant="ghost" onClick={onClose}>Close photo</Button></div>
-    <img ref={image} src={url || undefined} alt="" className="hidden" onLoad={() => { setDecoded(true); setError(""); }} onError={() => setError("This image format cannot be decoded.")} />
+    <img ref={image} src={url || undefined} alt="" className="hidden" onLoad={event => { setSourceDimensions({width:event.currentTarget.naturalWidth,height:event.currentTarget.naturalHeight});setDecoded(true); setError(""); }} onError={() => setError("This image format cannot be decoded.")} />
     <div className="flex h-96 items-center justify-center overflow-auto rounded-xl bg-black">{!decoded && <p role="status" className="text-white/70">Loading photo…</p>}<canvas ref={preview} onPointerDown={startDrawing} onPointerMove={moveDrawing} onPointerUp={finishDrawing} onPointerCancel={cancelPointer} onLostPointerCapture={cancelPointer} role="img" aria-label={`Edited preview of ${item.name}`} className="max-h-full max-w-full object-contain" style={{ touchAction:tool==='draw'?'none':undefined,cursor:tool==='draw'?'crosshair':undefined, display: decoded ? undefined : "none", transform: `scale(${zoom})` }} /></div>
     <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, geometry: { ...old.geometry, turns: (old.geometry.turns + 1) % 4 } }))}>Rotate</Button><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, flipX: !old.flipX }))}>Flip horizontal</Button><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, flipY: !old.flipY }))}>Flip vertical</Button><Button variant="ghost" onClick={() => { setEdit(defaultPhotoEdit()); setCaption(""); setError(""); }}>Reset edits</Button><Button disabled={draftStroke!==null} onClick={() => void exportCopy()}>Download edited copy</Button></div>
+    <details className="rounded-xl bg-s1 p-4 hairline"><summary className="cursor-pointer text-sm font-semibold">Photo information</summary><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><dt className="text-ink-3">Original dimensions</dt><dd>{sourceDimensions?`${sourceDimensions.width} × ${sourceDimensions.height} pixels`:"Waiting for image decode"}</dd><dt className="text-ink-3">File size</dt><dd>{Number.isFinite(item.size)&&item.size>=0?formatBytes(item.size):"Not provided"}</dd><dt className="text-ink-3">Reported file type</dt><dd className="break-words">{item.file.type||"Not provided"}</dd><dt className="text-ink-3">Source</dt><dd>{item.source==='server'?'Authenticated server library':'This browser'}</dd></dl><p className="mt-3 text-xs text-ink-3">Dimensions come from decoding the original image. Camera, capture date and GPS metadata are not extracted.</p></details>
     <Slider label="Viewer zoom" min={1} max={3} step={0.1} value={zoom} onChange={setZoom} />
     <div className="flex flex-wrap gap-2" role="group" aria-label="Photo edit history"><Button variant="ghost" disabled={!history.past.length} onClick={()=>{cancelDrawing();dispatch({type:'undo'});setError('');}}>Undo edit</Button><Button variant="ghost" disabled={!history.future.length} onClick={()=>{cancelDrawing();dispatch({type:'redo'});setError('');}}>Redo edit</Button></div>
     {(["brightness", "contrast", "saturation"] as const).map(key => <Slider key={key} label={key} min={0} max={200} value={edit[key]} onChange={value => setEdit(old => ({ ...old, [key]: value }))} />)}

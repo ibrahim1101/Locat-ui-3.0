@@ -1,3 +1,9 @@
+## Photo information and drawing browser acceptance
+
+Added a UI3 disclosure with decoded original dimensions, recorded file size, reported Blob MIME type and browser/server source. Unknown values remain explicit. The disclosure does not extract EXIF camera/capture-date/GPS fields or imply timeline inference. Extended the existing actual browser target to open the disclosure and verify original pixel dimensions; that additional assertion awaits its own CI execution. Added /api/media to the actual HTTP mismatched-owner rejection regression, which passed.
+
+Observed workflow 38778141307 at b44cdaeb30d4d4381d50f52c827bbb91493aac91, browser job 116571028417: all seven tests passed in 40.1 seconds and three separate foreground foundation repetitions passed in 11.4 seconds. Real Photos drawing/cancellation/undo/clear/export/original-byte assertions now passed after explicit canvas scrolling and hit checking. This does not certify physical touch/stylus or native platforms. macOS verification also succeeded; Linux/Windows status is separate until observed. Local follow-up check/lint, 232 frontend tests / 58 files, 105 backend tests and production build passed.
+
 ## Media refresh ownership and photo gesture regressions
 
 Server media inventory now uses the shared 15-second account request helper with X-Locat-Account, aborts replaced/unmounted loads and ignores late obsolete snapshots. A failed refresh retains the last successful library with its error visible. Local imports, read-only server paths, account-keyed root and file persistence remain unchanged. Provider regressions exercise expected-owner headers, overlapping refreshes, aborts and failed refresh preservation. A Photos DOM pointer regression verifies second-pointer exclusion, one-step undo and cancelled/lost-capture draft disposal.
