@@ -33,6 +33,19 @@ it('refuses sending through a verified server pairing when the local peer key is
  await screen.findAllByText('Review and confirm this peer key on this device before using Link.');expect(calls.some(row=>row.action==='create')).toBe(false);
 });
 
+it('discards the old account dialog and starts a fresh identity lifecycle when the account changes',async()=>{
+ api(true);const fetch=vi.mocked(globalThis.fetch);const view=render(<MemoryRouter><LiveDevices/></MemoryRouter>);
+ fireEvent.click(await screen.findByRole('button',{name:'Send to device'}));fireEvent.change(screen.getByLabelText('Text to encrypt'),{target:{value:'old account draft'}});
+ const original=session.user;
+ try{session.user={id:'second-device-owner'};view.rerender(<MemoryRouter><LiveDevices/></MemoryRouter>);expect(screen.queryByRole('dialog')).not.toBeInTheDocument();expect(screen.queryByDisplayValue('old account draft')).not.toBeInTheDocument();await waitFor(()=>expect(fetch.mock.calls.filter(([path])=>path==='/api/link/register')).toHaveLength(2));}finally{session.user=original;}
+});
+
+it('prevents duplicate submissions and further chunks after unmount with a delayed create response',async()=>{
+ local.pins.pair='peer-public-key';const calls=api(true),base=globalThis.fetch;let release!:()=>void;let createSignal:AbortSignal|null|undefined;
+ const gate=new Promise<void>(resolve=>{release=resolve;});vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{const result=await base(path,options);if(path==='/api/link/payload/create'){createSignal=options?.signal;await gate;}return result;}));
+ const view=render(<MemoryRouter><LiveDevices/></MemoryRouter>);fireEvent.click(await screen.findByRole('button',{name:'Send to device'}));const field=screen.getByLabelText('Text to encrypt');fireEvent.change(field,{target:{value:'private queued text'}});const form=field.closest('form')!;fireEvent.submit(form);fireEvent.submit(form);await waitFor(()=>expect(calls.filter(row=>row.action==='create')).toHaveLength(1));view.unmount();expect(createSignal?.aborted).toBe(true);release();await gate;await Promise.resolve();await Promise.resolve();expect(calls.some(row=>row.action==='chunk')).toBe(false);
+});
+
 it.each([['pending','Matrix device cleanup pending — server retries when available'],['confirmed','Matrix device revocation confirmed'],['manual','Matrix session requires manual server sign-out']] as const)('renders the actual %s Matrix cleanup state',async(status,label)=>{api(false,status);render(<MemoryRouter><LiveDevices/></MemoryRouter>);expect(await screen.findByText(label)).toBeVisible();});
 
 it.each([['unbound','Managed setup recorded — binding not completed'],['authorized','Locat messaging grant active'],['blocked','Locat messaging grant blocked or expired']] as const)('shows the recorded %s messaging state for a device',async(binding,label)=>{api(false,undefined,{deviceId:'LOCAT_2',managed:true,operationActive:binding==='unbound',binding});render(<MemoryRouter><LiveDevices/></MemoryRouter>);expect(await screen.findByText(label)).toBeVisible();expect(screen.getByText('Managed Matrix device · LOCAT_2')).toBeVisible();if(binding==='unbound')expect(screen.getByText('Managed device operation in progress')).toBeVisible();});

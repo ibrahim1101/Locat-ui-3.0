@@ -30,23 +30,29 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  if(!url.pathname.startsWith('/api/link/'))return false;
  const user=sessionUser(req);if(!user)fail(401,'Not authenticated');
  const session=sessionToken(req);if(!session)fail(401,'Not authenticated');
+ let actor;
+ const recheck=()=>{
+  if(req.aborted||res.destroyed||sessionToken(req)!==session||sessionUser(req)?.id!==user.id)fail(401,'Locat session changed during device operation');
+  if(actor!==undefined){if(verifyLinkProof(user.id,session,req.headers['x-locat-device-proof'])!==actor)fail(401,'Device proof changed during operation');store.owned(user.id,actor);}
+ };
+ const readBody=async(request,maximum)=>{const input=await body(request,maximum);recheck();return input;};
  const action=url.pathname.slice('/api/link/'.length);
  if(req.method==='POST'){if(req.headers.origin!==origin)fail(403,'Origin mismatch');const retryAfter=(action==='payload/chunk'||action==='remote/signal'?chunkLimit:limit)(user.id);if(retryAfter)throw Object.assign(new Error('Device command rate limit exceeded'),{status:429,retryAfter});}
  if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed');
  if(req.method==='POST'&&['register','challenge','prove'].includes(action)){
- const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');
- if(action==='register'){if(Object.keys(input).some(key=>!['name','platform','publicKey'].includes(key))||typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>80||!['web','android','windows','linux','macos'].includes(input.platform)||typeof input.publicKey!=='string'||input.publicKey.length>200)fail(400,'Invalid device registration');await validateLinkPublicKey(input.publicKey);json(res,201,store.register(user.id,input.name.trim(),input.platform,input.publicKey));}
- else if(action==='challenge'){if(!Number.isSafeInteger(input.id)||input.id<1||Object.keys(input).some(key=>key!=='id'))fail(400,'Invalid device');const device=store.owned(user.id,input.id);json(res,200,await issueLinkChallenge(user.id,device.id,session,device.publicKey));}
+ const input=await readBody(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');
+ if(action==='register'){if(Object.keys(input).some(key=>!['name','platform','publicKey'].includes(key))||typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>80||!['web','android','windows','linux','macos'].includes(input.platform)||typeof input.publicKey!=='string'||input.publicKey.length>200)fail(400,'Invalid device registration');await validateLinkPublicKey(input.publicKey);recheck();json(res,201,store.register(user.id,input.name.trim(),input.platform,input.publicKey));}
+ else if(action==='challenge'){if(!Number.isSafeInteger(input.id)||input.id<1||Object.keys(input).some(key=>key!=='id'))fail(400,'Invalid device');const device=store.owned(user.id,input.id);const challenge=await issueLinkChallenge(user.id,device.id,session,device.publicKey);recheck();store.owned(user.id,device.id);json(res,200,challenge);}
  else{if(Object.keys(input).some(key=>!['id','answer'].includes(key))||typeof input.id!=='string'||input.id.length>100||typeof input.answer!=='string'||input.answer.length>100)fail(400,'Invalid proof');const proof=answerLinkChallenge(user.id,session,input.id,input.answer);store.owned(user.id,proof.deviceId);json(res,200,proof);}
  return true;
  }
- const actor=verifyLinkProof(user.id,session,req.headers['x-locat-device-proof']);store.owned(user.id,actor);
+ actor=verifyLinkProof(user.id,session,req.headers['x-locat-device-proof']);store.owned(user.id,actor);
  if(action.startsWith('matrix/')&&matrixBinding)return matrixBinding({req,res,url,userId:user.id,actor,session,recheck:()=>{if(req.aborted||res.destroyed)fail(401,'Messaging request disconnected');if(sessionUser(req)?.id!==user.id||verifyLinkProof(user.id,session,req.headers['x-locat-device-proof'])!==actor)fail(401,'Locat session changed during Matrix validation');store.owned(user.id,actor);}});
  if(action==='connectivity'&&req.method==='GET'){const retryAfter=iceLimit(user.id);if(retryAfter)throw Object.assign(new Error('Connectivity request rate limit exceeded'),{status:429,retryAfter});json(res,200,connectivity?.issue()??{iceServers:[],expiresAt:null,hasRelay:false});return true;}
- if(action.startsWith('remote/'))return handleRemote({req,res,url,store:store.remote,userId:user.id,actor,body,json});
- if(action.startsWith('payload'))return handleLinkPayload({req,res,url,store:store.payloads,userId:user.id,actor,body,json});
+ if(action.startsWith('remote/'))return handleRemote({req,res,url,store:store.remote,userId:user.id,actor,body:readBody,json});
+ if(action.startsWith('payload'))return handleLinkPayload({req,res,url,store:store.payloads,userId:user.id,actor,body:readBody,json});
  if(req.method==='GET'&&action==='devices'){json(res,200,{...store.list(user.id,actor),currentDeviceId:actor});return true;}
- if(req.method!=='POST')fail(404,'Not found');const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');
+ if(req.method!=='POST')fail(404,'Not found');const input=await readBody(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');
  const only=keys=>{if(Object.keys(input).some(key=>!keys.includes(key)))fail(400,'Invalid command fields');};
  if(action==='heartbeat'){only([]);store.heartbeat(user.id,actor);json(res,200,{ok:true});}
  else if(action==='rename'){only(['name']);if(typeof input.name!=='string'||!input.name.trim()||input.name.trim().length>80)fail(400,'Use a device name of 1–80 characters');store.rename(user.id,actor,input.name.trim());json(res,200,{ok:true});}

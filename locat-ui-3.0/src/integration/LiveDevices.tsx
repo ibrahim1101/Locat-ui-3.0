@@ -5,22 +5,25 @@ import {Badge,Button,Meter,Sheet,StateView,TextField,formatBytes} from '../ui';
 import {deviceSharedKey,pairingSas,solveDeviceChallenge} from './linkCrypto';
 import {LINK_CHUNK_SIZE,encryptLinkPayload,decryptLinkPayload,type LinkPayload} from './linkPayloadCrypto';
 import {loadLinkIdentity,pinLinkPeer,resetLinkIdentity,type StoredLinkIdentity} from './linkIdentityStore';
+import {linkRequest} from './linkRequest';
 export type LinkDevice={id:number;name:string;platform:string;publicKey:string;lastSeenAt:number|null;revokedAt:number|null;matrix?:{deviceId:string;managed:boolean;operationActive:boolean;binding:'unbound'|'authorized'|'blocked'}|null;matrixRevocation?:'pending'|'confirmed'|'manual'|null};
 export type LinkPair={id:string;deviceA:number;deviceB:number;status:'pending'|'verified'|'rejected';confirmedA:number;confirmedB:number};
 type LinkSnapshot={observedAt:number;devices:LinkDevice[];pairs:LinkPair[];currentDeviceId:number;payloads:LinkPayload[]};
 type Proof={token:string;deviceId:number;expiresAt:number};
-async function request(path:string,input?:unknown,proof?:string){
- const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
- try{const response=await fetch('/api/link/'+path,{signal:controller.signal,credentials:'same-origin',cache:'no-store',headers:{...(input===undefined?{}:{'Content-Type':'application/json'}),...(proof?{'X-Locat-Device-Proof':proof}:{})},...(input===undefined?{}:{method:'POST',body:JSON.stringify(input)})});const data=await response.json();if(!response.ok)throw new Error(data.error??'Device operation failed');return data;}finally{clearTimeout(timer);}
-}
 export function LiveDevices(){
- const {user}=useSession();const accountId=user?.id;
+ const {user}=useSession();
+ if(!user)return <Screen title="Devices" subtitle="Locat Link"><StateView kind="offline" title="Sign in to manage your devices" body="Local mode does not authorize pairing or transfers."/></Screen>;
+ return <OwnedDevices key={user.id} accountId={user.id}/>;
+}
+function OwnedDevices({accountId}:{accountId:string}){
  const [snapshot,setSnapshot]=useState<LinkSnapshot|null>(null),[name,setName]=useState('This browser'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[pairing,setPairing]=useState<{pair:LinkPair;peer:LinkDevice;code:string}|null>(null),[revoking,setRevoking]=useState<LinkDevice|null>(null),[reset,setReset]=useState(false);
  const identity=useRef<StoredLinkIdentity|null>(null),proof=useRef<Proof|null>(null),generation=useRef(0);
  const [sending,setSending]=useState<{peer:LinkDevice;pair:LinkPair}|null>(null),[sendKind,setSendKind]=useState<'text'|'url'|'clipboard'|'file'>('text'),[sendText,setSendText]=useState(''),[progress,setProgress]=useState<number|null>(null),[received,setReceived]=useState<{payload:LinkPayload;text:string}|null>(null);
  const [verifiedPayloads,setVerifiedPayloads]=useState<Set<string>>(()=>new Set());
  const cancelled=useRef(false);
  const proofRequest=useRef<Promise<Proof>|null>(null);
+ const busyRef=useRef(false),lifetime=useRef(new AbortController());
+ const request=useCallback((path:string,input?:unknown,deviceProof?:string)=>linkRequest(path,input,deviceProof,lifetime.current.signal),[]);
  const invalidate=useCallback(()=>{generation.current++;cancelled.current=true;identity.current=null;proof.current=null;proofRequest.current=null;},[]);
  const getProof=useCallback(async()=>{
   if(!accountId)throw new Error('A signed-in account is required');
@@ -33,11 +36,11 @@ export function LiveDevices(){
    const result:Proof=await request('prove',{id:challenge.id,answer});check();proof.current=result;return result;
   })();proofRequest.current=pending;
   try{return await pending;}finally{if(version===generation.current)proofRequest.current=null;}
- },[accountId]);
- const refresh=useCallback(async()=>{const current=await getProof();const value:LinkSnapshot=await request('devices',undefined,current.token);const jobs=await request('payloads',undefined,current.token);return {...value,payloads:jobs.payloads};},[getProof]);
- useEffect(()=>()=>invalidate(),[invalidate]);
- useEffect(()=>{if(!accountId)return;let active=true;let pending=false;const poll=async()=>{if(pending)return;pending=true;const version=generation.current;try{const value=await refresh();if(active&&version===generation.current){setSnapshot(value);const device=value.devices.find(row=>row.id===value.currentDeviceId);if(device)setName(device.name);setError('');}if(active&&version===generation.current&&proof.current)await request('heartbeat',{},proof.current.token);}catch(error){if(active&&version===generation.current)setError(error instanceof Error?error.message:'Device connection failed');}finally{pending=false;}};void poll();const timer=setInterval(()=>void poll(),20000);return()=>{active=false;clearInterval(timer);};},[accountId,refresh]);
- async function run(task:()=>Promise<void>){const version=generation.current;setBusy(true);setError('');try{await task();}catch(error){if(version===generation.current)setError(error instanceof Error?error.message:'Device operation failed');}finally{if(version===generation.current)setBusy(false);}}
+ },[accountId,request]);
+ const refresh=useCallback(async()=>{const current=await getProof();const value:LinkSnapshot=await request('devices',undefined,current.token);const jobs=await request('payloads',undefined,current.token);return {...value,payloads:jobs.payloads};},[getProof,request]);
+ useEffect(()=>{lifetime.current=new AbortController();return()=>{lifetime.current.abort();invalidate();};},[invalidate]);
+ useEffect(()=>{let active=true;let pending=false;const poll=async()=>{if(pending||busyRef.current)return;pending=true;const version=generation.current;try{const value=await refresh();if(active&&version===generation.current){setSnapshot(value);const device=value.devices.find(row=>row.id===value.currentDeviceId);if(device)setName(device.name);setError('');}if(active&&version===generation.current&&proof.current)await request('heartbeat',{},proof.current.token);}catch(error){if(active&&version===generation.current)setError(error instanceof Error?error.message:'Device connection failed');}finally{pending=false;}};void poll();const timer=setInterval(()=>void poll(),20000);return()=>{active=false;clearInterval(timer);};},[refresh,request]);
+ async function run(task:()=>Promise<void>){if(busyRef.current||lifetime.current.signal.aborted)return;busyRef.current=true;const version=generation.current;setBusy(true);setError('');try{await task();}catch(error){if(version===generation.current)setError(error instanceof Error?error.message:'Device operation failed');}finally{busyRef.current=false;if(version===generation.current)setBusy(false);}}
  async function command(action:string,input:unknown){const current=await getProof();return request(action,input,current.token);}
  async function showPair(pair:LinkPair){if(!snapshot||!identity.current)return;const peer=snapshot.devices.find(row=>row.id===(pair.deviceA===snapshot.currentDeviceId?pair.deviceB:pair.deviceA));if(!peer)throw new Error('Pairing peer unavailable');const pinned=identity.current.pins[pair.id];if(pinned&&pinned!==peer.publicKey)throw new Error('Peer key changed. Reject this pairing and create a new request.');setPairing({pair,peer,code:await pairingSas(identity.current.publicKeyB64,peer.publicKey,pair.id)});}
  async function sharedKey(pairId:string,peerId:number){if(!snapshot||!identity.current||!accountId)throw new Error('Device identity unavailable');const pair=snapshot.pairs.find(row=>row.id===pairId&&row.status==='verified');const peer=snapshot.devices.find(row=>row.id===peerId&&!row.revokedAt);if(!pair||!peer||identity.current.pins[pairId]!==peer.publicKey)throw new Error('Review and confirm this peer key on this device before using Link.');return deviceSharedKey(identity.current.privateKey,peer.publicKey,accountId,pairId);}
@@ -60,7 +63,6 @@ export function LiveDevices(){
   if(version===generation.current)setVerifiedPayloads(ids=>new Set([...ids,payload.id]));
   if(payload.kind==='file'&&version===generation.current){const blob=new Blob(parts,{type:'application/octet-stream'});if(blob.size!==payload.size)throw new Error('File integrity length mismatch');const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=payload.name.replaceAll('/', '_').replaceAll(String.fromCharCode(92), '_');anchor.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
  }
- if(!user)return <Screen title="Devices" subtitle="Locat Link"><StateView kind="offline" title="Sign in to manage your devices" body="Local mode does not authorize pairing or transfers."/></Screen>;
  return <Screen title="Devices" subtitle="Link · account-owned browser identities" actions={<Button disabled={busy} onClick={()=>void run(async()=>setSnapshot(await refresh()))}>Refresh</Button>}><div className="mx-auto max-w-6xl space-y-5">
   <p className="text-sm text-ink-3">Register each browser under the same account. Pairing requires comparing the code on both screens and approval from both private-key holders. Keys use account-scoped IndexedDB; this is not native hardware secure storage. Link encrypts payloads between manually verified device keys and relays ciphertext through this server. File names, sizes, device labels and delivery metadata remain server-readable. LAN discovery and remote control are separate capabilities.</p>
   {error&&<p role="alert" className="text-danger">{error}</p>}
