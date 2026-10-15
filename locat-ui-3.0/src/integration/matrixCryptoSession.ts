@@ -12,7 +12,7 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
  const link=new BrowserLinkClient(binding.accountId);
  let client:MatrixClient|null=null,closed=false,release:()=>void=()=>{};
  const held=new Promise<void>(resolve=>{release=resolve;});
- type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;close():Promise<void>};
+ type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;revoke():Promise<void>;close():Promise<void>};
  let ready:(result:Result)=>void=()=>{},failed:(error:unknown)=>void=()=>{};
  const initialized=new Promise<Result>((resolve,reject)=>{ready=resolve;failed=reject;});
  const cancel=()=>{closed=true;release();};signal?.addEventListener('abort',cancel,{once:true});
@@ -34,7 +34,7 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
    const crypto=client.getCrypto();if(!crypto)throw new Error('Reviewed messaging encryption is unavailable.');
    crypto.globalBlacklistUnverifiedDevices=true;
    const publicKeys=await crypto.getOwnDeviceKeys();if(closed)throw new Error('Messaging initialization cancelled.');
-   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async close(){cancel();await task;}});
+   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async revoke(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/logout',{accessToken:binding.accessToken});},async close(){cancel();await task;}});
    await held;
   }finally{closed=true;client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
  });

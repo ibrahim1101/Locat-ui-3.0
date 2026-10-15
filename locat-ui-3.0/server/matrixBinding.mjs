@@ -17,10 +17,12 @@ export function matrixProvider(env=process.env){
   try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>32768)fail(502,'Matrix service response exceeds the validation limit');chunks.push(value);}}catch(error){if(error.status)throw error;fail(502,'Matrix validation response interrupted');}finally{await reader.cancel();}
   try{return JSON.parse(new TextDecoder('utf8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{fail(502,'Invalid Matrix service response');}
  }
- return {serverName,origin:upstream.origin,async inspect(token,signal=AbortSignal.timeout(8000)){
+ return {serverName,origin:upstream.origin,async logout(token,signal=AbortSignal.timeout(8000)){try{await request('/_matrix/client/v3/logout',token,{},signal);}catch(error){if(error.status!==401)throw error;}},async inspect(token,signal=AbortSignal.timeout(8000)){
   const value=await request('/_matrix/client/v3/account/whoami',token,undefined,signal);
+  if(!value||typeof value!=='object'||Array.isArray(value))fail(502,'Invalid Matrix account response');
   if(typeof value.user_id!=='string'||!value.user_id.startsWith('@')||value.user_id.length>512||!value.user_id.endsWith(':'+serverName)||!value.user_id.slice(1,-serverName.length-1)||typeof value.device_id!=='string'||!value.device_id||value.device_id.length>255||value.is_guest===true)fail(400,'A non-guest local Matrix device session is required');
   const keys=await request('/_matrix/client/v3/keys/query',token,{device_keys:{[value.user_id]:[value.device_id]}},signal);
+  if(!keys||typeof keys!=='object'||Array.isArray(keys)||!keys.device_keys||typeof keys.device_keys!=='object'||Array.isArray(keys.device_keys))fail(502,'Invalid Matrix device key response');
   if(keys.failures&&Object.keys(keys.failures).length)fail(502,'Matrix device keys could not be validated');
   const device=keys.device_keys?.[value.user_id]?.[value.device_id];
   if(device&&(device.user_id!==value.user_id||device.device_id!==value.device_id||!device.keys||typeof device.keys!=='object'||typeof device.keys['ed25519:'+value.device_id]!=='string'||typeof device.keys['curve25519:'+value.device_id]!=='string'))fail(502,'Invalid Matrix device identity');
@@ -49,7 +51,7 @@ export function matrixBindingStore(sql,devices){
    sql.exec('COMMIT');return this.status(userId,actor);
   }catch(error){sql.exec('ROLLBACK');if([2067,1555].includes(error.errcode))fail(409,'Matrix identity is already bound');throw error;}
  },
- authorize(userId,actor,sessionHash,token){devices.owned(userId,actor);const value=current(userId,actor);if(!value||value.sessionHash!==sessionHash||value.tokenHash!==matrixTokenHash(token)||value.expiresAt<=Date.now())fail(403,'Bind this Matrix device session to the current Locat session first');return value;},
+ authorize(userId,actor,sessionHash,token,allowExpiredForLogout=false){devices.owned(userId,actor);const value=current(userId,actor);if(!value||value.sessionHash!==sessionHash||value.tokenHash!==matrixTokenHash(token)||(!allowExpiredForLogout&&value.expiresAt<=Date.now()))fail(403,'Bind this Matrix device session to the current Locat session first');return value;},
  disconnect(userId,actor){devices.owned(userId,actor);return sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=? AND linkDeviceId=?').run(userId,actor);}
  };
 }
@@ -58,10 +60,17 @@ export function createMatrixBindingHandler({store,provider,body,json,audit}){
  return async({req,res,url,userId,actor,session,recheck})=>{
   const action=url.pathname.slice('/api/link/matrix/'.length);
   if(req.method==='GET'&&action==='status'){json(res,200,{configured:!!provider,serverName:provider?.serverName??null,...store.status(userId,actor),authorizedHere:store.current(userId,actor)?.sessionHash===matrixTokenHash(session)&&store.current(userId,actor)?.expiresAt>Date.now()});return true;}
-  if(req.method!=='POST'||!['bind','disconnect'].includes(action))fail(404,'Unknown Matrix binding action');
+  if(req.method!=='POST'||!['bind','disconnect','logout'].includes(action))fail(404,'Unknown Matrix binding action');
   const retryAfter=limit(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
   const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');
   if(action==='disconnect'){if(Object.keys(input).length)fail(400,'Invalid disconnect fields');store.disconnect(userId,actor);audit(userId,'matrix.device.disconnected');json(res,200,{ok:true});return true;}
+  if(action==='logout'){
+   if(Object.keys(input).some(key=>key!=='accessToken')||typeof input.accessToken!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(input.accessToken))fail(400,'Invalid Matrix logout');
+   store.authorize(userId,actor,matrixTokenHash(session),input.accessToken,true);store.disconnect(userId,actor);
+   try{if(!provider)fail(503,'Matrix sidecar is not configured');await provider.logout(input.accessToken);}
+   catch{audit(userId,'matrix.session.logout.unconfirmed','warning');fail(502,'Locat gateway access is blocked; Matrix server sign-out was not confirmed. You can retry while this device session remains open.');}
+   audit(userId,'matrix.session.logged_out');recheck();json(res,200,{ok:true,upstreamLogoutConfirmed:true});return true;
+  }
   if(!provider)fail(503,'Matrix sidecar is not configured');
   if(Object.keys(input).some(k=>!['userId','deviceId','accessToken','publicKeys'].includes(k))||typeof input.userId!=='string'||input.userId.length>512||typeof input.deviceId!=='string'||!input.deviceId||input.deviceId.length>255||typeof input.accessToken!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(input.accessToken))fail(400,'Invalid Matrix binding');publicKeys(input.publicKeys);
   const remote=await provider.inspect(input.accessToken);recheck();const value=store.bind(userId,actor,matrixTokenHash(session),input,remote);audit(userId,'matrix.device.bound');json(res,200,value);return true;

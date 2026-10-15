@@ -1,15 +1,10 @@
-import { LiveAccountSettings } from "./LiveAccountSettings";
-import { useSession } from "../app/session";
-
-/** Live mode never renders preview conversations, contacts or media as real data. */
-export function LiveModuleNotice({ title }: { title: string }) {
-  const { adapter, connection, user } = useSession();
-  return <main className="mx-auto max-w-2xl space-y-5 p-8" data-testid="live-module-notice">
-    <h1 className="text-3xl font-bold">{title}</h1>
-    {user ? <p className="text-ink-2">Signed in as <strong>{user?.displayName ?? "Unknown account"}</strong> (@{user?.username ?? "unknown"}).</p> : <p className="text-ink-2">Local device mode: no account or server session is used.</p>}
-    <p className="text-ink-2">This module is not connected to the live backend yet. Preview messages, files, devices and security events are deliberately hidden in live mode.</p>
-    <p className="text-sm text-ink-3">Backend: {connection.server}. Account sessions are real; end-to-end encryption and other modules are not enabled.</p>
-    {title === "Settings" && user && <LiveAccountSettings />}
-    <button type="button" className="rounded-lg bg-ember px-5 py-3 font-semibold text-ember-ink" onClick={() => void adapter.auth.signOut()}>{user ? "Sign out" : "Leave local mode"}</button>
-  </main>;
+import {LiveAccountSettings} from './LiveAccountSettings';
+import {useSession} from '../app/session';
+import {Screen} from '../layouts/Screen';
+import {Button,StateView} from '../ui';
+/** Live settings use real controls; other modules retain explicit unavailable states. */
+export function LiveModuleNotice({title}:{title:string}){
+ const {adapter,connection,user}=useSession();
+ if(title==='Settings')return <Screen title="Settings" subtitle={user?`${user.displayName} · ${user.lcCode}`:'Local device settings'} actions={<Button variant="ghost" onClick={()=>void adapter.auth.signOut()}>{user?'Sign out':'Leave local mode'}</Button>}><div className="mx-auto max-w-3xl space-y-5"><p className="text-sm text-ink-3">Server: {connection.server}. Account changes use your authenticated server session.</p>{user?<LiveAccountSettings/>:<StateView kind="offline" title="Account settings require sign-in" body="Local media remains available on this device. Sign in to manage server sessions, profile privacy and messaging-device setup."/>}</div></Screen>;
+ return <Screen title={title} subtitle="Live integration pending" actions={<Button variant="ghost" onClick={()=>void adapter.auth.signOut()}>{user?'Sign out':'Leave local mode'}</Button>}><div className="mx-auto max-w-3xl space-y-5" data-testid="live-module-notice"><StateView kind="empty" title="This module is not connected yet" body="Its live backend integration is still being implemented. No preview records are shown as your data."/><p className="text-sm text-ink-3">Server: {connection.server}.</p></div></Screen>;
 }

@@ -22,5 +22,5 @@ it('sends SDK requests only through the same-origin proved gateway and binds onl
  const transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch;
  await expect(transport('https://other.test/_matrix/client/v3/sync')).rejects.toThrow('same-origin');expect(fetch).not.toHaveBeenCalled();
  await transport(window.location.origin+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer synthetic-token'}});expect(fetch.mock.calls[0][1].credentials).toBe('same-origin');expect(fetch.mock.calls[0][1].headers.get('X-Locat-Device-Proof')).toBe('synthetic-proof');
- await value.bind();expect(linkRequest).toHaveBeenCalledWith('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys:value.publicKeys});await value.close();expect(linkClose).toHaveBeenCalled();
+ await value.bind();expect(linkRequest).toHaveBeenCalledWith('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys:value.publicKeys});await value.revoke();expect(linkRequest).toHaveBeenCalledWith('matrix/logout',{accessToken:binding.accessToken});await value.close();expect(linkClose).toHaveBeenCalled();
 });

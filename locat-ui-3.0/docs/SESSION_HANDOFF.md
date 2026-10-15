@@ -1,3 +1,13 @@
+# Latest follow-on — confirmed Matrix session logout and lifecycle fixes
+
+Verified preceding remote 7dafc2a7bdaa4e8801e0b12a2a20e51535a9a3bd (tree 96b09e826adb2e1efb995798ce3a80081698d89e), fetched/merged. Added explicit current-token Matrix logout with gateway-first blocking, truthful failure/retry handling and real Synapse invalid-token acceptance. Fixed late async setup cleanup tests, malformed upstream JSON handling and settings' contradictory planned-module notice. Latest checks: 124 frontend/40 files, 31 backend, check/lint/build plus separate real Matrix acceptance passed. The existing SDK chunk-size warning remains.
+
+Browser acceptance is still pending: Playwright Chromium install repeatedly received an invalid archive; HEAD returned text/html, length 195. No unused dependency retained and no browser pass claimed. No remote workflow runs were returned for the preceding published commit. Native/Docker/nginx/public-network acceptance remains pending. No services or DNS activated.
+
+Next: evaluate standards-based application-service provisioning for managed Matrix identities without separate user passwords/tokens; require restricted exclusive namespace and tested device lifecycle, never expose its service credential. Matrix spec supports this direction, but no application-service implementation/registration has yet been added. Keep conversations gated until browser/key verification/recovery and authorization acceptance. Continue the full master roadmap without routine confirmation.
+
+## Previous checkpoint history
+
 # Latest checkpoint — Matrix binding and protected bootstrap
 
 Starting remote 36a2bca32a804263c8b3a19aa3e2dd2bb0fb6dae; fetched/merged. Added schema 12 Matrix account/device association, whoami/key validation, token/session hashes, explicit UI3 setup, protected same-origin bootstrap gateway and lazy SDK/WASM packaging. See MATRIX_ACCOUNT_BINDING.md for exact limits/security boundaries. Source validation passes 121 frontend tests/39 files, 29 backend tests, check/lint/build; separate real Synapse acceptance passes with fresh Matrix device binding before SDK key upload. No private conversations, automated provisioning, upstream revocation/recovery or public deployment enabled.
