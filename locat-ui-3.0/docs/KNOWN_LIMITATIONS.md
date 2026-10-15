@@ -1,0 +1,3 @@
+# Known limitations
+
+FEATURE_MATRIX.md and CONNECT_IMPLEMENTATION_TRACKER.md are the current evidence inventory. Private conversations/E2EE, federation, global identities, authenticated real-time transport, TURN fallback, native hosts and public deployment remain incomplete. No public service is activated. Browser server changes isolate rather than migrate data. Persistent UUID is not cryptographic trust. Proxy-mode authentication rates aggregate by socket peer. Docker/Cloudflare templates are unexecuted. Shared media roots are readable by all registered accounts and are not Vaults. Experimental private encryption has no independent review. Existing per-module documentation retains detailed limits; no full-roadmap completion is asserted.

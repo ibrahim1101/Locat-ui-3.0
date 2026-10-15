@@ -1,0 +1,11 @@
+# Template only. Replace UUID and hostname in an ignored config.yml after approval.
+tunnel: REPLACE_WITH_APPROVED_TUNNEL_UUID
+credentials-file: /run/secrets/tunnel_credentials
+metrics: 0.0.0.0:2000
+ingress:
+  - hostname: locat.ibrahimshaik.com
+    service: http://locat:8787
+    originRequest:
+      httpHostHeader: locat.ibrahimshaik.com
+      connectTimeout: 10s
+  - service: http_status:404

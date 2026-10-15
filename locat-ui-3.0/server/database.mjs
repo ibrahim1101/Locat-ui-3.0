@@ -1,7 +1,7 @@
 import { linkStore } from './link.mjs';
 import { privateStore } from './privateStore.mjs';
 import { sentinelStore } from './sentinel.mjs';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { mkdirSync, chmodSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -14,7 +14,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 9) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 11) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -87,12 +87,27 @@ export function openDatabase(filename) {
     CREATE TABLE remoteSignals (sequence INTEGER PRIMARY KEY AUTOINCREMENT,sessionId TEXT NOT NULL REFERENCES remoteSessions(id),signalId TEXT NOT NULL UNIQUE,fromDevice INTEGER NOT NULL REFERENCES linkDevices(id),kind TEXT NOT NULL CHECK(kind IN ('offer','answer','candidate')),envelope TEXT NOT NULL);
     CREATE INDEX remote_signals_session ON remoteSignals(sessionId,sequence);
     PRAGMA user_version = 9; COMMIT;`);
+  if (version < 10) sql.exec(`BEGIN IMMEDIATE;
+    ALTER TABLE users ADD COLUMN profileVisibility TEXT NOT NULL DEFAULT 'everyone';
+    ALTER TABLE users ADD COLUMN usernameVisibility TEXT NOT NULL DEFAULT 'everyone';
+    ALTER TABLE users ADD COLUMN allowContactRequests INTEGER NOT NULL DEFAULT 1;
+    PRAGMA user_version = 10; COMMIT;`);
+  if (version < 11) {
+    sql.exec('BEGIN IMMEDIATE; CREATE TABLE serverMetadata (key TEXT PRIMARY KEY,value TEXT NOT NULL);');
+    try { sql.prepare('INSERT INTO serverMetadata VALUES (?,?)').run('serverId',randomUUID()); sql.exec('PRAGMA user_version = 11; COMMIT;'); }
+    catch(error) { sql.exec('ROLLBACK'); throw error; }
+  }
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
+    serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
     link: linkStore(sql),
     sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
+    acceptedContact: (a,b) => { const [low,high]=[a,b].sort(); return !!sql.prepare("SELECT 1 FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").get(low,high); },
+    savePrivacy: (id,profile,username,requests) => sql.prepare('UPDATE users SET profileVisibility=?,usernameVisibility=?,allowContactRequests=? WHERE id=?').run(profile,username,Number(requests),id),
+    cancelContact: (a,b) => { const [low,high]=[a,b].sort(); return sql.prepare("DELETE FROM contacts WHERE lowId=? AND highId=? AND requesterId=? AND status='pending'").run(low,high,a); },
+    removeContact: (a,b) => { const [low,high]=[a,b].sort(); return sql.prepare("DELETE FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").run(low,high); },
     health: () => ({ schemaVersion: sql.prepare("PRAGMA user_version").get().user_version, accessible: sql.prepare("SELECT 1 AS ok").get().ok === 1 }),
     blocked: (a, b) => !!sql.prepare('SELECT 1 FROM blocks WHERE (blockerId = ? AND blockedId = ?) OR (blockerId = ? AND blockedId = ?)').get(a, b, b, a),
     contacts: userId => sql.prepare('SELECT * FROM contacts WHERE lowId = ? OR highId = ?').all(userId, userId),

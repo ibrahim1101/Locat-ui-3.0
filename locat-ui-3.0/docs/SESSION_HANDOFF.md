@@ -1,0 +1,11 @@
+# Session handoff — 2026-10-15 Connect foundation
+
+Approved repository: ibrahim1101/Locat-ui-3.0; branch integration/locat-core; application locat-ui-3.0/. Original Locat remains read-only. Starting remote commit verified via connected GitHub: 6f4aff34a88848b9e058740359d2ac489670f715. This checkpoint's ending source commit is the development commit containing this file; resolve with git log -1 after fetching, and verify actual current remote before new edits. A publication checkpoint does not end the full authorized roadmap.
+
+Implemented: account privacy/contact completion; schema 10/11 additive migrations; persistent instance UUID/discovery; UI3 manual browser server entry; bounded readiness retry/network events; trusted fixed-peer proxy termination and Secure cookies; optional inactive Cloudflare/nginx templates; master/Connect/security/acceptance documentation. Changed files are reviewable with git show --stat at the checkpoint. No private credential, DNS or public hosting changes.
+
+Validation: npm run check, npm run lint, npm run test:all (110 frontend/36 files, 22 backend), npm run build passed. git diff --check passed. Test fixtures are synthetic. Docker/cloudflared/native/ARM64/physical devices unavailable. Messaging/federation security gates remain closed; preferred reviewed integration candidate is Matrix, not integrated. Browser origin navigation does not migrate keys. Proxy limits aggregate by socket peer. UUID is not cryptographic verification.
+
+Next: authenticated WebSocket lifecycle/heartbeats/backpressure/revocation and safe session recovery; then server-qualified identity and an executable pinned Matrix feasibility integration. Continue independently testable work when hardware/deployment authorization blocks acceptance. Preserve all modules and UI3 theme. Do not enable real private messaging based on generic ciphertext relay.
+
+Resume from repository root: git status --short; git fetch origin integration/locat-core; inspect actual remote HEAD and any local work; read AGENTS.md and ENGINEERING_HISTORY.md plus CONNECT_IMPLEMENTATION_TRACKER.md. From locat-ui-3.0 run npm ci if needed, npm run check, npm run lint, npm run test:all, npm run build. Commit/publish only the approved development branch. Do not merge main, activate tunnels/DNS, incur costs or publish releases.

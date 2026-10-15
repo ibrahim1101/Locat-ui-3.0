@@ -98,3 +98,8 @@ credentials.json
 certs/
 *.pem
 *.key
+
+# Operator tunnel configuration and credentials are never source artifacts.
+deploy/cloudflare/config.yml
+deploy/cloudflare/*.json
+.env.connect

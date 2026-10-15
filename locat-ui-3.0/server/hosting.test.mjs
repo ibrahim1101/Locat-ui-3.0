@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
@@ -50,4 +51,26 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await once(child, 'exit'); }
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('explicit proxy termination retains Host/Origin checks and Secure cookies over private HTTP hop',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-proxy-'));let child;
+ try{
+  const reservation=createServer();await new Promise(resolve=>reservation.listen(0,'127.0.0.1',resolve));const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
+  const origin='https://locat.test';
+  child=spawn(process.execPath,['server/index.mjs'],{env:{...process.env,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_DATABASE_FILE:join(dir,'app.sqlite'),LOCAT_TLS_KEY:'',LOCAT_TLS_CERT:'',LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PUBLIC_ORIGIN:origin,LOCAT_MEDIA_AUTHORIZED_ROOTS:''},stdio:'ignore'});
+  const request=(path,method='GET',data,extra={})=>new Promise((resolve,reject)=>{
+    const req=httpRequest({hostname:'127.0.0.1',port,path,method,headers:{Host:'locat.test',Origin:origin,'Content-Type':'application/json',...extra}},res=>{
+      let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>resolve({status:res.statusCode,ok:res.statusCode===200,headers:{get:key=>Array.isArray(res.headers[key])?res.headers[key][0]:res.headers[key]},json:async()=>JSON.parse(body)}));
+    });req.on('error',reject);req.end(data?JSON.stringify(data):undefined);
+  });
+  let ready=false;for(let i=0;i<60;i++){try{if((await request('/api/ready')).ok){ready=true;break;}}catch{}if(child.exitCode!==null)throw new Error('Proxy-mode server exited');await new Promise(resolve=>setTimeout(resolve,50));}assert.ok(ready);
+  const info=await (await request('/.well-known/locat')).json();assert.equal(info.origin,origin);
+  assert.equal((await request('/api/ready','GET',undefined,{Host:'evil.test','X-Forwarded-Host':'locat.test','X-Forwarded-Proto':'https'})).status,403);
+  const credentials={username:'alice',displayName:'Alice',password:'long-test-password-123'};
+  assert.equal((await request('/api/auth/register','POST',credentials,{Origin:'https://evil.test'})).status,403);
+  assert.equal((await request('/api/auth/register','POST',credentials)).status,201);
+  const login=await request('/api/auth/login','POST',credentials);assert.equal(login.status,200);assert.match(login.headers.get('set-cookie'),/; Secure/);
+  const cookie=login.headers.get('set-cookie').split(';')[0];const diagnostics=await (await request('/api/diagnostics','GET',undefined,{Cookie:cookie})).json();assert.equal(diagnostics.tls,true);assert.equal(diagnostics.tlsTermination,'proxy');
+ }finally{if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await once(child,'exit');}await rm(dir,{recursive:true,force:true});}
 });

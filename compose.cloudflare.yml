@@ -1,0 +1,49 @@
+# Preparation only. Do not activate until exact public hostname/tunnel changes are approved.
+services:
+  locat:
+    build: .
+    environment:
+      LOCAT_PUBLIC_ORIGIN: ${LOCAT_PUBLIC_ORIGIN:?Set the approved HTTPS origin}
+      LOCAT_TLS_TERMINATION: proxy
+      LOCAT_PROXY_PEERS: 172.30.88.2,127.0.0.1
+    volumes:
+      - locat_connect_data:/data
+    networks:
+      connect:
+        ipv4_address: 172.30.88.3
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, node, -e, "const u=new URL(process.env.LOCAT_PUBLIC_ORIGIN);const q=require('node:http').get('http://127.0.0.1:8787/api/ready',{headers:{Host:u.host}},r=>{r.resume();process.exit(r.statusCode===200?0:1)});q.setTimeout(3000,()=>{q.destroy();process.exit(1)});q.on('error',()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:?Set a verified ARM64-compatible cloudflared version or digest}
+    command: [tunnel, --no-autoupdate, --config, /etc/cloudflared/config.yml, run]
+    depends_on:
+      locat:
+        condition: service_healthy
+    volumes:
+      - ./deploy/cloudflare/config.yml:/etc/cloudflared/config.yml:ro
+    secrets: [tunnel_credentials]
+    networks:
+      connect:
+        ipv4_address: 172.30.88.2
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+networks:
+  connect:
+    ipam:
+      config:
+        - subnet: 172.30.88.0/24
+volumes:
+  locat_connect_data:
+secrets:
+  tunnel_credentials:
+    file: ${LOCAT_TUNNEL_CREDENTIALS_FILE:?Set a private credential file outside this repository}

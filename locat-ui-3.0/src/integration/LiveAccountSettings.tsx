@@ -1,68 +1,20 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { useSession } from "../app/session";
-
-type DeviceSession = { id: string; expiresAt: number; current: boolean };
-async function api(path: string, data?: object) {
-  const response = await fetch(path, { method: data ? "POST" : "GET", credentials: "same-origin", cache: "no-store", headers: data ? { "Content-Type": "application/json" } : undefined, body: data ? JSON.stringify(data) : undefined });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? "Request failed");
-  return result;
-}
-
-export function LiveAccountSettings() {
-  const { user, adapter, prefs, setPrefs } = useSession();
-  const [name, setName] = useState(user?.displayName ?? "");
-  const [bio, setBio] = useState(user?.bio ?? "");
-  const [sessions, setSessions] = useState<DeviceSession[]>([]);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    void api("/api/auth/sessions").then(data => { if (active) setSessions(data.sessions); }).catch(error => { if (active) setMessage(error.message); });
-    return () => { active = false; };
-  }, []);
-  async function action(operation: () => Promise<void>) {
-    setBusy(true); setMessage("");
-    try { await operation(); } catch (error) { setMessage(error instanceof Error ? error.message : "Request failed"); }
-    finally { setBusy(false); }
-  }
-  function password(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    void action(async () => {
-      await api("/api/auth/password", { currentPassword: data.get("currentPassword"), newPassword: data.get("newPassword") });
-      form.reset();
-      await adapter.auth.signOut();
-    });
-  }
-  const inputClass = "w-full rounded-lg border border-white/10 bg-transparent p-3";
-  const buttonClass = "rounded-lg bg-ember px-4 py-2 font-semibold text-ember-ink disabled:opacity-50";
-  return <section className="space-y-6" aria-label="Account settings">
-    <label className="block">Theme<select className={inputClass} value={prefs.theme} onChange={event => {
-      const theme = event.target.value as typeof prefs.theme;
-      void action(async () => { await api("/api/preferences", { theme }); setPrefs({ theme }); setMessage("Theme saved."); });
-    }}><option value="obsidian">Obsidian</option><option value="graphite">Graphite</option><option value="daylight">Daylight</option><option value="system">System</option></select></label>
-    <h2 className="text-xl font-semibold">Account settings</h2>
-    <form className="space-y-3" onSubmit={event => { event.preventDefault(); void action(async () => { await api("/api/profile", { displayName: name, bio }); setMessage("Display name saved. Reload to refresh your account heading."); }); }}>
-      <label className="block">Display name<input className={inputClass} value={name} onChange={event => setName(event.target.value)} required maxLength={80} /></label>
-      <label className="block">Bio<textarea className={inputClass} value={bio} onChange={event => setBio(event.target.value)} maxLength={500} /></label>
-      <p className="text-sm text-ink-3">Your directory identity: {user?.lcCode}. Profile information is visible to accounts that discover you.</p>
-      <button className={buttonClass} disabled={busy}>Save profile</button>
-    </form>
-    <div className="space-y-3"><h3 className="font-semibold">Active sessions</h3>
-      {sessions.map(session => <div key={session.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3">
-        <span>{session.current ? "This session" : "Another session"} · Expires {new Date(session.expiresAt).toLocaleString()}</span>
-        {!session.current && <button className={buttonClass} disabled={busy} onClick={() => void action(async () => { await api("/api/auth/sessions/revoke", { id: session.id }); setSessions(old => old.filter(item => item.id !== session.id)); setMessage("Session revoked."); })}>Revoke</button>}
-      </div>)}
-    </div>
-    <form className="space-y-3" onSubmit={password}>
-      <h3 className="font-semibold">Change password</h3>
-      <label className="block">Current password<input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required maxLength={256} /></label>
-      <label className="block">New password<input className={inputClass} name="newPassword" type="password" autoComplete="new-password" required minLength={15} maxLength={256} /></label>
-      <p className="text-sm text-ink-3">Changing your password signs out every session.</p>
-      <button className={buttonClass} disabled={busy}>Change password</button>
-    </form>
-    <p role="status">{message}</p>
-  </section>;
+import {useEffect,useState,type FormEvent} from 'react';
+import {useSession} from '../app/session';
+import {Button,Sheet,Switch,TextField} from '../ui';
+type DeviceSession={id:string;expiresAt:number;current:boolean};
+type Privacy={profileVisibility:'everyone'|'contacts'|'nobody';usernameVisibility:'everyone'|'contacts'|'nobody';allowContactRequests:boolean};
+async function api(path:string,data?:object){const response=await fetch(path,{method:data?'POST':'GET',credentials:'same-origin',cache:'no-store',headers:data?{'Content-Type':'application/json'}:undefined,body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok)throw new Error(result.error??'Request failed');return result;}
+export function LiveAccountSettings(){
+ const {user,adapter,prefs,setPrefs}=useSession();const [name,setName]=useState(user?.displayName??''),[bio,setBio]=useState(user?.bio??''),[sessions,setSessions]=useState<DeviceSession[]>([]),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[currentPassword,setCurrentPassword]=useState(''),[newPassword,setNewPassword]=useState(''),[privacy,setPrivacy]=useState<Privacy|null>(null),[privacyOpen,setPrivacyOpen]=useState(false);
+ useEffect(()=>{let active=true;void api('/api/auth/sessions').then(data=>{if(active)setSessions(data.sessions);}).catch(error=>{if(active)setMessage(error.message);});return()=>{active=false;};},[]);
+ async function action(operation:()=>Promise<void>){setBusy(true);setMessage('');try{await operation();}catch(error){setMessage(error instanceof Error?error.message:'Request failed');}finally{setBusy(false);}}
+ function password(event:FormEvent<HTMLFormElement>){event.preventDefault();void action(async()=>{await api('/api/auth/password',{currentPassword,newPassword});setCurrentPassword('');setNewPassword('');await adapter.auth.signOut();});}
+ return <section className="space-y-6" aria-label="Account settings">
+  <div className="rounded-2xl bg-s1 p-5 hairline"><label className="block text-sm font-semibold">Theme<select className="mt-2 w-full rounded-xl bg-s2 p-3 hairline" value={prefs.theme} disabled={busy} onChange={event=>{const theme=event.target.value as typeof prefs.theme;void action(async()=>{await api('/api/preferences',{theme});setPrefs({theme});setMessage('Theme saved.');});}}><option value="obsidian">Obsidian</option><option value="graphite">Graphite</option><option value="daylight">Daylight</option><option value="system">System</option></select></label></div>
+  <form className="space-y-4 rounded-2xl bg-s1 p-5 hairline" onSubmit={event=>{event.preventDefault();void action(async()=>{await api('/api/profile',{displayName:name,bio});window.dispatchEvent(new Event('locat-account-profile-updated'));setMessage('Profile saved.');});}}><h2 className="text-xl font-semibold">Account settings</h2><TextField label="Display name" value={name} required maxLength={80} onChange={event=>setName(event.target.value)}/><label className="block text-sm font-semibold">Bio<textarea className="mt-2 w-full rounded-xl bg-s2 p-3 hairline" value={bio} maxLength={500} onChange={event=>setBio(event.target.value)}/></label><p className="text-sm text-ink-3">Your fixed directory identity: {user?.lcCode}. Directory name and LC code remain discoverable; privacy controls govern bio/profile details and username.</p><Button type="submit" disabled={busy}>Save profile</Button><Button variant="ghost" disabled={busy} onClick={()=>void action(async()=>{setPrivacy(await api('/api/profile/privacy'));setPrivacyOpen(true);})}>Privacy controls</Button></form>
+  <div className="space-y-3 rounded-2xl bg-s1 p-5 hairline"><h3 className="font-semibold">Active sessions</h3>{sessions.map(session=><div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-s2 p-3 hairline"><span className="text-sm">{session.current?'This session':'Another session'} · Expires {new Date(session.expiresAt).toLocaleString()}</span>{!session.current&&<Button disabled={busy} onClick={()=>void action(async()=>{await api('/api/auth/sessions/revoke',{id:session.id});setSessions(old=>old.filter(item=>item.id!==session.id));setMessage('Session revoked.');})}>Revoke</Button>}</div>)}</div>
+  <form className="space-y-4 rounded-2xl bg-s1 p-5 hairline" onSubmit={password}><h3 className="font-semibold">Change password</h3><TextField label="Current password" reveal value={currentPassword} autoComplete="current-password" required maxLength={256} onChange={event=>setCurrentPassword(event.target.value)}/><TextField label="New password" reveal value={newPassword} autoComplete="new-password" required minLength={15} maxLength={256} onChange={event=>setNewPassword(event.target.value)}/><p className="text-sm text-ink-3">Changing your login password signs out every session. It does not change your separate Vault/Secrets passphrase.</p><Button type="submit" disabled={busy}>Change password</Button></form>
+  <p role="status">{message}</p>
+  <Sheet open={privacyOpen} onClose={()=>setPrivacyOpen(false)} title="Profile privacy" size="sm">{privacy&&<form className="space-y-4" onSubmit={event=>{event.preventDefault();void action(async()=>{await api('/api/profile/privacy',privacy);setPrivacyOpen(false);setMessage('Privacy settings saved.');});}}>{(['profileVisibility','usernameVisibility'] as const).map(field=><label key={field} className="block text-sm font-semibold">{field==='profileVisibility'?'Bio and profile details':'Username visibility'}<select className="mt-2 w-full rounded-xl bg-s2 p-3 hairline" value={privacy[field]} onChange={event=>setPrivacy(old=>old?{...old,[field]:event.target.value}:null)}><option value="everyone">Everyone with an account</option><option value="contacts">Accepted contacts</option><option value="nobody">Only me</option></select></label>)}<Switch label="Accept new contact requests" checked={privacy.allowContactRequests} onChange={allowContactRequests=>setPrivacy(old=>old?{...old,allowContactRequests}:null)}/><p className="text-xs text-ink-3">Privacy is enforced by the server. Changing it cannot recall earlier responses or copies. Pending requests are preserved; accepted contact membership controls contact-only visibility.</p><Button type="submit" disabled={busy}>Save privacy settings</Button><p role="status">{message}</p></form>}</Sheet>
+ </section>;
 }

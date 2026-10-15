@@ -47,7 +47,8 @@ async function body(req, maximum = 16384) {
   try { return JSON.parse(new TextDecoder("utf-8", {fatal:true}).decode(Buffer.concat(chunks))); }
   catch { throw Object.assign(new Error("Invalid JSON or UTF-8"), {status:400}); }
 }
-function publicUser(user) { return { id: user.id, username: user.username, displayName: user.displayName, lcCode: "LC-" + user.lcCode, bio: user.bio }; }
+function visibleTo(user,viewerId,policy) { return user.id===viewerId || (!db.blocked(user.id,viewerId) && (policy==='everyone' || policy==='contacts' && db.acceptedContact(user.id,viewerId))); }
+function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
 function cookie(req) {
   const match = /(?:^|;\s*)locat_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? "");
   return match?.[1] ?? null;
@@ -59,7 +60,7 @@ function sessionUser(req) {
   return db.sessionUser(digest, Date.now()) ?? null;
 }
 function setCookie(token, maxAge) {
-  return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.tls ? "; Secure" : "");
+  return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
@@ -75,11 +76,15 @@ async function handle(req, res) {
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;
+  if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
+    app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
+    capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:false},
+  },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
     const media = await mediaLibrary.refresh();
-    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.tls, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: "not-enabled", nativeClients: "not-verified" });
+    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: "not-enabled", nativeClients: "not-verified" });
   }
   if (url.pathname === "/api/media" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
@@ -107,11 +112,11 @@ async function handle(req, res) {
   if (url.pathname === "/api/contacts" && req.method === "GET") {
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
-    const contacts = db.contacts(user.id).map(row => ({ user: publicUser(db.userById(row.lowId === user.id ? row.highId : row.lowId)), status: row.status, direction: row.requesterId === user.id ? "outgoing" : "incoming" }));
-    const blocked = db.blocks(user.id).map(row => publicUser(db.userById(row.blockedId)));
+    const contacts = db.contacts(user.id).map(row => ({ user: publicUser(db.userById(row.lowId === user.id ? row.highId : row.lowId),user.id), status: row.status, direction: row.requesterId === user.id ? "outgoing" : "incoming" }));
+    const blocked = db.blocks(user.id).map(row => publicUser(db.userById(row.blockedId),user.id));
     return json(res, 200, { contacts, blocked });
   }
-  if (["/api/contacts/request", "/api/contacts/respond", "/api/contacts/block"].includes(url.pathname) && req.method === "POST") {
+  if (["/api/contacts/request", "/api/contacts/respond", "/api/contacts/block", "/api/contacts/cancel", "/api/contacts/remove"].includes(url.pathname) && req.method === "POST") {
     if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
@@ -125,12 +130,29 @@ async function handle(req, res) {
       return json(res, 200, { ok: true });
     }
     if (db.blocked(user.id, input.userId)) return json(res, 403, { error: "Contact unavailable" });
-    if (url.pathname === "/api/contacts/request") db.requestContact(user.id, input.userId);
+    if (url.pathname === "/api/contacts/cancel" || url.pathname === "/api/contacts/remove") {
+      const result=url.pathname==="/api/contacts/cancel"?db.cancelContact(user.id,input.userId):db.removeContact(user.id,input.userId);
+      if(!result.changes)return json(res,404,{error:"Matching contact relationship not found"});
+      db.audit(user.id,url.pathname==="/api/contacts/cancel"?"contact.request.cancelled":"contact.removed");return json(res,200,{ok:true});
+    }
+    if (url.pathname === "/api/contacts/request") {
+      if(!db.userById(input.userId).allowContactRequests && !db.acceptedContact(user.id,input.userId))return json(res,403,{error:"This account is not accepting new contact requests"});
+      db.requestContact(user.id,input.userId);
+    }
     else {
       if (typeof input.accept !== "boolean") return json(res, 400, { error: "Invalid response" });
       if (!db.respondContact(user.id, input.userId, input.accept).changes) return json(res, 404, { error: "Incoming request not found" });
     }
     return json(res, 200, { ok: true });
+  }
+  if(url.pathname==='/api/profile/privacy'&&['GET','POST'].includes(req.method)){
+    const user=sessionUser(req);if(!user)return json(res,401,{error:'Not authenticated'});
+    if(req.method==='POST'){
+      if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});const input=await body(req);
+      if(!input||Object.keys(input).some(key=>!['profileVisibility','usernameVisibility','allowContactRequests'].includes(key))||!['everyone','contacts','nobody'].includes(input.profileVisibility)||!['everyone','contacts','nobody'].includes(input.usernameVisibility)||typeof input.allowContactRequests!=='boolean')return json(res,400,{error:'Invalid privacy settings'});
+      db.savePrivacy(user.id,input.profileVisibility,input.usernameVisibility,input.allowContactRequests);db.audit(user.id,'profile.privacy.changed');
+    }
+    const latest=db.userById(user.id);return json(res,200,{profileVisibility:latest.profileVisibility,usernameVisibility:latest.usernameVisibility,allowContactRequests:!!latest.allowContactRequests});
   }
   if (url.pathname === "/api/security/events" && req.method === "GET") {
     const user = sessionUser(req);
@@ -194,7 +216,7 @@ async function handle(req, res) {
     const code = /^(?:lc-)?([1-9][0-9]{3})$/.exec(query)?.[1];
     if (!code && !/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires an exact username or LC-1234 identity" });
     const found = code ? db.userByCode(code) : db.userByName(query);
-    const users = found && found.id !== viewer.id && !db.blocked(viewer.id, found.id) ? [publicUser(found)] : [];
+    const users = found && found.id !== viewer.id && !db.blocked(viewer.id, found.id) && (code || visibleTo(found,viewer.id,found.usernameVisibility)) ? [publicUser(found,viewer.id)] : [];
     return json(res, 200, { users });
   }
   // Ciphertext-only transport. The server never accepts a plaintext message field.

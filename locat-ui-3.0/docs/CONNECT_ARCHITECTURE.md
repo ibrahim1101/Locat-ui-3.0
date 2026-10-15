@@ -1,0 +1,9 @@
+# Locat Connect architecture
+
+The existing UI3 app and Node/SQLite server remain the platform. Browser accounts, cookies, IndexedDB keys and module APIs are isolated by origin. Server selection opens a validated HTTPS origin; it does not forward a cookie/token or migrate keys across origins. Do not add per-module alternate backends. Native configurable-server transport will reuse discovery but requires its own secure cookie/key lifecycle acceptance.
+
+GET /.well-known/locat is a bounded, public version-1 discovery contract with instance UUID, exact origin and truthful capabilities. Wildcard CORS applies only to this public response and carries no credentials. UUID persists in SQLite schema 11 and its backups; it is not a cryptographic server identity. Restoring a clone preserves UUID: do not run independent writable clones as one identity. TLS plus operator address verification is currently the server trust boundary.
+
+Direct TLS remains the LAN option. Optional TLS-termination mode accepts only exact configured socket IPs and one HTTPS Host/Origin; forwarding headers never select the origin or client IP. Isolate the HTTP hop using loopback or a dedicated private container network with no published port. The terminating proxy is trusted to preserve HTTPS and Host. Other tenants must not access that network.
+
+Connection monitor: one readiness fetch at a time, 5-second abort, 15-second healthy checks, exponential jittered retries capped near 30 seconds, online/offline and visibility events, cleanup on unmount/local mode. Readiness never creates or removes an account. Authenticated WebSockets, safe session recovery, server-qualified identity, synchronization and durable notification services are next dependencies. Existing Link/Remote proof and encryption boundaries remain distinct from messaging.

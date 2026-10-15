@@ -33,3 +33,7 @@ Original Link proof, pairing and directional transfer policies now have SQLite/a
 ### Paired browser Remote continuation
 
 Added a UI3-native experimental browser viewing flow using the new Link account/device proof/pins. Source consent, browser display picker, authenticated encrypted signaling, expiry and resource cleanup are connected. Original standalone Remote files remain a native-host reference; mouse/keyboard control, Android capture, TURN and actual two-device acceptance are unfinished. See REMOTE_INTEGRATION.md.
+
+## Connect and contact privacy additions (2026-10-15)
+
+Contact cancel/remove, privacy projection and themed settings extend the original contacts/users privacy behavior in the UI3 SQLite/auth boundary. They do not import original accounts automatically. Connect discovery, proxy configuration, readiness monitor and templates are new UI3 platform implementation responding to the supplied directives; they are not claimed as original integration compatibility. UUID schema migration preserves existing account/LC IDs, sessions and encrypted records. Existing browser keys remain origin-scoped. MASTER_ROADMAP.md preserves the expanded directive and FEATURE_MATRIX.md separates code/test/platform/review states.

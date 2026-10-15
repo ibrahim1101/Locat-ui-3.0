@@ -1,3 +1,4 @@
+import { LiveServerSetup } from '../../integration/LiveServerSetup';
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Delete, FlaskConical, Globe, HardDrive, KeyRound, Lock, LogIn, Network, ServerCog, ShieldAlert, ShieldCheck, UserPlus, Wifi } from "lucide-react";
 import type { OperationResult, ServerProbeView } from "@/contracts";
@@ -18,7 +19,7 @@ function Frame({ children, onBack, step }: { children: ReactNode; onBack?: () =>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-2">A self-hosted home for messages, media and devices. Features become available as their secure integrations are completed.</p>
         </div>
         <ul className="relative grid grid-cols-3 gap-3 text-xs text-ink-2">
-          {[[ShieldCheck, "E2EE identity on your device"], [Network, "Same-LAN first, Tailscale optional"], [HardDrive, "Local tools work offline"]].map(([I, t], i) => {
+          {[[ShieldCheck, "Private tools, explicit permissions"], [Network, "Same-LAN first, Tailscale optional"], [HardDrive, "Local tools work offline"]].map(([I, t], i) => {
             const Icon = I as typeof ShieldCheck; return <li key={i} className="rounded-xl bg-s2/80 p-3 hairline"><Icon className="mb-2 size-4 text-ember" />{t as string}</li>;
           })}
         </ul>
@@ -47,7 +48,7 @@ function PendingNotice({ result, onContinue }: { result: OperationResult; onCont
 }
 
 function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"): void }) {
-  const { connection, adapter } = useSession();
+  const { connection } = useSession();
   return (
     <Frame>
       <div className="mb-10 flex flex-col items-start lg:hidden"><LocatMark size={56} /><h1 className="mt-6 text-[32px] font-extrabold leading-tight tracking-tight">Private by<br />design. <span className="text-ember">Yours.</span></h1></div>
@@ -60,7 +61,7 @@ function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"
           <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Device media players and Photos</span></span><ArrowRight className="size-4 text-ink-3" />
         </button>}
       </div>
-      {adapter.mode === "preview" && <button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
+      {<button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
         <ServerCog className="size-5 text-ember" />
         <span className="min-w-0 flex-1"><span className="block text-2xs font-bold uppercase tracking-wider text-ink-3">Server</span><span className="block truncate font-mono text-[13px]">{connection.origin ?? "Not configured"}</span></span>
         <span className="text-xs font-semibold text-ember">Change</span>
@@ -73,6 +74,7 @@ function ServerSetup({ back }: { back(): void }) {
   const { adapter, connection, setConnection } = useSession();
   const [origin, setOrigin] = useState(connection.origin ?? "https://");
   const [probe, setProbe] = useState<ServerProbeView>({ state: "idle" });
+  if(adapter.mode === "live")return <Frame onBack={back} step="Server connection"><LiveServerSetup/></Frame>;
   const check = async (e: FormEvent) => { e.preventDefault(); setProbe({ state: "checking", origin }); setProbe(await adapter.auth.probeServer(origin.trim())); };
   return (
     <Frame onBack={back} step="Server connection">

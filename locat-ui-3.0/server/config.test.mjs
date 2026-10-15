@@ -18,3 +18,15 @@ test('development supports loopback Vite proxy hosts but rejects DNS rebinding h
   assert.equal(requestOrigin({ headers: { host: 'rebind.attacker.test' } }, config), null);
   assert.equal(requestOrigin({ headers: { host: '127.0.0.1@attacker.test' } }, config), null);
 });
+
+test('TLS termination trusts exact socket peers and fixed HTTPS origin, never forwarded headers', () => {
+  assert.throws(()=>serverConfig({LOCAT_TLS_TERMINATION:'proxy',LOCAT_PUBLIC_ORIGIN:'https://locat.test'}),/PEERS/);
+  assert.throws(()=>serverConfig({LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PUBLIC_ORIGIN:'http://locat.test'}),/scheme/);
+  const config=serverConfig({LOCAT_HOST:'0.0.0.0',LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1,172.30.8.2',LOCAT_PUBLIC_ORIGIN:'https://locat.test'});
+  const request=(peer,host='locat.test')=>({socket:{remoteAddress:peer},headers:{host,'x-forwarded-proto':'http','x-forwarded-host':'evil.test','x-forwarded-for':'127.0.0.1'}});
+  assert.equal(config.tls,false);assert.equal(config.secure,true);
+  assert.equal(requestOrigin(request('::ffff:127.0.0.1'),config),'https://locat.test');
+  assert.equal(requestOrigin(request('172.30.8.2'),config),'https://locat.test');
+  assert.equal(requestOrigin(request('172.30.8.3'),config),null);
+  assert.equal(requestOrigin(request('127.0.0.1','evil.test'),config),null);
+});

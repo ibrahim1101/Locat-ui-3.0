@@ -1,0 +1,18 @@
+# Conventional alternative: operator-owned nginx on the same host as loopback Locat.
+# Replace hostname/cert paths. Not activated by this repository.
+server {
+    listen 443 ssl;
+    server_name locat.example.com;
+    ssl_certificate /etc/locat/tls/fullchain.pem;
+    ssl_certificate_key /etc/locat/tls/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 5m;
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host locat.example.com;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 75s;
+    }
+}

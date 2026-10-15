@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { monitorConnection } from './connectionMonitor';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiveMediaProvider } from "./LiveMediaProvider";
 import { useNavigate } from "react-router";
 import { App } from "../App";
@@ -30,7 +31,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   const [session, setSession] = useState<LiveSessionSnapshot>({ authStatus: "loading", user: null, connection: disconnected });
   const sessionMode = useRef(session.authStatus);
   useEffect(() => { sessionMode.current = session.authStatus; }, [session.authStatus]);
-  const refresh = async () => { setSession(await loadSession()); };
+  const refresh = useCallback(async () => { setSession(await loadSession()); }, []);
   useEffect(() => {
     let active = true;
     void loadSession().then(snapshot => { if (active && sessionMode.current !== "local") setSession(snapshot); });
@@ -39,17 +40,15 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
 
   useEffect(() => {
     if (session.authStatus === "local") return;
-    let active = true;
-    let pending = false;
-    const timer = setInterval(() => {
-      if (pending) return;
-      pending = true;
-      void fetch("/api/ready", { cache: "no-store", credentials: "omit" }).then(async response => response.ok && (await response.json()).app === "Locat").catch(() => false).then(reachable => {
-        if (active) setSession(old => ({ ...old, connection: { ...old.connection, server: reachable ? "connected" : "unreachable" } }));
-      }).finally(() => { pending = false; });
-    }, 15000);
-    return () => { active = false; clearInterval(timer); };
+    return monitorConnection(server => setSession(old => ({...old,connection:{...old.connection,server}})));
   }, [session.authStatus]);
+
+  useEffect(() => {
+    let active=true;
+    const update=()=>{if(sessionMode.current==='ready')void loadSession().then(snapshot=>{if(active&&sessionMode.current==='ready')setSession(snapshot);});};
+    window.addEventListener('locat-account-profile-updated',update);
+    return()=>{active=false;window.removeEventListener('locat-account-profile-updated',update);};
+  }, []);
 
   const adapter = useMemo<LocatUiAdapter>(() => ({
     ...previewAdapter,
@@ -96,7 +95,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
       },
       savedAccounts: () => [],
     },
-  }), [nav]);
+  }), [nav, refresh]);
 
   return <SessionProvider key={session.authStatus === "local" ? "local-device" : session.user?.id ?? "signed-out"} adapter={adapter} initialUser={null} initialConnection={disconnected} platform={platform} liveSession={session}>
     <LiveMediaProvider key={session.user?.id ?? (session.authStatus === "local" ? "local-device" : "signed-out")}><PlayerProvider><App /></PlayerProvider></LiveMediaProvider>

@@ -6,9 +6,9 @@ This tracker supersedes the earlier migration-preparation plan. The approved fre
 
 | Area | Current UI3 behavior | Remaining acceptance or feature scope |
 | --- | --- | --- |
-| Authentication/accounts | Real SQLite registration/login/logout, password/session management, immutable LC codes and bio | Profile picture/privacy expansion, app lock, MFA/passkeys/account closure |
+| Authentication/accounts | Real SQLite registration/login/logout, password/session management, immutable LC codes and bio | Profile picture expansion, app lock, MFA/passkeys/account closure |
 | Navigation/theme | Live routes, explicit local mode, premium UI3 controls, saved/system appearance, readiness monitor | Physical accessibility and native Back/lifecycle acceptance |
-| Contacts | Account-owned requests/accept/decline/block/discovery | Cancel/remove and wider privacy controls; private chat remains gated |
+| Contacts | Account-owned requests/accept/decline/block/discovery | Cancel/remove and bio/username/request privacy implemented; wider contact fields pending; private chat remains gated |
 | Media | Browser/server libraries, authenticated ranges, FFprobe/FFmpeg, local subtitles, themed music/EQ, playlists, photo crop/text | HLS/hardware/background audio, metadata/artwork, synchronization, freehand/undo and browser/native acceptance |
 | Sentinel | Owned incidents/history, generic/nScout/PipelineGuard webhooks, revocable write-only tokens, notes/status actions | Real emitters/native monitoring, notifications, retention/redaction |
 | Vault/Secrets | Experimental client encryption, revisions/quotas, file/credential operations, local search, lock and encrypted backup/recovery | Independent review, original encrypted-data migration, rotation, native storage/autofill/sharing |
@@ -24,4 +24,4 @@ ORIGINAL_LOCAT_REQUIREMENTS.md preserves all 49 numbered requirements and the ec
 
 Continue autonomously through independent implementable work. A passed batch is a publication checkpoint, not overall completion. Keep backend authorization authoritative, never display fixture content as live, and use the current theme for every option/dialog/section. Develop and publish ordinary work only to integration/locat-core; do not merge main, deploy services or publish releases implicitly.
 
-Dependency order: finish Link/Remote contracts and browser flow; evaluate reviewed messaging protocol/library and implement dependent messaging; finish account/media/infrastructure features; implement productivity/admin using real authorization and appropriate encryption/isolation; integrate native hosts and run platform acceptance. Independent tasks may proceed while an unavailable toolchain or hardware blocks acceptance elsewhere. Only concrete blocked requirements should be marked blocked; never mark the whole roadmap complete because tests pass.
+The new Locat Connect directive makes global connectivity the highest priority without removing ecosystem scope. See CONNECT_IMPLEMENTATION_TRACKER.md. Dependency order: stabilize shared discovery/connection/session infrastructure; evaluate reviewed messaging protocol/library and implement dependent messaging; finish account/media/infrastructure features; implement productivity/admin using real authorization and appropriate encryption/isolation; integrate native hosts and run platform acceptance. Independent tasks may proceed while an unavailable toolchain or hardware blocks acceptance elsewhere. Only concrete blocked requirements should be marked blocked; never mark the whole roadmap complete because tests pass.

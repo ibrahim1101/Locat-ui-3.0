@@ -1,0 +1,13 @@
+# Messaging security model and implementation gate
+
+Private messaging remains disabled in live UI. The legacy /api/messages opaque-envelope developer endpoint is not an E2EE protocol, is not a conversation UI and must not be used for real private communication. Its durable ciphertext storage does not establish key authentication, forward secrecy, ratchets, group membership or device revocation. Preserve existing data, then replace/gate this transport as part of reviewed protocol integration.
+
+Evaluation (official upstream documentation checked 2026-10-15): matrix-js-sdk supports browser/Node clients and initRustCrypto with a persistent browser crypto store, cross-signing and backup APIs. It warns against multiple clients using the same IndexedDB crypto store. This makes a full Matrix stack the preferred integration candidate for browser plus standards-based federation. It is not yet installed, selected at a pinned version, licensed for this repository by review, or tested here. Multi-tab single-writer ownership is mandatory.
+
+libsignal provides Rust-backed Java/Swift/TypeScript bindings, but upstream explicitly does not support use outside Signal and permits API/bridge changes. It carries AGPLv3 terms. It is not a drop-in browser messaging backend or federation stack. The feasibility direction favors Matrix; no claim of equal post-compromise guarantees across protocols is made. Verify exact selected SDK/homeserver licenses and notices before distribution.
+
+Next gate: pin SDK plus a locally runnable test homeserver; real two-device encryption/decryption and verification, offline delivery, group change, replay rejection, key rotation/revocation and backup/recovery tests. Inspect databases/logs for plaintext/private keys. Test altered keys, stale devices, malicious server responses and attachment tampering. Do not enable Send until these pass. No independent audit has occurred.
+
+Metadata boundary: a homeserver still observes accounts, device/public keys, routing, membership, timing, sizes and delivery information appropriate to the chosen protocol. TLS termination can read server-visible metadata and ordinary profile/media APIs. Link ECDH and Vault encryption do not certify messaging. Browser compromise/XSS or a maliciously served client can compromise client keys; origin isolation is necessary but insufficient.
+
+Sources: https://github.com/matrix-org/matrix-js-sdk (E2EE initialization, crypto store, cross-signing and backup); https://github.com/matrix-org/matrix-sdk-crypto-wasm ; https://github.com/signalapp/libsignal (support and license). Exact production architecture remains gated by executable integration evidence.

@@ -13,6 +13,7 @@ test('SQLite durability, constraints, recipient cursors and consistent backup', 
   try {
     const file = join(dir, 'app.sqlite');
     db = openDatabase(file);
+    const serverId=db.serverId;
     db.addUser({ id: 'a', username: 'alice', displayName: 'Alice', salt: 'salt', hash: 'hash' });
     db.addUser({ id: 'b', username: 'bob', displayName: 'Bob', salt: 'salt', hash: 'hash' });
     assert.throws(() => db.addUser({ id: 'c', username: 'alice', displayName: 'Duplicate', salt: 'salt', hash: 'hash' }));
@@ -22,6 +23,7 @@ test('SQLite durability, constraints, recipient cursors and consistent backup', 
     assert.equal(db.addEnvelope(message), 1);
     db.close();
     db = openDatabase(file);
+    assert.equal(db.serverId,serverId);
     assert.equal(db.sessionUser('valid', Date.now()).username, 'alice');
     assert.equal(db.sessionUser('valid', Date.now() + 20000), undefined);
     assert.equal(db.inbox('a', 0).length, 0);

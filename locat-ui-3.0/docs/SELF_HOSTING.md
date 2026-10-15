@@ -1,6 +1,6 @@
 # Self-hosted UI 3.0 server
 
-Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Private chat, E2EE, transcoding, native clients and advanced administration remain incomplete. Nothing is automatically deployed.
+Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Private chat, reviewed messaging E2EE, native clients and advanced administration remain incomplete. Progressive FFmpeg conversion is connected with documented limits. Nothing is automatically deployed.
 
 ## One machine
 
@@ -29,7 +29,7 @@ $env:LOCAT_MEDIA_AUTHORIZED_ROOTS='D:\Shared\Movies;D:\Shared\Music'
 npm start
 ```
 
-Use your actual hostname and certificate paths. Configure host DNS and permit port 8787 on your private LAN firewall. Same-LAN use does not require Tailscale. Native app onboarding and remote access are separate work. Non-loopback listeners fail startup without TLS and an explicit public origin. Secure cookies and exact Origin/Host checks apply in HTTPS mode; forwarding-proxy headers are not trusted. Reverse-proxy TLS termination is not implemented in this configuration.
+Use your actual hostname and certificate paths. Configure host DNS and permit port 8787 on your private LAN firewall. Same-LAN use does not require Tailscale. Native app onboarding and remote access are separate work. Non-loopback listeners fail startup without TLS and an explicit public origin. Secure cookies and exact Origin/Host checks apply in HTTPS mode; forwarding-proxy headers are not trusted. Optional explicit reverse-proxy TLS termination is documented in CONNECT_ARCHITECTURE.md and CLOUDFLARE_DEPLOYMENT.md. Direct TLS remains the default LAN path.
 
 ## Shared media
 

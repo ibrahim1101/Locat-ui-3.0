@@ -47,6 +47,10 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.equal(ready, true, "API did not become ready");
+    const discoveryResponse=await request('/.well-known/locat');
+    assert.equal(discoveryResponse.headers.get('access-control-allow-origin'),'*');
+    const discovery=await discoveryResponse.json();assert.equal(discovery.origin,origin);assert.match(discovery.serverId,/^[a-f0-9-]{36}$/);
+    assert.equal(discovery.capabilities.privateMessaging,false);assert.equal(discovery.capabilities.federation,false);
     const password = "long-test-password-123";
     assert.equal((await request("/api/auth/register", "POST", { username: "alice", displayName: "Alice", password })).status, 201);
     assert.equal((await request("/api/auth/register", "POST", { username: "bob", displayName: "Bob", password })).status, 201);
@@ -94,7 +98,7 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 9); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 11); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/sentinel/incidents')).status, 401);
     const createdToken = await request('/api/sentinel/tokens', 'POST', {name:'Monitor'}, aliceCookie);
@@ -217,10 +221,26 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     const alice = (await (await request("/api/auth/me", "GET", undefined, aliceCookie)).json()).user;
     assert.equal((await request("/api/contacts")).status, 401);
     assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 200);
+    assert.equal((await request('/api/contacts/cancel','POST',{userId:alice.id},bobCookie)).status,404);
+    assert.equal((await request('/api/contacts/cancel','POST',{userId:bob.id},aliceCookie)).status,200);
+    assert.equal((await request('/api/contacts/request','POST',{userId:bob.id},aliceCookie)).status,200);
     assert.equal((await request("/api/contacts/respond", "POST", { userId: bob.id, accept: true }, aliceCookie)).status, 404);
     assert.equal((await request("/api/contacts/respond", "POST", { userId: alice.id, accept: true }, bobCookie)).status, 200);
     const friends = (await (await request("/api/contacts", "GET", undefined, aliceCookie)).json()).contacts;
     assert.equal(friends.length, 1); assert.equal(friends[0].status, "accepted");
+    const privacy={profileVisibility:'contacts',usernameVisibility:'contacts',allowContactRequests:false};
+    assert.equal((await request('/api/profile/privacy')).status,401);
+    assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie,{Origin:'https://evil.test'})).status,403);
+    assert.equal((await request('/api/profile/privacy','POST',{...privacy,extra:true},bobCookie)).status,400);
+    assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie)).status,200);
+    assert.equal((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
+    assert.equal((await request('/api/contacts/remove','POST',{userId:bob.id},aliceCookie)).status,200);
+    assert.deepEqual((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users,[]);
+    const hidden=(await (await request('/api/users/search?q='+bob.lcCode,'GET',undefined,aliceCookie)).json()).users[0];
+    assert.equal(hidden.username,'');assert.equal(hidden.bio,'');
+    assert.equal((await request('/api/contacts/request','POST',{userId:bob.id},aliceCookie)).status,403);
+    assert.equal((await (await request('/api/auth/me','GET',undefined,bobCookie)).json()).user.username,'bob');
+    assert.equal((await request('/api/profile/privacy','POST',{profileVisibility:'everyone',usernameVisibility:'everyone',allowContactRequests:true},bobCookie)).status,200);
     assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: true }, bobCookie)).status, 200);
     assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 403);
     assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 403);
