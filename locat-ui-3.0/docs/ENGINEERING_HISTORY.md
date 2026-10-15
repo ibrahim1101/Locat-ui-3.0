@@ -1,3 +1,11 @@
+## Photos freehand drawing implementation
+
+Added the planned Draw tool using the existing UI3 TextField/Slider/Button controls. Pointer capture keeps one active gesture, normalized coordinates follow canvas scaling, frame-scheduled drafts share the preview/export renderer, completed strokes create one undo step and cancelled/lost-capture drafts are discarded. Brush color/width and undoable clearing are available, with 100-stroke/1,000-point bounds. Single-point strokes render as round dots. Download is disabled during an unfinished stroke; originals remain unchanged. Physical touch/stylus and native acceptance remain pending.
+
+Validation: TypeScript, lint, 229 frontend tests / 57 files, 105 backend tests and production build passed. Added coordinate/clamping/invalid-geometry regressions. Expanded actual Chromium Photos target checks cancellation/export gating, green canvas stroke pixels, undo/redo, clear/undo and unchanged original bytes; execution of the expanded target is pending CI. No schema or source media changed.
+
+Observed preceding undo/redo commit 812058a0cfec55424827f071ded531c3ff2723f4: workflow 38776082498 succeeded on Ubuntu, macOS and Windows; browser job 116563960019 passed all seven tests in 37.1 seconds and three separate foundation repetitions in 12.4 seconds. This certifies the preceding browser scenario, not the new drawing assertions or universal platform compatibility.
+
 ## Photos bounded undo/redo implementation
 
 Added immutable photo edit-parameter history with 100 retained previous states, disabled-aware UI3 Undo/Redo controls, no-op suppression and redo-branch clearing after a new edit. Crop/rotation/flips/color/text/reset share the history; viewer zoom and unsaved annotation drafts remain separate. Preview/export use the selected state, original file bytes are preserved and closing/reopening drops history. PHOTO_EDITING.md documents step/memory/persistence/export limits and remaining freehand/native/sync scope. Added pure/DOM regressions and a seventh actual-browser target for PNG import, canvas pixel undo, redo/annotations, JPEG download and unchanged original bytes; its execution is pending.
