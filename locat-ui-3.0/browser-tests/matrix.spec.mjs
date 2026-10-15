@@ -53,3 +53,28 @@ test('two real browser accounts reject a SAS comparison then mutually verify thr
   expect(await alice.page.evaluate(async()=>(await fetch('/api/messages')).status)).toBe(501);
  }finally{await Promise.all(contexts.map(context=>context.close()));}
 });
+
+test('browser history workers reject a wrong passphrase, import a real key and export it after reload',async({browser})=>{
+ const {OlmMachine,UserId,DeviceId,RoomId,EncryptionSettings}=await import('@matrix-org/matrix-sdk-crypto-wasm');
+ const machine=await OlmMachine.initialize(new UserId('@synthetic:fixture.invalid'),new DeviceId('HISTORY_FIXTURE'));
+ const roomId='!synthetic-history:fixture.invalid';let source;
+ try{await machine.shareRoomKey(new RoomId(roomId),[],new EncryptionSettings());await machine.encryptRoomEvent(new RoomId(roomId),'m.room.message',JSON.stringify({msgtype:'m.text',body:'Synthetic offline fixture'}));source=await machine.exportRoomKeys(()=>true);}finally{machine.close();}
+ const entry=JSON.parse(source)[0];expect(entry.room_id).toBe(roomId);
+ const importPhrase='Synthetic import '+randomBytes(16).toString('hex'),exportPhrase='Synthetic export '+randomBytes(16).toString('hex'),encrypted=OlmMachine.encryptExportedRoomKeys(source,importPhrase,10000);
+ const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',acceptDownloads:true});await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
+ const writes=[],username='history_'+randomBytes(6).toString('hex'),password=randomBytes(24).toString('base64url');
+ try{
+  const page=await context.newPage();page.on('request',request=>{if(request.method()==='POST')writes.push(request.postData());});await page.goto(fixture.origin);await expect(page.getByTestId('login-submit')).toBeVisible();
+  const registered=await page.evaluate(async input=>{const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});return {status:response.status,data:await response.json()};},{username,password,displayName:'Synthetic history browser'});expect(registered.status,registered.data.error).toBe(201);
+  await page.getByTestId('login-username').fill(username);await page.getByTestId('login-password').fill(password);await page.getByTestId('login-submit').click();await expect(page.getByTestId('entry-flow')).toHaveCount(0);
+  async function bind(){await page.goto(fixture.origin+'/settings');await page.getByRole('button',{name:'Set up messaging device',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Messaging device setup',exact:true});await dialog.getByRole('button',{name:'Create and bind managed session',exact:true}).click();await expect(dialog.getByText('Device bound and local crypto initialized. Conversation access remains gated.',{exact:true})).toBeVisible({timeout:45000});return dialog;}
+  let dialog=await bind();const key=await dialog.getByText(/^Public signing key: /).innerText();
+  async function importFile(phrase){await dialog.getByLabel('Encrypted Matrix history file',{exact:true}).setInputFiles({name:'synthetic-history.txt',mimeType:'text/plain',buffer:Buffer.from(encrypted)});await dialog.getByLabel('History file passphrase',{exact:true}).fill(phrase);await dialog.getByRole('button',{name:'Decrypt and import history keys',exact:true}).click();}
+  await importFile('A deliberately incorrect synthetic phrase');await expect(dialog.getByRole('alert')).toContainText('could not be decrypted or validated');await expect(dialog.getByLabel('History file passphrase',{exact:true})).toHaveValue('');
+  await importFile(importPhrase);await expect(dialog.getByText('Processed 1 history-key entry locally. Some may already have been stored.',{exact:true})).toBeVisible({timeout:30000});
+  await page.reload();dialog=await bind();await expect(dialog.getByText(key,{exact:true})).toBeVisible();
+  await dialog.getByLabel('History export passphrase',{exact:true}).fill(exportPhrase);await dialog.getByLabel('Confirm history export passphrase',{exact:true}).fill(exportPhrase);const downloading=page.waitForEvent('download');await dialog.getByRole('button',{name:'Download encrypted history keys',exact:true}).click();const download=await downloading,stream=await download.createReadStream();expect(stream).not.toBeNull();const parts=[];for await(const part of stream)parts.push(part);const armor=Buffer.concat(parts).toString('utf8');
+  const {inspectHistoryFile}=await import('../shared/matrixHistoryFormat.mjs');expect(inspectHistoryFile(armor).rounds).toBe(500000);expect(armor).not.toContain(entry.session_key);expect(()=>OlmMachine.decryptExportedRoomKeys(armor,'wrong export phrase')).toThrow();const exported=JSON.parse(OlmMachine.decryptExportedRoomKeys(armor,exportPhrase));expect(exported).toEqual(expect.arrayContaining([expect.objectContaining({room_id:entry.room_id,session_id:entry.session_id,session_key:entry.session_key})]));
+  for(const plaintext of [importPhrase,exportPhrase,entry.session_key])expect(JSON.stringify(writes)).not.toContain(plaintext);
+ }finally{await context.close();}
+});
