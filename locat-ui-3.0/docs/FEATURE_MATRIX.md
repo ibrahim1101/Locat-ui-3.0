@@ -14,3 +14,5 @@ Implemented, tested, platform-verified and independently security-reviewed are s
 | Remaining master ecosystem | Truthful unavailable live states | Some preview contract tests only | None | Planned; see full MASTER_ROADMAP.md sections A–AM |
 
 Original requirement register: ORIGINAL_LOCAT_REQUIREMENTS.md (all 49 retained). Current live provenance: PORTED_INTEGRATIONS.md. MASTER_ROADMAP.md preserves the complete expanded user directive including Identity, Wallet, emergency, health and all other modules; no feature is dropped by the connectivity reprioritization.
+
+2026-10-15 managed messaging checkpoint: optional restricted service registration, proof-bound derived account/device provisioning, UI3 managed setup, local public-key binding and managed-token cleanup are implemented and locally tested. Real Synapse acceptance exercises the provisioning module. Complete browser, peer verification/recovery, conversations, federation and native acceptance remain pending; no live chat or full roadmap completion claim.

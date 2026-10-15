@@ -12,3 +12,5 @@
 | P7 beta | Threat boundaries and acceptance procedures documented | Local foundation checks only | Not internet/public-beta ready |
 
 Continuous scope is MASTER_ROADMAP.md; earlier all-49 register remains intact. Next engineering dependency is executable reviewed E2EE integration, account mapping and device verification; global authority/key lifecycle remains pending. Do not equate documentation or a tunnel with completed connectivity.
+
+2026-10-15 managed messaging checkpoint: optional restricted service registration, proof-bound derived account/device provisioning, UI3 managed setup, local public-key binding and managed-token cleanup are implemented and locally tested. Real Synapse acceptance exercises the provisioning module. Complete browser, peer verification/recovery, conversations, federation and native acceptance remain pending; no live chat or full roadmap completion claim.

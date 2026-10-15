@@ -1,3 +1,5 @@
+import {loadMatrixAppserviceFile} from './matrixAppserviceFile.mjs';
+import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
 import { createMatrixGateway } from './matrixGateway.mjs';
 import { verifyLinkProof } from './linkProof.mjs';
 import { matrixProvider, createMatrixBindingHandler } from './matrixBinding.mjs';
@@ -30,6 +32,9 @@ const config = serverConfig();
 const connectivity = iceConfiguration();
 const matrix = matrixProvider();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
+const matrixServiceFile=process.env.LOCAT_MATRIX_APPSERVICE_FILE;
+if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a configured sidecar');
+const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings}):null;
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();
 const authLimit = createRateLimiter();
@@ -71,7 +76,7 @@ function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
 const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=verifyLinkProof(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
-const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,body,json,audit:db.audit});
+const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});

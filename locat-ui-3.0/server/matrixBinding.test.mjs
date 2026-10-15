@@ -37,3 +37,13 @@ test('explicit Matrix logout blocks the gateway first, supports retry and never 
  const command={req:{method:'POST'},res:{},url:new URL('http://locat.test/api/link/matrix/logout'),userId:'owner',actor:1,session:'session',recheck(){}};
  await assert.rejects(handler(command),{status:502});assert.equal(blocked,true);assert.equal(result,undefined);assert.deepEqual(events,['matrix.session.logout.unconfirmed']);await handler(command);assert.deepEqual(result,{ok:true,upstreamLogoutConfirmed:true});assert.equal(events.at(-1),'matrix.session.logged_out');
 });
+
+test('managed setup endpoint requires empty derived-identity input and existing action limits',async()=>{
+ let input={},status,payload,called=0;const audits=[];
+ const handler=createMatrixBindingHandler({store:{},provider:{},provisioner:{async provision(user,actor,recheck){assert.equal(user,'account');assert.equal(actor,7);recheck();called++;return {userId:'@managed:matrix.test',deviceId:'LOCAT_7',accessToken:'synthetic-device-token'};}},body:async()=>input,json(_res,code,value){status=code;payload=value;},audit(...args){audits.push(args);}});
+ const context={req:{method:'POST'},res:{},url:new URL('http://localhost/api/link/matrix/provision'),userId:'account',actor:7,session:'session',recheck(){}};
+ input={userId:'@chosen:matrix.test'};await assert.rejects(handler(context),{status:400});assert.equal(called,0);
+ input={};await handler(context);assert.equal(status,200);assert.equal(payload.deviceId,'LOCAT_7');assert.equal(audits[0][1],'matrix.session.provisioned');
+ for(let i=0;i<8;i++)await handler(context);await assert.rejects(handler(context),{status:429});
+ const unavailable=createMatrixBindingHandler({store:{},provider:{},body:async()=>({}),json(){},audit(){}});await assert.rejects(unavailable(context),{status:503});
+});

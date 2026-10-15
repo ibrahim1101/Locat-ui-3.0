@@ -55,14 +55,16 @@ export function matrixBindingStore(sql,devices){
  disconnect(userId,actor){devices.owned(userId,actor);return sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=? AND linkDeviceId=?').run(userId,actor);}
  };
 }
-export function createMatrixBindingHandler({store,provider,body,json,audit}){
- const limit=createRateLimiter(10);
+export function createMatrixBindingHandler({store,provider,provisioner,body,json,audit}){
+ const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30);
  return async({req,res,url,userId,actor,session,recheck})=>{
   const action=url.pathname.slice('/api/link/matrix/'.length);
-  if(req.method==='GET'&&action==='status'){json(res,200,{configured:!!provider,serverName:provider?.serverName??null,...store.status(userId,actor),authorizedHere:store.current(userId,actor)?.sessionHash===matrixTokenHash(session)&&store.current(userId,actor)?.expiresAt>Date.now()});return true;}
-  if(req.method!=='POST'||!['bind','disconnect','logout'].includes(action))fail(404,'Unknown Matrix binding action');
-  const retryAfter=limit(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
+  if(req.method==='GET'&&action==='status'){json(res,200,{configured:!!provider,managedProvisioning:!!provisioner,serverName:provider?.serverName??null,...store.status(userId,actor),authorizedHere:store.current(userId,actor)?.sessionHash===matrixTokenHash(session)&&store.current(userId,actor)?.expiresAt>Date.now()});return true;}
+  if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision'].includes(action))fail(404,'Unknown Matrix binding action');
+  const retryAfter=(action==='cancel-provision'?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
   const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');
+  if(action==='cancel-provision'){if(Object.keys(input).some(key=>key!=='accessToken'))fail(400,'Invalid managed cancellation');if(!provisioner)fail(503,'Managed messaging accounts are not configured');await provisioner.cancel(userId,actor,input.accessToken,recheck);audit(userId,'matrix.provision.cancelled');json(res,200,{ok:true,upstreamLogoutConfirmed:true});return true;}
+  if(action==='provision'){if(Object.keys(input).length)fail(400,'Managed identity fields cannot be chosen by the browser');if(!provisioner)fail(503,'Managed messaging accounts are not configured');const value=await provisioner.provision(userId,actor,recheck);audit(userId,'matrix.session.provisioned');json(res,200,value);return true;}
   if(action==='disconnect'){if(Object.keys(input).length)fail(400,'Invalid disconnect fields');store.disconnect(userId,actor);audit(userId,'matrix.device.disconnected');json(res,200,{ok:true});return true;}
   if(action==='logout'){
    if(Object.keys(input).some(key=>key!=='accessToken')||typeof input.accessToken!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(input.accessToken))fail(400,'Invalid Matrix logout');
