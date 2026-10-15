@@ -34,6 +34,7 @@ export interface BackController {
 
 export type ConnectionMode = "server" | "local-only";
 export type ConnectionState = {
+  realtime?: "connecting" | "connected" | "reconnecting" | "unavailable" | "session-expired";
   mode: ConnectionMode;
   server: "connected" | "connecting" | "disconnected" | "tls-error" | "unreachable" | "not-configured";
   origin?: string; // canonical HTTPS origin (display only)

@@ -1,3 +1,4 @@
+import WebSocket from 'ws';
 import { once } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +16,7 @@ async function freePort() {
   return port;
 }
 
-test("development API: auth, isolation, encrypted envelope validation", async () => {
+test("development API: auth, isolation, discovery and messaging security gate", async () => {
   const dir = await mkdtemp(join(tmpdir(), "locat-api-test-"));
   const mediaDir = join(dir, "media");
   await mkdir(mediaDir);
@@ -30,7 +31,7 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
   const origin = "http://127.0.0.1:" + port;
   const child = spawn(process.execPath, ["server/index.mjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: join(dir, "auth.sqlite"), LOCAT_MEDIA_AUTHORIZED_ROOTS: mediaDir },
+    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_PUBLIC_ORIGIN:origin, LOCAT_DATABASE_FILE: join(dir, "auth.sqlite"), LOCAT_MEDIA_AUTHORIZED_ROOTS: mediaDir },
     stdio: "ignore",
   });
   async function request(path, method = "GET", data, cookie, extraHeaders = {}) {
@@ -59,10 +60,19 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     const login = await request("/api/auth/login", "POST", { username: "alice", password });
     assert.equal(login.status, 200);
     const aliceCookie = login.headers.get("set-cookie").split(";")[0];
+    const socket=new WebSocket(origin.replace('http:','ws:')+'/api/connect/socket',{headers:{Origin:origin,Cookie:aliceCookie}});
+    try{
+      assert.equal(JSON.parse((await once(socket,'message'))[0]).type,'ready');
+      const pong=once(socket,'message');socket.send(JSON.stringify({type:'ping',id:'api-check'}));
+      assert.deepEqual(JSON.parse((await pong)[0]),{type:'pong',id:'api-check'});
+    }finally{socket.terminate();}
     const bobLogin = await request("/api/auth/login", "POST", { username: "bob", password });
     const bobCookie = bobLogin.headers.get("set-cookie").split(";")[0];
     const bob = (await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users[0];
     assert.ok(bob.id);
+    assert.equal(bob.globalIdentity.address,bob.lcCode+'@127.0.0.1:'+port);
+    assert.equal((await (await request('/api/users/search?q='+encodeURIComponent(bob.globalIdentity.address),'GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
+    assert.equal((await request('/api/users/search?q=LC-1234@elsewhere.test','GET',undefined,aliceCookie)).status,501);
     assert.equal((await request("/api/media")).status, 401);
     const media = await (await request("/api/media", "GET", undefined, aliceCookie)).json();
     assert.equal(media.items.length, 2);
@@ -209,15 +219,11 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal((await request('/api/link/devices','GET',undefined,aliceCookie,secondDevice.headers)).status,403);
     assert.equal((await request('/api/link/register','POST',{name:'Reuse',platform:'web',publicKey:secondDevice.publicKey},aliceCookie)).status,403);
     const payload = { recipientId: bob.id, ciphertext: "A".repeat(48), nonce: "B".repeat(24), algorithm: "client-e2ee-v1" };
-    assert.equal((await request("/api/messages", "POST", { ...payload, plaintext: "secret" }, aliceCookie)).status, 400);
-    assert.equal((await request("/api/messages", "POST", { ...payload, extra: "unexpected" }, aliceCookie)).status, 400);
-    assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 201);
-    const aliceInbox = await (await request("/api/messages", "GET", undefined, aliceCookie)).json();
-    assert.equal(aliceInbox.messages.length, 0);
-    const bobInbox = await (await request("/api/messages", "GET", undefined, bobCookie)).json();
-    assert.equal(bobInbox.messages.length, 1);
-    assert.equal(bobInbox.messages[0].ciphertext, payload.ciphertext);
-    assert.equal((await request("/api/messages?after=" + bobInbox.nextCursor, "GET", undefined, bobCookie)).status, 200);
+    assert.equal((await request('/api/messages','POST',{...payload,plaintext:'synthetic-text'},aliceCookie)).status,501);
+    assert.equal((await request('/api/messages','POST',payload,aliceCookie)).status,501);
+    assert.equal((await request('/api/messages','GET',undefined,aliceCookie)).status,501);
+    assert.equal((await request('/api/messages','GET',undefined,bobCookie)).status,501);
+    assert.equal((await request('/api/messages','POST',payload,aliceCookie,{Origin:'https://evil.test'})).status,403);
     const alice = (await (await request("/api/auth/me", "GET", undefined, aliceCookie)).json()).user;
     assert.equal((await request("/api/contacts")).status, 401);
     assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 200);
@@ -228,12 +234,14 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal((await request("/api/contacts/respond", "POST", { userId: alice.id, accept: true }, bobCookie)).status, 200);
     const friends = (await (await request("/api/contacts", "GET", undefined, aliceCookie)).json()).contacts;
     assert.equal(friends.length, 1); assert.equal(friends[0].status, "accepted");
+    assert.equal((await request('/api/profile','POST',{displayName:'Bob',bio:'Synthetic contact-only bio'},bobCookie)).status,200);
     const privacy={profileVisibility:'contacts',usernameVisibility:'contacts',allowContactRequests:false};
     assert.equal((await request('/api/profile/privacy')).status,401);
     assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie,{Origin:'https://evil.test'})).status,403);
     assert.equal((await request('/api/profile/privacy','POST',{...privacy,extra:true},bobCookie)).status,400);
     assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie)).status,200);
     assert.equal((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
+    assert.equal((await (await request('/api/contacts','GET',undefined,aliceCookie)).json()).contacts[0].user.bio,'Synthetic contact-only bio');
     assert.equal((await request('/api/contacts/remove','POST',{userId:bob.id},aliceCookie)).status,200);
     assert.deepEqual((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users,[]);
     const hidden=(await (await request('/api/users/search?q='+bob.lcCode,'GET',undefined,aliceCookie)).json()).users[0];
@@ -242,7 +250,7 @@ test("development API: auth, isolation, encrypted envelope validation", async ()
     assert.equal((await (await request('/api/auth/me','GET',undefined,bobCookie)).json()).user.username,'bob');
     assert.equal((await request('/api/profile/privacy','POST',{profileVisibility:'everyone',usernameVisibility:'everyone',allowContactRequests:true},bobCookie)).status,200);
     assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: true }, bobCookie)).status, 200);
-    assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 403);
+    assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 501);
     assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 403);
     assert.deepEqual((await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users, []);
     assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: false }, bobCookie)).status, 200);

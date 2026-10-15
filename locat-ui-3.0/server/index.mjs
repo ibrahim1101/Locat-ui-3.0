@@ -1,3 +1,5 @@
+import { accountIdentity, localDiscoveryQuery } from './globalIdentity.mjs';
+import { attachRealtime } from './realtime.mjs';
 /**
  * Locat 3.0 development authentication service.
  * Run with Node 24+: node server/index.mjs
@@ -48,7 +50,7 @@ async function body(req, maximum = 16384) {
   catch { throw Object.assign(new Error("Invalid JSON or UTF-8"), {status:400}); }
 }
 function visibleTo(user,viewerId,policy) { return user.id===viewerId || (!db.blocked(user.id,viewerId) && (policy==='everyone' || policy==='contacts' && db.acceptedContact(user.id,viewerId))); }
-function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
+function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,globalIdentity:accountIdentity(user,config.origin,db.serverId),bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
 function cookie(req) {
   const match = /(?:^|;\s*)locat_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? "");
   return match?.[1] ?? null;
@@ -78,7 +80,7 @@ async function handle(req, res) {
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
-    capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:false},
+    capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:true},
   },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
@@ -212,43 +214,19 @@ async function handle(req, res) {
   if (req.method === "GET" && url.pathname === "/api/users/search") {
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });
-    const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const query = localDiscoveryQuery(url.searchParams.get("q") ?? "",config.origin);
     const code = /^(?:lc-)?([1-9][0-9]{3})$/.exec(query)?.[1];
     if (!code && !/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires an exact username or LC-1234 identity" });
     const found = code ? db.userByCode(code) : db.userByName(query);
     const users = found && found.id !== viewer.id && !db.blocked(viewer.id, found.id) && (code || visibleTo(found,viewer.id,found.usernameVisibility)) ? [publicUser(found,viewer.id)] : [];
     return json(res, 200, { users });
   }
-  // Ciphertext-only transport. The server never accepts a plaintext message field.
-  // Clients must independently implement and verify their E2EE protocol.
-  if (url.pathname === "/api/messages" && req.method === "GET") {
-    const user = sessionUser(req);
-    if (!user) return json(res, 401, { error: "Not authenticated" });
-    const cursor = Number(url.searchParams.get("after") ?? 0);
-    if (!Number.isSafeInteger(cursor) || cursor < 0) return json(res, 400, { error: "Invalid cursor" });
-    const messages = db.inbox(user.id, cursor);
-    return json(res, 200, { messages, nextCursor: messages.at(-1)?.sequence ?? cursor });
-  }
-  if (url.pathname === "/api/messages" && req.method === "POST") {
-    const origin = req.headers.origin;
-    if (origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
-    const sender = sessionUser(req);
-    if (!sender) return json(res, 401, { error: "Not authenticated" });
-    const input = await body(req);
-    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(k => !["recipientId", "ciphertext", "nonce", "algorithm"].includes(k))) return json(res, 400, { error: "Only encrypted envelopes accepted" });
-    const { recipientId, ciphertext, nonce, algorithm } = input;
-    if (typeof recipientId !== "string" || typeof ciphertext !== "string" || typeof nonce !== "string" || algorithm !== "client-e2ee-v1" ||
-        ciphertext.length < 24 || ciphertext.length > 12000 || nonce.length < 16 || nonce.length > 128 ||
-        !/^[A-Za-z0-9+/=_-]+$/.test(ciphertext) || !/^[A-Za-z0-9+/=_-]+$/.test(nonce)) {
-      return json(res, 400, { error: "Invalid encrypted envelope" });
-    }
-    return serialized(async () => {
-      if (!db.userById(recipientId)) return json(res, 404, { error: "Recipient not found" });
-      if (db.blocked(sender.id, recipientId)) return json(res, 403, { error: "Recipient unavailable" });
-      const envelope = { id: randomBytes(16).toString("hex"), senderId: sender.id, recipientId, ciphertext, nonce, algorithm, createdAt: Date.now() };
-      const sequence = db.addEnvelope(envelope);
-      return json(res, 201, { id: envelope.id, sequence });
-    });
+  // The old opaque-envelope experiment is preserved in SQLite, but is not a reviewed messaging protocol.
+  // Enforce the messaging gate at the API as well as the UI; no deployment flag bypasses it.
+  if (url.pathname === '/api/messages' && ['GET','POST'].includes(req.method)) {
+    if(req.method==='POST'&&req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});
+    if(!sessionUser(req))return json(res,401,{error:'Not authenticated'});
+    return json(res,501,{error:'Private messaging requires the reviewed E2EE integration, which is not enabled.',code:'MESSAGING_SECURITY_GATE'});
   }
   if (req.method === "POST" && ["/api/auth/register", "/api/auth/login", "/api/auth/logout"].includes(url.pathname)) {
     // Same-origin requests only. Non-browser clients must supply a trusted Origin for state changes.
@@ -314,7 +292,10 @@ const listener = (req, res) => {
 };
 const server = (tlsOptions ? createHttpsServer(tlsOptions, listener) : createHttpServer(listener)).listen(port, host, () => console.log("Locat development API listening on " + host + ":" + port));
 
+const realtime = attachRealtime(server,{requestOrigin:req=>requestOrigin(req,config),sessionUser});
+
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => {
+  realtime.close();
   server.close(() => { db.close(); process.exit(0); });
   server.closeIdleConnections();
 });

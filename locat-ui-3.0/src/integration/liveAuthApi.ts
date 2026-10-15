@@ -1,11 +1,13 @@
 import type { OperationResult } from "../contracts/common";
 
-export type AuthenticatedAccount = { id: string; username: string; displayName: string; lcCode?: string; bio?: string };
+export type AuthenticatedAccount = { id: string; username: string; displayName: string; lcCode?: string; bio?: string; globalIdentity?: {serverId:string;authority:string;address:string;accountUri:string}|null };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     credentials: "same-origin",
+    cache: "no-store",
+    signal: init?.signal ?? AbortSignal.timeout(10000),
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   const data: unknown = await response.json();
@@ -33,6 +35,16 @@ export const liveAuthApi = {
       await request("/api/auth/login", { method: "POST", body: JSON.stringify(input) });
       return { status: "ok", value: undefined };
     } catch (error) { return result(error); }
+  },
+  async inspectSession():Promise<{status:'ready';user:AuthenticatedAccount}|{status:'signedOut'}|{status:'unavailable'}>{
+    try{
+      const response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(10000)});
+      if(response.status===401)return {status:'signedOut'};
+      if(!response.ok)return {status:'unavailable'};
+      const data=await response.json();
+      if(!data?.user||typeof data.user.id!=='string'||typeof data.user.username!=='string'||typeof data.user.displayName!=='string')return {status:'unavailable'};
+      return {status:'ready',user:data.user};
+    }catch{return {status:'unavailable'};}
   },
   async currentAccount(): Promise<AuthenticatedAccount | null> {
     try {

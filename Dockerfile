@@ -14,6 +14,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
 COPY --from=build /app/LICENSE ./LICENSE
+COPY --from=build /app/package*.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 USER node
 ENV LOCAT_HOST=0.0.0.0 LOCAT_PORT=8787 LOCAT_DATABASE_FILE=/data/locat.sqlite LOCAT_STATIC_DIR=/app/dist
 EXPOSE 8787

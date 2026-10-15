@@ -14,3 +14,5 @@ Use only synthetic identities/messages and test credentials. Source tests do not
 | H compromise boundary | Inspect test DB/backups/queues/logs for synthetic plaintext/private keys while retaining expected routing metadata | Vault/Link ciphertext tests exist; messaging acceptance pending |
 
 Automated foundation coverage: direct TLS with trusted test CA; real HTTP proxy-hop auth/Secure cookies/Host/Origin checks; exact socket-peer unit denial; discovery version/origin/size and no-credential/no-redirect client checks; persisted instance identity/backup/migration; readiness failure backoff/network event/disposal. Commands: npm run check; npm run lint; npm run test:all; npm run build. Docker Compose/cloudflared configuration is not runtime-tested locally.
+
+Local ws coverage now includes actual production cookie auth/ping and isolated socket origin/host/path/session denial, account cap, invalid/oversized frames and revoked-session close. Client heartbeat/backoff/disposal, safe session inspection and qualified-authority isolation are tested. Real WSS through TLS proxies/Cloudflare and physical network changes remain pending acceptance.

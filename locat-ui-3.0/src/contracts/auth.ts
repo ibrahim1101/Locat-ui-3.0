@@ -2,6 +2,7 @@ import type { OperationResult } from "./common";
 
 /** Display-only projection of Locat `SessionUser` (src/state/auth.tsx). */
 export type SessionUserView = {
+  globalIdentity?: {serverId:string;authority:string;address:string;accountUri:string}|null;
   id: string;
   username: string;
   displayName: string;

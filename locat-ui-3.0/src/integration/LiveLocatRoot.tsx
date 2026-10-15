@@ -1,3 +1,4 @@
+import { connectRealtime } from './realtimeConnection';
 import { monitorConnection } from './connectionMonitor';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiveMediaProvider } from "./LiveMediaProvider";
@@ -14,16 +15,13 @@ const origin = window.location.origin;
 const disconnected = { mode: "server" as const, server: "disconnected" as const, origin, pendingOutbox: 0 };
 
 function view(account: AuthenticatedAccount): SessionUserView {
-  return { id: account.id, username: account.username, displayName: account.displayName, lcCode: account.lcCode ?? "", bio: account.bio ?? "", isAdmin: false, serverOrigin: origin };
+  return { id: account.id, username: account.username, displayName: account.displayName, lcCode: account.lcCode ?? "", bio: account.bio ?? "", globalIdentity:account.globalIdentity, isAdmin: false, serverOrigin: origin };
 }
 
-async function loadSession(): Promise<LiveSessionSnapshot> {
-  const account = await liveAuthApi.currentAccount();
-  const reachable = await fetch("/api/ready", { cache: "no-store", credentials: "omit" })
-    .then(async (response) => response.ok && (await response.json()).app === "Locat")
-    .catch(() => false);
-  const connection = { ...disconnected, server: reachable ? "connected" as const : "unreachable" as const };
-  return { authStatus: account ? "ready" : "signedOut", user: account ? view(account) : null, connection };
+async function loadSession(): Promise<LiveSessionSnapshot|null> {
+  const result=await liveAuthApi.inspectSession();
+  if(result.status==='unavailable')return null;
+  return {authStatus:result.status,user:result.status==='ready'?view(result.user):null,connection:{...disconnected,server:'connected'}};
 }
 
 export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
@@ -31,10 +29,10 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   const [session, setSession] = useState<LiveSessionSnapshot>({ authStatus: "loading", user: null, connection: disconnected });
   const sessionMode = useRef(session.authStatus);
   useEffect(() => { sessionMode.current = session.authStatus; }, [session.authStatus]);
-  const refresh = useCallback(async () => { setSession(await loadSession()); }, []);
+  const refresh = useCallback(async () => { const snapshot=await loadSession();if(snapshot)setSession(snapshot);else setSession(old=>({...old,connection:{...old.connection,server:'unreachable'}})); }, []);
   useEffect(() => {
     let active = true;
-    void loadSession().then(snapshot => { if (active && sessionMode.current !== "local") setSession(snapshot); });
+    void loadSession().then(snapshot => { if (active && sessionMode.current !== "local") setSession(snapshot??{authStatus:"signedOut",user:null,connection:{...disconnected,server:"unreachable"}}); });
     return () => { active = false; };
   }, []);
 
@@ -44,8 +42,23 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   }, [session.authStatus]);
 
   useEffect(() => {
+    if(session.authStatus!=='ready')return;
+    let active=true,pending=false;
+    const stop=connectRealtime(realtime=>{
+      setSession(old=>({...old,connection:{...old.connection,realtime}}));
+      if(!pending&&(realtime==='connected'||realtime==='reconnecting')){
+        pending=true;
+        void loadSession().then(snapshot=>{if(active&&snapshot)setSession(old=>({...snapshot,connection:{...old.connection,server:'connected'}}));}).finally(()=>{pending=false;});
+      }
+    },()=>{
+      if(active){active=false;setSession({authStatus:'signedOut',user:null,connection:{...disconnected,realtime:'session-expired'}});}
+    });
+    return()=>{active=false;stop();};
+  },[session.authStatus,session.user?.id]);
+
+  useEffect(() => {
     let active=true;
-    const update=()=>{if(sessionMode.current==='ready')void loadSession().then(snapshot=>{if(active&&sessionMode.current==='ready')setSession(snapshot);});};
+    const update=()=>{if(sessionMode.current==='ready')void loadSession().then(snapshot=>{if(active&&snapshot&&sessionMode.current==='ready')setSession(snapshot);});};
     window.addEventListener('locat-account-profile-updated',update);
     return()=>{active=false;window.removeEventListener('locat-account-profile-updated',update);};
   }, []);

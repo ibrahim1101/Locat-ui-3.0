@@ -1,6 +1,6 @@
 # Messaging security model and implementation gate
 
-Private messaging remains disabled in live UI. The legacy /api/messages opaque-envelope developer endpoint is not an E2EE protocol, is not a conversation UI and must not be used for real private communication. Its durable ciphertext storage does not establish key authentication, forward secrecy, ratchets, group membership or device revocation. Preserve existing data, then replace/gate this transport as part of reviewed protocol integration.
+Private messaging remains disabled in live UI. The legacy /api/messages API is gated on the backend: authenticated GET/POST return 501 MESSAGING_SECURITY_GATE, unauthenticated access returns 401, and mutating Origin checks remain. No flag bypasses this gate. Existing experiment rows remain in SQLite/backups. Its durable ciphertext storage does not establish key authentication, forward secrecy, ratchets, group membership or device revocation. Replace the gated experiment only after reviewed protocol integration acceptance.
 
 Evaluation (official upstream documentation checked 2026-10-15): matrix-js-sdk supports browser/Node clients and initRustCrypto with a persistent browser crypto store, cross-signing and backup APIs. It warns against multiple clients using the same IndexedDB crypto store. This makes a full Matrix stack the preferred integration candidate for browser plus standards-based federation. It is not yet installed, selected at a pinned version, licensed for this repository by review, or tested here. Multi-tab single-writer ownership is mandatory.
 

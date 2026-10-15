@@ -1,6 +1,6 @@
 # Global connectivity status
 
-Implemented/tested locally: existing same-origin auth/API, direct HTTPS, opt-in fixed-peer reverse proxy mode, discovery, manual browser server entry and readiness recovery. These foundations permit an operator to prepare an HTTPS public origin; they do not establish international reachability or private messaging.
+Implemented/tested locally: existing same-origin auth/API, direct HTTPS, opt-in fixed-peer reverse proxy mode, discovery, manual browser server entry, readiness recovery, session-authenticated WebSocket health and qualified local addresses. These foundations permit an operator to prepare an HTTPS public origin; they do not establish international reachability or private messaging.
 
 The proposed personal endpoint is https://locat.ibrahimshaik.com. It is an operator target, not a compiled application requirement. No DNS existence, ownership verification, tunnel activation or public connectivity is claimed. Other operators supply their own LOCAT_PUBLIC_ORIGIN. Browser selection checks /.well-known/locat without cookies and opens the chosen origin only after the user clicks Open this server.
 

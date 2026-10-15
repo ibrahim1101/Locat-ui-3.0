@@ -27,3 +27,13 @@ describe("live authentication client", () => {
     finally { globalThis.fetch = original; }
   });
 });
+
+it('distinguishes unavailable session inspection from confirmed sign-out',async()=>{
+ const original=globalThis.fetch;
+ try{
+  globalThis.fetch=async()=>{throw new Error('offline');};expect(await liveAuthApi.inspectSession()).toEqual({status:'unavailable'});
+  globalThis.fetch=async()=>new Response('{}',{status:503});expect(await liveAuthApi.inspectSession()).toEqual({status:'unavailable'});
+  globalThis.fetch=async()=>new Response('{}',{status:401});expect(await liveAuthApi.inspectSession()).toEqual({status:'signedOut'});
+  globalThis.fetch=async()=>new Response(JSON.stringify({user:{id:'a',username:'alice',displayName:'Alice'}}));expect(await liveAuthApi.inspectSession()).toEqual({status:'ready',user:{id:'a',username:'alice',displayName:'Alice'}});
+ }finally{globalThis.fetch=original;}
+});
