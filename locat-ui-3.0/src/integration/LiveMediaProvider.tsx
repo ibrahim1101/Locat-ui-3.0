@@ -15,38 +15,42 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
   const { user, connection } = useSession();
   const account = user?.id ?? (connection.mode === "local-only" ? "local-device" : "signed-out");
   const [local, setLocal] = useState<LocalMediaItem[]>([]);
-  const [server, setServer] = useState<ServerSnapshot>({ items: [], libraries: [] });
+  const [server, setServer] = useState<ServerSnapshot|null>(null);
   const [loading, setLoading] = useState(true);
   const [imports,setImports]=useState(0);
+  const [serverLoading,setServerLoading]=useState(!!user);
+  const hydration=useRef<Promise<void>|null>(null);
   const [error, setError] = useState("");
   const [serverError, setServerError] = useState("");
-  const items = useMemo(() => mergeMedia(local, server.items), [local, server]);
+  const items = useMemo(() => mergeMedia(local, server?.items??[]), [local, server]);
   const authenticated = !!user;
   const serverGeneration=useRef(0),serverRequest=useRef<AbortController|null>(null);
   const loadServer=useCallback(async()=>{
     if(!authenticated)return;
-    const generation=++serverGeneration.current;serverRequest.current?.abort();const control=new AbortController();serverRequest.current=control;
+    const generation=++serverGeneration.current;serverRequest.current?.abort();const control=new AbortController();serverRequest.current=control;setServerLoading(true);
     try{const snapshot=await fetchServer(account,control.signal);if(generation===serverGeneration.current&&!control.signal.aborted){setServer(snapshot);setServerError("");}}
     catch(error){if(generation===serverGeneration.current&&!control.signal.aborted)setServerError(error instanceof Error?error.message:"Server library unavailable");}
-    finally{if(serverRequest.current===control)serverRequest.current=null;}
+    finally{if(serverRequest.current===control){serverRequest.current=null;setServerLoading(false);}}
   },[account,authenticated]);
   const disposeServer=useCallback(()=>{serverGeneration.current++;serverRequest.current?.abort();serverRequest.current=null;},[]);
   useEffect(() => {
     let active = true;
-    const device = readMedia(account).then(rows => { if (active) setLocal(rows); }).catch(error => { if (active) setError(error.message); });
-    const remote = authenticated ? Promise.resolve().then(()=>{if(active)return loadServer();}) : Promise.resolve();
-    void Promise.all([device, remote]).finally(() => { if (active) setLoading(false); });
+    const device = readMedia(account).then(rows => { if (active) setLocal(rows); }).catch(error => { if (active) setError(error instanceof Error?error.message:"Device library unavailable"); });
+    hydration.current=device;
+    void device.finally(()=>{if(active)setLoading(false);});
+    if(authenticated)void Promise.resolve().then(()=>{if(active)return loadServer();});
     return () => { active = false;disposeServer(); };
   }, [account, authenticated,loadServer,disposeServer]);
   async function run(operation: () => Promise<void>) {
     setError("");
     try { await operation(); } catch (error) { setError(error instanceof Error ? error.message : "Media operation failed"); }
   }
-  return <LiveMediaContext.Provider value={{ items, loading, importing:imports>0, error, serverError, serverLibraries: server.libraries,
+  return <LiveMediaContext.Provider value={{ items, loading, importing:imports>0, serverLoading, error, serverError, serverLibraries: server?.libraries,
     refreshServer: async()=>{if(!authenticated){setServerError("Sign in to read server media");return;}await loadServer();},
     importFiles: files => run(async () => {
       setImports(count=>count+1);
       try{
+        await hydration.current;
         let additions:LocalMediaItem[]=[];const started=performance.now();
         for(const file of Array.from(files)){
           const kind=mediaKind(file);if(!kind)throw new Error(`Unsupported media file: ${file.name}`);
