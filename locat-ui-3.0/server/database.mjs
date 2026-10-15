@@ -10,6 +10,8 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import { mkdirSync, chmodSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+export const DATABASE_SCHEMA_VERSION=14;
+
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
   const file = resolve(filename);
@@ -18,7 +20,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 14) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > DATABASE_SCHEMA_VERSION) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
