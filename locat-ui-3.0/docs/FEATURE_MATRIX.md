@@ -36,3 +36,6 @@ Password-confirmed other-session sign-out and transactional password-change auth
 
 
 Account-owned security audit search and cursor pagination are implemented in Sentinel; see ACCOUNT_ACTIVITY.md. This covers retained audit records rather than the full cross-module Timeline roadmap.
+
+
+Account audit date windows and bounded loaded-result JSON export are implemented; ACCOUNT_ACTIVITY.md defines the readable-file scope and excludes full account/private-key backup or signed-evidence claims.

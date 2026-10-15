@@ -1,3 +1,7 @@
+## Latest — activity time windows and loaded-record JSON export
+
+UI3 account activity now accepts local start/before times and sends explicit epoch-millisecond filters. Server validation enforces finite canonical bounds, start-inclusive/end-exclusive matching, correct ordering and the existing owner/cursor/page controls. A user-clicked Export loaded activity action prepares versioned readable JSON with only explicit public event fields, applied filters, export time/count and hasMore; it excludes unloaded records, unsaved filter drafts and unexpected event properties. Exports reject invalid/duplicate rows, more than 10,000 rows or UTF-8 output above 8 MiB without truncation. Validation passes: 172 frontend/48 files, 67 backend, check/lint/build and real HTTPS/Synapse acceptance including exact date boundaries. Tests inspect downloaded Blob content, inverted ranges and resource limits. This is a bounded loaded-history export, not a full account/Matrix/Vault backup, signed forensic evidence or actual browser-download acceptance. Full roadmap/recovery/native/browser scope remains open; Send stays gated. See ACCOUNT_ACTIVITY.md.
+
 ## Latest — searchable paged account audit history
 
 Initial lint failed the new synchronous effect-driven loading state and flagged mutable-ref cleanup. Request startup now runs through a cancellable asynchronous callback with a stable cancellation function; the rule remains enabled. Subsequent check/lint/test/build pass.

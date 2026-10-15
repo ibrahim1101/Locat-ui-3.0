@@ -17,3 +17,6 @@ The schema 14 follow-on also creates two managed devices that never bind: the fi
 
 
 Session-policy follow-on: the real HTTPS server rejects wrong-password and foreign-Origin bulk sign-out, preserves the current/foreign accounts, rejects the other login cookie after success and closes its actual WSS health connection with 4001 on the next message. This is local session revocation; Matrix account-wide token deletion remains separate.
+
+
+Audit time-window acceptance includes the generating event at its exact start millisecond, excludes it at an equal exclusive end and rejects empty/inverted bounds. UI export file saving is not exercised by this Node client.
