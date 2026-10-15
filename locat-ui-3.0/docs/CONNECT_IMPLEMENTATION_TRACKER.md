@@ -11,7 +11,7 @@
 | P6 native | Original source references only | Three-OS source CI does not certify native clients | Windows/Android/Pi physical testing pending |
 | P7 beta | Threat boundaries and acceptance procedures documented | Local foundation checks only | Not internet/public-beta ready |
 
-Continuous scope is MASTER_ROADMAP.md; earlier all-49 register remains intact. Next engineering dependency is executable reviewed E2EE integration, account mapping and device verification; global authority/key lifecycle remains pending. Do not equate documentation or a tunnel with completed connectivity.
+Continuous scope is MASTER_ROADMAP.md; earlier all-49 register remains intact. Implemented Matrix setup/account mapping and device verification now have isolated real-browser evidence; conversation/attachment/recovery integration, global authority/key lifecycle and native acceptance remain pending. Do not equate documentation or a tunnel with completed connectivity.
 
 2026-10-15 managed messaging checkpoint: optional restricted service registration, proof-bound derived account/device provisioning, UI3 managed setup, local public-key binding and managed-token cleanup are implemented and locally tested. Real Synapse acceptance exercises the provisioning module. Complete browser, peer verification/recovery, conversations, federation and native acceptance remain pending; no live chat or full roadmap completion claim.
 
@@ -29,3 +29,6 @@ Live verification checkpoint: UI3 now explicitly enables room-free verification 
 
 
 Current durable follow-on: schema 13 now queues cleanup of bound Matrix devices atomically with Link revocation. The managed worker retries and records confirmed/manual results, and UI3 renders that status. See MATRIX_DEVICE_REVOCATION.md for scope and remaining limits; the earlier separate-action description is historical.
+
+
+Current browser acceptance supersedes earlier pending-browser checkpoint notes for the exercised subset: BROWSER_FOUNDATION_ACCEPTANCE.md records actual Chromium managed provisioning/binding, exclusive native IndexedDB writer/key continuity, peer SAS rejection/mutual verification and standard history workers. It also records browser Link/private-store evidence and exact runs. Conversation Send, cross-signing/full identity recovery, federation/global trust, actual TURN/media relay and native acceptance remain open. The all-49 register and complete A–AM roadmap remain in scope.

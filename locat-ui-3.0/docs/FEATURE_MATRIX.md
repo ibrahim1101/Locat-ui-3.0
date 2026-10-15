@@ -4,13 +4,13 @@ Implemented, tested, platform-verified and independently security-reviewed are s
 
 | Scope | Implemented live subset | Tests | Platform verified | Remaining state |
 | --- | --- | --- | --- | --- |
-| Accounts/Contacts | Auth, LC/bio, sessions, preferences, cancel/remove/block and server privacy | API + UI/unit | Local Node/Linux only | Avatars/MFA/native/app lock planned |
+| Accounts/Contacts | Auth, LC/bio, session security, preferences, cancel/remove/block and server privacy | API + UI/unit, built login/cookie browser flow | Three-OS source/API CI; isolated Chromium/Linux login | Avatars/MFA/native/app lock planned |
 | Connect | Discovery/manual browser navigation, retry monitor, proxy termination, authenticated health WebSockets and qualified local addresses | Local client/config/HTTP/TLS | No real LAN/global/Docker | Device subscriptions/global trust/E2EE/federation pending |
-| Link/Remote | Proved paired browser identities, encrypted chunks/signaling, consent/cleanup | Crypto/API/UI tests | No real two-device/native | Resume/LAN/native/control/TURN pending |
+| Link/Remote | Proved paired browser identities, encrypted chunks/signaling, account isolation and consent/cleanup | Crypto/API/UI; actual two-context Link SAS, text/file/revocation | Isolated Chromium/Linux Link; Remote capture/WebRTC mocked | Actual streaming, resume/LAN/native/control/TURN pending |
 | Cinema/Music/Photos | Local/server media, conversion, playlists/EQ/crop/text | Unit/API/real FFmpeg | No physical codec/browser acceptance | Broader roadmap remains planned |
-| Vault/Secrets | Experimental client-encrypted records/files/backup | Crypto/API/UI | No native/independent review | Full key rotation/recovery/autofill expansion planned |
-| Sentinel | Scoped token webhooks, owned incidents/history/actions | API/unit/UI | No native agent acceptance | Monitoring/notifications/retention planned |
-| Messages/Calls | Contacts; reviewed Matrix synthetic integration and unwired persistent-crypto lifecycle; no live conversation/call flow | API/UI messaging gate enforced; legacy DB tests are not E2EE | None | Security gate closed |
+| Vault/Secrets | Experimental client-encrypted records/files/backup and wrapping-passphrase change | Crypto/API/UI; actual Secrets create/rewrap/reload/reopen | Isolated Chromium/Linux round-trip; no native/independent review | Full data-key rotation/recovery/autofill expansion planned |
+| Sentinel | Scoped token webhooks, paged incidents/history, actions and bounded loaded JSON export | API/unit/UI; actual Chromium token/webhook/actions/export/revocation | Isolated Chromium/Linux; no native agents | Monitoring/notifications/retention/full archives planned |
+| Messages/Calls | Live experimental managed Matrix setup, native browser crypto lifecycle, room-free peer SAS and history workers; no live conversations/calls | Real Synapse/HTTPS plus actual Chromium setup, exclusive writer, key continuity, mutual SAS, workers/logout | Isolated Chromium/Linux and synthetic Synapse; no native/federation/full recovery | Conversation/call security gate closed |
 | Remaining master ecosystem | Truthful unavailable live states | Some preview contract tests only | None | Planned; see full MASTER_ROADMAP.md sections A–AM |
 
 Original requirement register: ORIGINAL_LOCAT_REQUIREMENTS.md (all 49 retained). Current live provenance: PORTED_INTEGRATIONS.md. MASTER_ROADMAP.md preserves the complete expanded user directive including Identity, Wallet, emergency, health and all other modules; no feature is dropped by the connectivity reprioritization.
