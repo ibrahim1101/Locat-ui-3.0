@@ -1,3 +1,9 @@
+## Observed duplicate-comparison browser acceptance
+
+Source fc49fa234f5617cadf7f90f80d0a9bb2d32ef09c, workflow 38780050257 / browser job 116577577755 passed all seven browser scenarios in 38.3 seconds and three separate foundation repetitions in 12.2 seconds. Photos now actually imports two identical PNG files and reports both names in the matching SHA-256 group, alongside drawing, undo/redo, original-byte preservation, decoded information and persisted tag search. Ubuntu/macOS source verification succeeded; Windows was still installing its media/TLS tools at this observation. Prior tags workflow 38779206826 and information workflow 38778737431 are now observed successful on all four jobs.
+
+Local source validation remains 238 frontend tests / 60 files, 105 backend tests, TypeScript, lint and production build. The source tree was verified byte-identical to the published development commit after fetch/merge. This records desktop Chromium and source acceptance, not native installers, hardware codecs, physical stylus/touch, full identity recovery, cloud Photos backup/sync or completion of the A–AM master roadmap. No public deployment or main merge occurred.
+
 ## Bounded local photo duplicate comparison
 
 Added the roadmap duplicate-detection option with shared UI3 Button/Sheet controls. The explicit scan hashes the current filtered browser-local photo files using Web Crypto SHA-256, groups matching hashes and leaves all files/metadata unchanged. Server media is excluded without fetching it. Limits: 500 imported candidates, 32 MiB per file, 256 MiB total eligible bytes; oversized files are counted as skipped and over-count/total scans require narrower filters. Closing/unmount aborts publication, with cancellation checks after each read/digest; native operations already running are not forcibly interrupted. Results/hashes are not persisted, uploaded, synchronized or treated as visual similarity. PHOTO_EDITING.md documents those boundaries.
