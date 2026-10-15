@@ -87,10 +87,11 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   const linkDevices=await json('/api/link/devices',alice.auth);const ownLink=linkDevices.devices.find(device=>device.id===Number(alice.issued.deviceId.slice('LOCAT_'.length)));assert.ok(ownLink);
   await json('/api/link/revoke',{...alice.auth,method:'POST',data:{id:ownLink.id}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,403,'Revoked Link identity blocks the Matrix gateway');
+  await until(async()=>(await fetch(upstream+protectedPath,{headers:bearer})).status===401,'queued Link revocation invalidates actual Matrix session');
   for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [alice.password,bob.password,alice.auth.cookie.split('=')[1],bob.auth.cookie.split('=')[1],alice.auth.proof,bob.auth.proof,alice.issued.accessToken,bob.issued.accessToken])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, block/revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}

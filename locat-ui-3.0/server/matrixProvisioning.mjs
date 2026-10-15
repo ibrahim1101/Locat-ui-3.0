@@ -11,13 +11,20 @@ export function createManagedMatrixProvisioner({provider,serviceToken,serverId,s
   let value;try{value=JSON.parse(new TextDecoder('utf8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{fail(502,'Invalid managed messaging response');}
   if(!value||typeof value!=='object'||Array.isArray(value))fail(502,'Invalid managed messaging response');return {status:response.status,ok:response.ok,value};
  }
- return {async revokeDevice(userId,actor,recheck){
+ async function deleteIdentity(identity){
+  const result=await request('/_matrix/client/v3/devices/'+encodeURIComponent(identity.deviceId)+'?user_id='+encodeURIComponent(identity.userId),{},AbortSignal.timeout(10000),'DELETE');
+  if(!result.ok&&!(result.status===404&&result.value.errcode==='M_NOT_FOUND'))fail(502,'Locat gateway is blocked; Matrix device revocation was not confirmed');
+ }
+ return {async revokeQueuedDevice(job,recheck){
+  const identity=managedMatrixIdentity(serverId,job.userId,job.linkDeviceId,provider.serverName);
+  if(identity.userId!==job.matrixUserId||identity.deviceId!==job.matrixDeviceId)throw Object.assign(new Error('Matrix identity requires manual cleanup'),{manual:true});
+  recheck();await deleteIdentity(identity);recheck();
+ },async revokeDevice(userId,actor,recheck){
   const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const local=store.status(userId,actor);
   if(local.matrixUserId!==identity.userId||local.device?.deviceId!==identity.deviceId)fail(409,'This device has no matching managed Matrix binding');
   // Fail closed locally before asking the homeserver to remove all sessions for this device.
   store.disconnect(userId,actor);
-  const result=await request('/_matrix/client/v3/devices/'+encodeURIComponent(identity.deviceId)+'?user_id='+encodeURIComponent(identity.userId),{},AbortSignal.timeout(10000),'DELETE');
-  if(!result.ok)fail(502,'Locat gateway is blocked; Matrix device revocation was not confirmed');recheck();
+  await deleteIdentity(identity);recheck();
  },async cancel(userId,actor,token,recheck){
   if(typeof token!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(token)||token===serviceToken)fail(400,'Invalid managed device token');
   const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const remote=await provider.inspect(token);recheck();if(remote.userId!==identity.userId||remote.deviceId!==identity.deviceId)fail(403,'Managed device token belongs to another identity');await provider.logout(token);recheck();

@@ -1,3 +1,4 @@
+import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
 import {loadMatrixAppserviceFile} from './matrixAppserviceFile.mjs';
 import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
 import { createMatrixGateway } from './matrixGateway.mjs';
@@ -35,6 +36,7 @@ const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.
 const matrixServiceFile=process.env.LOCAT_MATRIX_APPSERVICE_FILE;
 if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a configured sidecar');
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings}):null;
+const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();
 const authLimit = createRateLimiter();
@@ -308,8 +310,11 @@ const server = (tlsOptions ? createHttpsServer(tlsOptions, listener) : createHtt
 
 const realtime = attachRealtime(server,{requestOrigin:req=>requestOrigin(req,config),sessionUser});
 
+matrixCleanup?.start();
+let shuttingDown=false;
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => {
+  if(shuttingDown)return;shuttingDown=true;const stopping=matrixCleanup?.stop()??Promise.resolve();
   realtime.close();
-  server.close(() => { db.close(); process.exit(0); });
+  server.close(() => {void stopping.finally(()=>{db.close();process.exit(0);});});
   server.closeIdleConnections();
 });

@@ -1,3 +1,4 @@
+import {matrixRevocationStore} from './matrixRevocation.mjs';
 import { matrixBindingStore } from './matrixBinding.mjs';
 import { linkStore } from './link.mjs';
 import { privateStore } from './privateStore.mjs';
@@ -15,7 +16,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 12) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 13) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -102,12 +103,21 @@ export function openDatabase(filename) {
     CREATE TABLE matrixAccounts(userId TEXT PRIMARY KEY REFERENCES users(id),matrixUserId TEXT NOT NULL UNIQUE,createdAt INTEGER NOT NULL);
     CREATE TABLE matrixBindings(userId TEXT NOT NULL REFERENCES matrixAccounts(userId),linkDeviceId INTEGER NOT NULL REFERENCES linkDevices(id),matrixUserId TEXT NOT NULL,matrixDeviceId TEXT NOT NULL,publicKeys TEXT NOT NULL,tokenHash TEXT NOT NULL UNIQUE,sessionHash TEXT NOT NULL,expiresAt INTEGER NOT NULL,PRIMARY KEY(userId,linkDeviceId),UNIQUE(matrixUserId,matrixDeviceId));
     PRAGMA user_version=12;COMMIT;`);
-  const link=linkStore(sql);
+  if(version<13)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE matrixRevocations(userId TEXT NOT NULL REFERENCES users(id),linkDeviceId INTEGER NOT NULL REFERENCES linkDevices(id),matrixUserId TEXT NOT NULL,matrixDeviceId TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','confirmed','manual')),attempts INTEGER NOT NULL DEFAULT 0,nextAttemptAt INTEGER NOT NULL,leaseUntil INTEGER NOT NULL DEFAULT 0,leaseToken TEXT,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL,PRIMARY KEY(userId,linkDeviceId));
+    CREATE INDEX matrix_revocations_due ON matrixRevocations(status,nextAttemptAt,leaseUntil);
+    INSERT INTO matrixRevocations(userId,linkDeviceId,matrixUserId,matrixDeviceId,status,attempts,nextAttemptAt,leaseUntil,createdAt,updatedAt)
+      SELECT b.userId,b.linkDeviceId,b.matrixUserId,b.matrixDeviceId,'pending',0,0,0,d.revokedAt,d.revokedAt FROM matrixBindings b JOIN linkDevices d ON d.userId=b.userId AND d.id=b.linkDeviceId WHERE d.revokedAt IS NOT NULL;
+    UPDATE matrixBindings SET expiresAt=0 WHERE linkDeviceId IN (SELECT linkDeviceId FROM matrixRevocations);
+    PRAGMA user_version=13;COMMIT;`);
+  const matrixRevocations=matrixRevocationStore(sql);
+  const link=linkStore(sql,matrixRevocations);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
     serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
     link,
+    matrixRevocations,
     matrixBindings:matrixBindingStore(sql,link),
     sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
