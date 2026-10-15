@@ -1,3 +1,11 @@
+## Photos import timeline
+
+Added Grid / Import timeline to the existing themed Photos toolbar. Timeline uses browser-local import timestamps and the viewing browser's calendar/time zone, sorts newest first with deterministic ties, puts invalid/missing dates in Unknown import date and excludes server entries whose catalog dates represent file modification times. Search/name/album/tags, favorites, source and playlist filters apply before grouping; saving results uses the actual visible order. Timeline does not modify stored playlists or Grid sorting, and its UI copy explicitly distinguishes import dates from camera capture metadata. No media/account/schema changes occurred.
+
+Validation passed: TypeScript, lint, 241 frontend tests / 61 files, 105 backend tests and production build. New pure/DOM regressions cover local calendar boundaries, invalid dates, immutable input, server exclusion, chronological grouping, tag filtering and preserved custom playlist ordering. The existing Photos Chromium scenario now selects timeline, checks grouped imported cards/filtering and restores Grid; actual execution is pending CI. Camera/EXIF capture-date timeline and cloud synchronization remain planned.
+
+Observed preceding evidence commit 03a231d30b32cf37ddd02f7dcbc41fcf3645711e / workflow 38780575836 succeeded on all four jobs. Earlier duplicate source fc49fa2 / workflow 38780050257 also finished with all four jobs successful, including Windows. Full native compatibility and the A–AM master roadmap remain incomplete.
+
 ## Observed duplicate-comparison browser acceptance
 
 Source fc49fa234f5617cadf7f90f80d0a9bb2d32ef09c, workflow 38780050257 / browser job 116577577755 passed all seven browser scenarios in 38.3 seconds and three separate foundation repetitions in 12.2 seconds. Photos now actually imports two identical PNG files and reports both names in the matching SHA-256 group, alongside drawing, undo/redo, original-byte preservation, decoded information and persisted tag search. Ubuntu/macOS source verification succeeded; Windows was still installing its media/TLS tools at this observation. Prior tags workflow 38779206826 and information workflow 38778737431 are now observed successful on all four jobs.
