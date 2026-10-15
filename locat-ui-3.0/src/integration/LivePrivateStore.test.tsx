@@ -151,3 +151,26 @@ it('does not submit a late passphrase derivation after hidden-page locking',asyn
  expect(fetch).toHaveBeenCalledTimes(2);expect(screen.queryByRole('button',{name:'Lock now'})).toBeNull();
  expect(screen.getByLabelText('Private-store passphrase')).toHaveValue('');
 });
+
+it('offers a status-only retry after a connection failure without creating or changing a store',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const fetch=vi.fn().mockRejectedValueOnce(new Error('temporarily unreachable')).mockResolvedValue({ok:true,json:async()=>({config:null,objects:[],quota:67108864,maxObjects:128})});vi.stubGlobal('fetch',fetch);
+ render(<MemoryRouter><LivePrivateStore kind="vault"/></MemoryRouter>);
+ fireEvent.click(await screen.findByRole('button',{name:'Retry encrypted-store status'}));
+ expect(await screen.findByRole('button',{name:'Create encrypted store'})).toBeVisible();
+ expect(screen.queryByText('temporarily unreachable')).toBeNull();expect(fetch).toHaveBeenCalledTimes(2);
+ for(const [path,options] of fetch.mock.calls){expect(path).toBe('/api/private/vault');expect(options.method).toBeUndefined();}
+});
+
+it('aborts a pending status request on unmount',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ let signal:AbortSignal|undefined;
+ vi.stubGlobal('fetch',vi.fn((_path:string,options:RequestInit)=>new Promise((_resolve,reject)=>{
+  signal=options.signal??undefined;
+  signal?.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true});
+ })));
+ const view=render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ expect(signal?.aborted).toBe(false);
+ await act(async()=>{view.unmount();});
+ expect(signal?.aborted).toBe(true);
+});

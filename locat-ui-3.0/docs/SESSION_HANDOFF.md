@@ -1,3 +1,9 @@
+Private-request validation: check, lint, all 185 frontend tests / 49 files, all 89 backend tests and production build passed. Network handling changed only in Vault/Secrets; actual browser/native acceptance remains pending.
+
+## Latest — bounded private requests and recoverable status loading
+
+Extracted the private-store request helper with a 15-second fetch/body AbortController deadline, forwarded external cancellation and timer/listener cleanup. Failed initial metadata loading now offers a shared UI3 error state and Retry encrypted-store status action rather than remaining on an indefinite loading screen. Retry is GET-only, clears the previous error and aborts on unmount. Timed-out mutation messages explicitly allow an already-completed change and require lock/unlock refresh; no automatic write replay or rollback claim. Added helper deadline/cancellation/body/HTTP behavior tests and UI status retry/unmount regressions. Local crypto/file work and nonconforming fetch behavior are not certified by this timer; browser/native acceptance and full roadmap remain open. PRIVATE_STORAGE.md records the behavior.
+
 Atomic private-write validation: check, lint, all 179 frontend tests / 48 files, all 89 backend tests, and production build passed. No new browser/native/independent cryptographic acceptance claim.
 
 ## Latest — atomic private entry writes and audits
