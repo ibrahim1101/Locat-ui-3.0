@@ -136,12 +136,12 @@ function SignIn({ back, done }: { back(): void; done(): void }) {
 function RecoveryLink() {
   const [open, setOpen] = useState(false);
   return (<>
-    <button onClick={() => setOpen(true)} className="rounded-lg px-1 py-2 text-left font-semibold text-ember hover:underline" data-testid="recovery-link">Restore identity from encrypted backup</button>
-    <Sheet open={open} onClose={() => setOpen(false)} title="Identity recovery" description="Your encryption identity lives on your devices, not on the server.">
+    <button onClick={() => setOpen(true)} className="rounded-lg px-1 py-2 text-left font-semibold text-ember hover:underline" data-testid="recovery-link">Messaging recovery status</button>
+    <Sheet open={open} onClose={() => setOpen(false)} title="Identity recovery is planned" description="Room-history key backups and complete identity recovery have different scopes.">
       <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-ink-2">
-        <li>Sign in on this device with your password.</li><li>Choose your encrypted Locat backup file.</li><li>Enter the backup passphrase to unwrap your keys locally.</li>
+        <li>Sign in with your current Locat account password.</li><li>After device setup, messaging settings can import or export encrypted room-history keys.</li><li>History keys do not restore device identity, verified trust, cross-signing or account access. Complete identity recovery is not connected yet.</li>
       </ol>
-      <Banner className="mt-4" tone="warn" icon={ShieldAlert} title="Locat can't reset a forgotten backup passphrase">Without it, older encrypted messages can't be read on a new device.</Banner>
+      <Banner className="mt-4" tone="warn" icon={ShieldAlert} title="Keep the original backup passphrase">Locat cannot reset that passphrase. A history-key backup alone is not a full account or device backup.</Banner>
     </Sheet>
   </>);
 }
@@ -156,9 +156,9 @@ function Register({ back, done }: { back(): void; done(): void }) {
   return (
     <Frame onBack={back} step="Create account">
       <h1 className="text-2xl font-extrabold tracking-tight">Create your account</h1>
-      <p className="mt-2 text-sm text-ink-2">Your username and LC code are permanent. Your encryption keys are created on this device.</p>
+      <p className="mt-2 text-sm text-ink-2">Your username and LC code are permanent. Private-tool keys are created on this device when you explicitly set those tools up.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
-        <TextField label="Username" value={u} onChange={(e) => setU(e.target.value.toLowerCase())} autoCapitalize="off" hint="Lowercase letters, numbers and dots. Can't be changed later." data-testid="register-username" />
+        <TextField label="Username" value={u} onChange={(e) => setU(e.target.value.toLowerCase())} autoCapitalize="off" hint="3–32 lowercase letters, numbers or underscores. Can't be changed later." data-testid="register-username" />
         <TextField label="Display name" value={n} onChange={(e) => setN(e.target.value)} data-testid="register-display-name" />
         <div>
           <TextField label="Password" reveal value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" data-testid="register-password" />

@@ -1,3 +1,7 @@
+## Browser CI follow-on — registration fixture and entry guidance
+
+The first actual Chromium job (run 38745774227, commit 4819b99) installed/started Chromium and reached the built app, then failed with registration HTTP 400 because the synthetic username used a dot. Corrected the fixture to an underscore and corrected the UI's outdated dots-allowed hint to the server's existing 3–32 letters/digits/underscores policy; validation is unchanged. Browser assertions now include the API error for diagnosis. Entry recovery copy explicitly marks complete identity recovery planned and distinguishes available encrypted history keys from identity/trust/account recovery. Registration copy no longer implies private keys exist before explicit tool setup. BROWSER_FOUNDATION_ACCEPTANCE.md records the failed run and requires a later observed success before acceptance claims.
+
 Browser-job source validation: check, lint, all 194 frontend tests / 51 files, all 101 backend tests and production build passed; Playwright lists one test and the isolated HTTPS fixture starts/stops successfully. This does not claim browser execution.
 
 ## Latest — executable browser foundation acceptance job

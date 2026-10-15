@@ -30,3 +30,9 @@ The browser-foundation job installs Chromium/dependencies, builds the app and ru
 At introduction, local checks include fixture HTTPS readiness, script syntax and one discovered test. The local environment has no Chromium executable; previous browser downloads returned invalid artifacts, so browser execution is delegated to CI rather than simulated. Full browser acceptance remains pending until a successful run is actually observed.
 
 Primary tooling references: https://playwright.dev/docs/intro and https://playwright.dev/docs/ci-intro.
+
+## First executed CI run and fixture correction
+
+Workflow 38745774227 on commit 4819b99 successfully installed Chromium and executed the test against the built app. It failed at synthetic account creation (HTTP 400): the fixture used browser.<suffix>, while server usernames accept only 3–32 lowercase letters/digits/underscores. The fixture now uses browser_<suffix> and reports the API error on a status assertion. The registration hint was corrected to the same server policy. This is an observed failed browser run, not acceptance success; later successful evidence must identify its exact commit/run.
+
+The login recovery notice was also corrected to distinguish existing room-history import/export from planned complete account/device identity recovery. Account creation no longer claims that all private-tool keys were already created; setup remains explicit. No authentication validation was weakened.

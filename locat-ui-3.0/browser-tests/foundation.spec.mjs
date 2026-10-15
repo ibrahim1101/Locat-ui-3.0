@@ -12,14 +12,14 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
  await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
  const page=await context.newPage(),privateWrites=[];
  page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/private/')&&request.method()==='POST')privateWrites.push(request.postData());});
- const password=randomBytes(24).toString('base64url'),username='browser.'+randomBytes(6).toString('hex');
+ const password=randomBytes(24).toString('base64url'),username='browser_'+randomBytes(6).toString('hex');
  try{
   await page.goto(fixture.origin);
   await expect(page.getByTestId('login-submit')).toBeVisible();
   const registered=await page.evaluate(async({username,password})=>{
    const response=await fetch('/api/auth/register',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,displayName:'Synthetic browser account'})});
-   return {status:response.status,user:(await response.json()).user};
-  },{username,password});expect(registered.status).toBe(201);
+   const data=await response.json();return {status:response.status,user:data.user,error:data.error};
+  },{username,password});expect(registered.status,registered.error).toBe(201);
   await page.getByTestId('login-username').fill(username);await page.getByTestId('login-password').fill(password);await page.getByTestId('login-submit').click();
   await expect(page.getByTestId('entry-flow')).toHaveCount(0);
   const cookie=(await context.cookies(fixture.origin)).find(row=>row.name==='locat_session');
