@@ -1,3 +1,4 @@
+import {parseAuditQuery} from './auditEvents.mjs';
 import {createSessionSecurityHandler} from './sessionSecurity.mjs';
 import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
 import {loadMatrixAppserviceFile} from './matrixAppserviceFile.mjs';
@@ -177,7 +178,8 @@ async function handle(req, res) {
   }
   if (url.pathname === "/api/security/events" && req.method === "GET") {
     const user = sessionUser(req);
-    return json(res, user ? 200 : 401, user ? { events: db.events(user.id) } : { error: "Not authenticated" });
+    if(!user)return json(res,401,{error:"Not authenticated"});
+    return json(res,200,db.auditPage(user.id,parseAuditQuery(url.searchParams)));
   }
   if (url.pathname === "/api/preferences" && ["GET", "POST"].includes(req.method)) {
     if (req.method === "POST" && req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });

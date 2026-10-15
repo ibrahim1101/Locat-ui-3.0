@@ -1,3 +1,4 @@
+import {auditEventPage} from './auditEvents.mjs';
 import {managedMatrixDeviceStore} from './matrixManagedDevices.mjs';
 import {matrixRevocationStore} from './matrixRevocation.mjs';
 import { matrixBindingStore } from './matrixBinding.mjs';
@@ -156,6 +157,7 @@ export function openDatabase(filename) {
     preferences: userId => JSON.parse(sql.prepare('SELECT value FROM preferences WHERE userId = ?').get(userId)?.value ?? '{}'),
     savePreferences: (userId, value) => sql.prepare('INSERT INTO preferences VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET value = excluded.value').run(userId, JSON.stringify(value)),
     audit: (userId, event, severity = 'info') => sql.prepare('INSERT INTO audit (userId, event, severity, createdAt) VALUES (?, ?, ?, ?)').run(userId, event, severity, Date.now()),
+    auditPage: (userId,options) => auditEventPage(sql,userId,options),
     events: userId => sql.prepare('SELECT id, event, severity, createdAt FROM audit WHERE userId = ? ORDER BY id DESC LIMIT 100').all(userId),
     userById: id => userById.get(id),
     userByName: name => userByName.get(name),

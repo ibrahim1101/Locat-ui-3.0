@@ -1,0 +1,13 @@
+# Searchable account activity
+
+Sentinel's account activity section now fetches its own real account audit data when selected. It reuses UI3 TextField, Button, Badge, StateView and existing card/theme tokens. Search/severity changes are applied explicitly; the current result set resets on a new filter or refresh. Older events append by ID without duplicates. Refreshing the Sentinel header while this section is selected refreshes activity rather than unrelated incident/token requests.
+
+GET /api/security/events remains cookie-authenticated and owner-bound. Its existing events field is retained; nextCursor is an additive string/null field. Default page size remains 100 for existing callers; UI3 requests 25. Optional parameters are q (trimmed event-name search, at most 80 characters), severity (info, warn, error), before (canonical positive safe-integer event ID) and limit (1–100). Duplicate/unknown keys, foreign account selectors, invalid severities and malformed/oversized cursors/pages return 400. No client account ID influences ownership.
+
+SQLite uses bound literal substring matching on raw event names and their period-to-space display names; percent/underscore characters have no wildcard meaning. The warning filter includes legacy warn and warning rows without rewriting history. Results use descending unique audit IDs and before-ID cursors, so new events arriving above the current page do not duplicate or skip the retained older sequence. Search is over audit event names, not document contents or incident notes. Every older page reapplies ownership and filters.
+
+The panel has a 15-second request deadline. It aborts obsolete/in-flight work on filter/refresh/unmount and ignores stale responses by request generation. Older-page errors preserve already loaded rows and the cursor for retry. First-page errors show an honest error and refresh control; no preview/fake events are inserted. An exhausted result has no continuation cursor.
+
+Tests exercise more than 100 retained events, new inserts during paging, owner isolation, literal search, severity aliases, query bounds, explicit filter submission, retry, stale-result suppression, pending-request abortion and Sentinel tab/header wiring. The actual HTTPS/Synapse harness checks search for the newly generated bulk-revocation audit event, foreign-account isolation and rejection of malformed/foreign-selector queries. Local unit/browser-rendering tests do not certify actual browser/native acceptance.
+
+No schema migration, audit erasure, external notification or public service activation is added. Retention policy, exports and the wider cross-module Timeline remain future work. Existing browser/native/full identity-recovery and messaging gates remain unchanged.

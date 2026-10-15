@@ -1,7 +1,7 @@
+import {AccountActivityPanel} from './AccountActivityPanel';
 import { useCallback, useEffect, useState } from "react";
 import { Screen } from "../layouts/Screen";
 import { Badge, Button, Sheet, StateView, TextField } from "../ui";
-type SecurityEvent = { id: number; event: string; severity: string; createdAt: number };
 type Incident = { id: string; title: string; description: string; source: string; severity: string; status: string; occurrences: number; updatedAt: number };
 type Token = { id: string; name: string; prefix: string; revokedAt: number | null };
 type History = { id: number; action: string; note: string; createdAt: number };
@@ -10,7 +10,7 @@ async function request(path: string, input?: unknown) {
   const data = await response.json(); if (!response.ok) throw new Error(data.error ?? "Sentinel request failed"); return data;
 }
 export function LiveSentinel() {
-  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [activityRefresh,setActivityRefresh]=useState(0);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [error, setError] = useState("");
@@ -26,16 +26,16 @@ export function LiveSentinel() {
   const [secret, setSecret] = useState("");
   const [revoke, setRevoke] = useState<Token | null>(null);
   async function load() {
-    const [audit, alerts, keys] = await Promise.all([request("/api/security/events"), request("/api/sentinel/incidents"), request("/api/sentinel/tokens")]);
-    return { events: audit.events as SecurityEvent[], incidents: alerts.incidents as Incident[], tokens: keys.tokens as Token[] };
+    const [alerts, keys] = await Promise.all([request("/api/sentinel/incidents"), request("/api/sentinel/tokens")]);
+    return { incidents: alerts.incidents as Incident[], tokens: keys.tokens as Token[] };
   }
-  const apply = useCallback((data: Awaited<ReturnType<typeof load>>) => { setEvents(data.events); setIncidents(data.incidents); setTokens(data.tokens); }, []);
+  const apply = useCallback((data: Awaited<ReturnType<typeof load>>) => { setIncidents(data.incidents); setTokens(data.tokens); }, []);
   useEffect(() => { let active = true; void load().then(data => { if (active) apply(data); }).catch(error => { if (active) setError(error.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [apply]);
   async function run(task: () => Promise<void>) { setBusy(true); setError(""); try { await task(); } catch (error) { setError(error instanceof Error ? error.message : "Sentinel request failed"); } finally { setBusy(false); } }
   async function openIncident(id: string) { const detail = await request("/api/sentinel/incidents/" + id); setSelected(detail.incident); setHistory(detail.events); setNote(""); }
   async function action(value: string) { if (!selected) return; await request("/api/sentinel/incidents/" + selected.id, { action: value, ...(value === "note" ? { note } : {}) }); await openIncident(selected.id); apply(await load()); }
   const visible = incidents.filter(item => !filter || item.status === filter);
-  return <Screen title="Sentinel" subtitle="Incidents, integrations and account security" actions={<Button disabled={busy} onClick={() => void run(async () => apply(await load()))}>Refresh</Button>}>
+  return <Screen title="Sentinel" subtitle="Incidents, integrations and account security" actions={<Button disabled={busy} onClick={() => tab==='account activity'?setActivityRefresh(value=>value+1):void run(async () => apply(await load()))}>Refresh</Button>}>
     <div className="mx-auto max-w-5xl space-y-4">
       <p className="text-sm text-ink-3">Account-owned alerts from generic, nScout and PipelineGuard webhooks. Incident text is readable by this server. Device monitoring and external notification delivery are pending.</p>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Sentinel sections">{["incidents", "integrations", "account activity"].map(value => <Button key={value} aria-pressed={tab === value} onClick={() => setTab(value)}>{value}</Button>)}</div>
@@ -49,7 +49,7 @@ export function LiveSentinel() {
         <p className="text-sm text-ink-3">POST JSON with a Bearer token to <code>/api/sentinel/webhook?format=generic</code>. Required field: title. Optional: description, severity, source, fingerprint, status. Tokens can only submit incidents for your account. The nscout and pipelineguard format parameters accept the original Locat adapter payloads; real vendor acceptance remains pending.</p>
         {tokens.map(token => <article key={token.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-s1 p-4 hairline"><h2 className="flex-1 font-semibold">{token.name}</h2><code className="text-xs text-ink-3">{token.prefix}…</code>{token.revokedAt ? <Badge>Revoked</Badge> : <Button disabled={busy} onClick={() => setRevoke(token)}>Revoke</Button>}</article>)}
         {!tokens.length && <StateView kind="empty" title="No integrations configured" />}
-      </> : events.length ? events.map(event => <article key={event.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-s1 p-4 hairline"><Badge tone={event.severity === "warn" ? "warn" : "neutral"}>{event.severity}</Badge><p className="flex-1 font-semibold">{event.event.replaceAll(".", " ")}</p><time className="text-xs text-ink-3" dateTime={new Date(event.createdAt).toISOString()}>{new Date(event.createdAt).toLocaleString()}</time></article>) : <StateView kind="empty" title="No account events yet" />}
+      </> : <AccountActivityPanel refreshToken={activityRefresh}/>}
     </div>
     <Sheet open={!!selected} onClose={() => { setSelected(null); setNote(""); }} title={selected?.title ?? "Incident"}>
       {selected && <div className="space-y-4"><p className="whitespace-pre-wrap break-words text-sm text-ink-3">{selected.description || "No description"}</p><p className="text-sm">{selected.severity} · {selected.status} · {selected.occurrences} occurrences</p>
