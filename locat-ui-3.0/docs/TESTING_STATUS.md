@@ -1,3 +1,9 @@
+Atomic private-write validation: check, lint, all 179 frontend tests / 48 files, all 89 backend tests, and production build passed. No new browser/native/independent cryptographic acceptance claim.
+
+## Latest — atomic private entry writes and audits
+
+Extended the rewrap transaction boundary to private-store initialization, entry put and removal. Every HTTP mutation now passes a server-derived session hash, rechecks exact owner/expiry after acquiring BEGIN IMMEDIATE, and commits its metadata-only audit with the data change. The router's separate post-write audits were removed to prevent partial success and duplicate events. Existing internal maintenance method signatures remain available; HTTP bodies cannot choose them. Rewrap still requires session context. New forced-audit-failure tests prove no partial configuration, creation, revision update or deletion; expired/revoked/foreign sessions preserve data; actual API activity queries show exactly one audit per successful action. Original account/media data and schema 14 are preserved. PRIVATE_STORAGE.md records commit ordering and already-completed-write/key-revocation limits. Full master scope, browser/native acceptance and full recovery/key rotation remain unfinished.
+
 Passphrase-change validation: check, lint, all 179 frontend tests / 48 files, all 87 backend tests, and production build passed. Actual browser/native/full data-key rotation acceptance remains pending.
 
 ## Latest — private-store passphrase changes

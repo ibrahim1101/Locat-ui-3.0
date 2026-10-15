@@ -167,6 +167,11 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.deepEqual(afterRewrap.config,nextPrivateConfig);assert.deepEqual(afterRewrap.objects,privateStatus.objects);
     assert.equal((await request('/api/private/vault/remove','POST',{id:privateId,expectedRevision:2},aliceCookie)).status,409);
     assert.equal((await request('/api/private/vault/remove','POST',{id:privateId,expectedRevision:1},aliceCookie)).status,200);
+    for(const event of ['initialized','written','removed','passphrase.changed']){
+      const activity=await(await request('/api/security/events?q='+encodeURIComponent('private.vault.'+event),'GET',undefined,aliceCookie)).json();
+      assert.equal(activity.events.filter(row=>row.event==='private.vault.'+event).length,1);
+    }
+
     async function registerDevice(name,cookieValue) {
       const identity=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);
       const publicKey=Buffer.from(await crypto.subtle.exportKey('spki',identity.publicKey)).toString('base64');

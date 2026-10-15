@@ -27,3 +27,5 @@ Operator restore:server can publish a checksum-verified standalone SQLite snapsh
 Vault/Secrets account/module changes mount a fresh locked state; generation guards and synchronous operation exclusion prevent stale client-state attachment and duplicate form operations. PRIVATE_STORAGE.md documents already-dispatched write and JavaScript-erasure limits.
 
 Private-store passphrase changes rewrap the existing master key in the browser. SQLite validates owner/live session/config continuity and audits atomically, but cannot verify passphrase knowledge or cryptographic key continuity itself. Older backups and unlocked clients retain access. See PRIVATE_STORAGE.md.
+
+All private-store HTTP mutations now check their live owning session under SQLite BEGIN IMMEDIATE and commit data plus a single metadata-only audit together. Failed audits roll back configuration/entry changes. Internal maintenance APIs are distinct from the authenticated router; see PRIVATE_STORAGE.md.

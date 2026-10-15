@@ -73,3 +73,51 @@ test('private writes recheck session after reading the body and passphrase chang
  actor=null;release();await assert.rejects(operation,error=>error.status===401);
  assert.equal(called,false);assert.equal(limit,4096);
 });
+
+test('private initialization, entry updates and removal roll back if their audit cannot commit',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-private-atomic-'));let db,raw;
+ try{
+  const file=join(dir,'db.sqlite');db=openDatabase(file);raw=new DatabaseSync(file);
+  db.addUser({id:'a',username:'a',displayName:'a',salt:'s',hash:'h'});
+  const token='a'.repeat(64);db.addSession(token,'a',Date.now()+60000);
+  const reject=()=>raw.exec("CREATE TRIGGER reject_private_write_audit BEFORE INSERT ON audit WHEN NEW.event LIKE 'private.%' BEGIN SELECT RAISE(ABORT,'synthetic audit unavailable');END;");
+  const allow=()=>raw.exec('DROP TRIGGER reject_private_write_audit;');
+  reject();assert.throws(()=>db.privateStore.initialize('a','secrets',configuration(),token),/synthetic audit unavailable/);
+  assert.equal(db.privateStore.status('a','secrets').config,null);
+  allow();db.privateStore.initialize('a','secrets',configuration(),token);
+  const id=randomUUID();reject();assert.throws(()=>db.privateStore.put('a','secrets',id,0,envelope,token),/synthetic audit unavailable/);
+  assert.equal(db.privateStore.status('a','secrets').objects.length,0);
+  allow();db.privateStore.put('a','secrets',id,0,envelope,token);
+  reject();assert.throws(()=>db.privateStore.put('a','secrets',id,1,{...envelope,iv:Buffer.alloc(12,5).toString('base64')},token),/synthetic audit unavailable/);
+  assert.deepEqual(db.privateStore.get('a','secrets',id),{revision:1,envelope});
+  assert.throws(()=>db.privateStore.remove('a','secrets',id,1,token),/synthetic audit unavailable/);
+  assert.deepEqual(db.privateStore.get('a','secrets',id),{revision:1,envelope});
+  allow();db.privateStore.remove('a','secrets',id,1,token);
+  const events=db.auditPage('a',{q:'private.secrets.'}).events;
+  assert.deepEqual(events.map(row=>row.event),['private.secrets.removed','private.secrets.written','private.secrets.initialized']);
+  assert.equal(JSON.stringify(events).includes(id),false);assert.equal(JSON.stringify(events).includes('wrappedKey'),false);
+ }finally{raw?.close();db?.close();await rm(dir,{recursive:true,force:true});}
+});
+test('every HTTP-style private write rejects a revoked, expired or foreign session inside its transaction',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-private-session-'));let db;
+ try{
+  db=openDatabase(join(dir,'db.sqlite'));
+  for(const id of ['a','b'])db.addUser({id,username:id,displayName:id,salt:'s',hash:'h'});
+  const own='a'.repeat(64),foreign='b'.repeat(64),expired='c'.repeat(64);
+  db.addSession(own,'a',Date.now()+60000);db.addSession(foreign,'b',Date.now()+60000);db.addSession(expired,'a',Date.now()-1);
+  for(const hash of [foreign,expired])assert.throws(()=>db.privateStore.initialize('a','secrets',configuration(),hash),error=>error.status===401);
+  db.privateStore.initialize('a','secrets',configuration(),own);
+  const id=randomUUID();
+  for(const hash of [foreign,expired])assert.throws(()=>db.privateStore.put('a','secrets',id,0,envelope,hash),error=>error.status===401);
+  db.privateStore.put('a','secrets',id,0,envelope,own);
+  db.revokeSession(own);
+  for(const hash of [own,foreign,expired]){
+   assert.throws(()=>db.privateStore.put('a','secrets',id,1,envelope,hash),error=>error.status===401);
+   assert.throws(()=>db.privateStore.remove('a','secrets',id,1,hash),error=>error.status===401);
+  }
+  assert.throws(()=>db.privateStore.initialize('a','vault',configuration(),own),error=>error.status===401);
+  assert.equal(db.privateStore.status('a','vault').config,null);
+  assert.deepEqual(db.privateStore.get('a','secrets',id),{revision:1,envelope});
+  assert.equal(db.auditPage('a',{q:'private.secrets.'}).events.length,2);
+ }finally{db?.close();await rm(dir,{recursive:true,force:true});}
+});
