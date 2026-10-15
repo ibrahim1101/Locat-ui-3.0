@@ -1,3 +1,4 @@
+import {verificationSyncFilter,verificationEventTypes} from '../shared/matrixVerificationProfile.mjs';
 import {verificationRoute,validateMatrixVerification} from './matrixVerification.mjs';
 import {matrixTokenHash} from './matrixBinding.mjs';
 import {createRateLimiter} from './rateLimit.mjs';
@@ -15,12 +16,15 @@ export function createMatrixGateway({provider,store,sessionUser,sessionToken,dev
   const token=/^Bearer ([A-Za-z0-9._~+/=-]{16,8192})$/.exec(req.headers.authorization??'')?.[1];if(!token)fail(401,'Matrix bearer session required');
   const actor=deviceActor(req,user.id,session),binding=store.authorize(user.id,actor,matrixTokenHash(session),token);
   const path=url.pathname,verification=req.method==='PUT'?verificationRoute(url.pathname):null;
-  const allowed=verification|| (req.method==='GET'?['/_matrix/client/versions','/_matrix/client/v3/account/whoami','/_matrix/client/v3/sync','/_matrix/client/v3/keys/changes','/_matrix/client/v3/room_keys/version'].includes(path):['/_matrix/client/v3/keys/upload','/_matrix/client/v3/keys/query','/_matrix/client/v3/keys/claim'].includes(path)&&req.method==='POST');
+  const filterPath='/_matrix/client/v3/user/'+encodeURIComponent(binding.matrixUserId)+'/filter';
+  const ownFilter=req.method==='POST'?path===filterPath:req.method==='GET'&&path.startsWith(filterPath+'/')&&/^[A-Za-z0-9_-]{1,128}$/.test(path.slice(filterPath.length+1));
+  const allowed=(ownFilter&&['GET','POST'].includes(req.method))||verification|| (req.method==='GET'?['/_matrix/client/v3/capabilities','/_matrix/client/v3/pushrules/','/_matrix/client/versions','/_matrix/client/v3/account/whoami','/_matrix/client/v3/sync','/_matrix/client/v3/keys/changes','/_matrix/client/v3/room_keys/version'].includes(path):['/_matrix/client/v3/keys/upload','/_matrix/client/v3/keys/query','/_matrix/client/v3/keys/claim'].includes(path)&&req.method==='POST');
   if(!allowed)fail(501,'This Matrix endpoint is gated until its Locat integration is accepted');
   const retryAfter=limit(user.id);if(retryAfter)throw Object.assign(new Error('Matrix bootstrap rate limit exceeded'),{status:429,retryAfter});
   if((active.get(user.id)??0)>=8)fail(429,'Matrix bootstrap connection limit exceeded');
   const queriedPeers=new Set();let verificationTarget;
-  let input;if(req.method!=='GET'){input=await body(req,verification?16384:1024*1024);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix request');
+  let input;if(req.method!=='GET'){input=await body(req,verification?16384:ownFilter?4096:1024*1024);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix request');
+   if(ownFilter)input=verificationSyncFilter();
    if(verification){if(url.search)fail(400,'Verification transport does not accept query parameters');verificationTarget=validateMatrixVerification(verification.event,input,binding);if(!store.permitsMatrixDevice?.(user.id,verificationTarget.userId,verificationTarget.deviceId))fail(403,'Verification recipient must be an active bound device of this account or an accepted contact');}
    if(path.endsWith('/keys/query')||path.endsWith('/keys/claim')){
     const users=input[path.endsWith('/keys/query')?'device_keys':'one_time_keys'];if(!users||typeof users!=='object'||Array.isArray(users)||Object.keys(users).length>50)fail(400,'Invalid or oversized Matrix device-key lookup');
@@ -32,10 +36,12 @@ export function createMatrixGateway({provider,store,sessionUser,sessionToken,dev
   const check=()=>{if(verificationTarget&&!store.permitsMatrixDevice?.(user.id,verificationTarget.userId,verificationTarget.deviceId))fail(403,'Verification recipient authorization changed');for(const peer of queriedPeers)if(!store.permitsMatrixPeer?.(user.id,peer))fail(403,'Messaging contact authorization changed');if(sessionUser(req)?.id!==user.id||deviceActor(req,user.id,session)!==actor)fail(401,'Locat authorization changed');store.authorize(user.id,actor,matrixTokenHash(session),token);};check();
   const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),verification?10000:65000);const closed=()=>controller.abort();res.once('close',closed);active.set(user.id,(active.get(user.id)??0)+1);
   try{
-   let response;try{response=await fetch(provider.origin+path+url.search,{method:req.method,headers:{Authorization:'Bearer '+token,Accept:'application/json',...(input?{'Content-Type':'application/json'}:{})},body:input?JSON.stringify(input):undefined,redirect:'error',signal:controller.signal});}catch{fail(502,'Matrix bootstrap service is unavailable');}
+   const upstreamQuery=new URLSearchParams(url.search);if(path==='/_matrix/client/v3/sync'){upstreamQuery.set('filter',JSON.stringify(verificationSyncFilter()));upstreamQuery.set('set_presence','offline');}
+   let response;try{response=await fetch(provider.origin+path+(upstreamQuery.size?'?'+upstreamQuery.toString():''),{method:req.method,headers:{Authorization:'Bearer '+token,Accept:'application/json',...(input?{'Content-Type':'application/json'}:{})},body:input?JSON.stringify(input):undefined,redirect:'error',signal:controller.signal});}catch{fail(502,'Matrix bootstrap service is unavailable');}
    const reader=response.body?.getReader();if(!reader)fail(502,'Invalid Matrix bootstrap response');let size=0;const chunks=[];
    try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2*1024*1024)fail(502,'Matrix bootstrap response exceeds the limit');chunks.push(value);}}catch(error){if(error.status)throw error;fail(502,'Matrix bootstrap response interrupted');}finally{await reader.cancel();}
    let value;try{value=JSON.parse(new TextDecoder('utf8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{fail(502,'Invalid Matrix bootstrap JSON');}check();
+   if(response.ok&&path==='/_matrix/client/v3/sync'){if(!value||typeof value!=='object'||Array.isArray(value))fail(502,'Invalid verification sync response');value.rooms={};value.presence={events:[]};value.account_data={events:[]};const events=value.to_device?.events;if(events!==undefined&&!Array.isArray(events))fail(502,'Invalid verification events');value.to_device={events:(events??[]).filter(event=>event&&verificationEventTypes.has(event.type)&&(event.sender===binding.matrixUserId||store.permitsMatrixPeer?.(user.id,event.sender)))};}
    json(res,response.status,value);return true;
   }finally{clearTimeout(deadline);res.off('close',closed);const count=(active.get(user.id)??1)-1;if(count)active.set(user.id,count);else active.delete(user.id);}
  };
