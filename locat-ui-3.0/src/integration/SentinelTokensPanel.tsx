@@ -1,8 +1,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Badge,Button,Sheet,StateView,TextField} from '../ui';
-import {sentinelRequest as request} from './sentinelRequest';
+import {sentinelRequest} from './sentinelRequest';
 type Token={id:string;name:string;prefix:string;createdAt:number;lastUsedAt:number|null;revokedAt:number|null};
-export function SentinelTokensPanel({refreshToken=0}:{refreshToken?:number}){
+export function SentinelTokensPanel({refreshToken=0,accountId}:{refreshToken?:number;accountId?:string}){
+ const request=useCallback((path:string,input?:unknown,signal?:AbortSignal)=>sentinelRequest(path,input,signal,accountId),[accountId]);
  const [tokens,setTokens]=useState<Token[]>([]),[cursor,setCursor]=useState<string|null>(null),[filter,setFilter]=useState('active'),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [open,setOpen]=useState(false),[name,setName]=useState(''),[secret,setSecret]=useState(''),[revoke,setRevoke]=useState<Token|null>(null);
  const currentFilter=useRef('active'),listRequest=useRef<AbortController|null>(null),listGeneration=useRef(0),generation=useRef(0),sheetGeneration=useRef(0),operation=useRef(false);
@@ -15,7 +16,7 @@ export function SentinelTokensPanel({refreshToken=0}:{refreshToken?:number}){
    setTokens(old=>append?[...old,...(data.tokens as Token[]).filter(row=>!old.some(existing=>existing.id===row.id))]:data.tokens);setCursor(data.nextCursor??null);
   }catch(reason){if(version===listGeneration.current)setError(reason instanceof Error?reason.message:'Integration tokens could not be loaded');}
   finally{if(version===listGeneration.current){listRequest.current=null;setLoading(false);}}
- },[]);
+ },[request]);
  const cancel=useCallback(()=>{listGeneration.current++;listRequest.current?.abort();listRequest.current=null;},[]);
  const invalidate=useCallback(()=>{generation.current++;sheetGeneration.current++;},[]);
  useEffect(()=>{let active=true;void Promise.resolve().then(()=>{if(active)void load(filter,null,false);});return()=>{active=false;cancel();};},[filter,refreshToken,load,cancel]);

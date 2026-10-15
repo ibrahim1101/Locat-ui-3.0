@@ -73,7 +73,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const bobCookie = bobLogin.headers.get("set-cookie").split(";")[0];
     const bob = (await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users[0];
     assert.ok(bob.id);
-    for(const path of ['/api/auth/me','/api/contacts','/api/users/search?q=bob','/api/preferences','/api/profile/privacy','/api/auth/sessions'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
+    for(const path of ['/api/auth/me','/api/contacts','/api/users/search?q=bob','/api/preferences','/api/profile/privacy','/api/auth/sessions','/api/private/vault','/api/private/secrets','/api/sentinel/incidents','/api/sentinel/tokens','/api/security/events'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
     assert.equal((await request('/api/contacts','GET',undefined,bobCookie,{'X-Locat-Account':bob.id})).status,200,'Matching expected account remains authorized');
     assert.equal(bob.globalIdentity.address,bob.lcCode+'@127.0.0.1:'+port);
     assert.equal((await (await request('/api/users/search?q='+encodeURIComponent(bob.globalIdentity.address),'GET',undefined,aliceCookie)).json()).users[0].id,bob.id);

@@ -1,12 +1,13 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Badge,Button,Sheet,StateView,TextField} from '../ui';
-import {sentinelRequest as request} from './sentinelRequest';
+import {sentinelRequest} from './sentinelRequest';
 import {prepareIncidentExport,type IncidentExportRow} from './incidentExport';
 type Incident=IncidentExportRow;
 type History={id:number;action:string;note:string;createdAt:number};
 type Filters={q:string;status:string;severity:string;source:string};
 const emptyFilters:Filters={q:'',status:'',severity:'',source:''};
-export function SentinelIncidentsPanel({refreshToken=0}:{refreshToken?:number}){
+export function SentinelIncidentsPanel({refreshToken=0,accountId}:{refreshToken?:number;accountId?:string}){
+ const request=useCallback((path:string,input?:unknown,signal?:AbortSignal)=>sentinelRequest(path,input,signal,accountId),[accountId]);
  const [incidents,setIncidents]=useState<Incident[]>([]),[cursor,setCursor]=useState<string|null>(null),[draft,setDraft]=useState<Filters>(emptyFilters),[filters,setFilters]=useState<Filters>(emptyFilters),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [selected,setSelected]=useState<Incident|null>(null),[history,setHistory]=useState<History[]>([]),[historyCursor,setHistoryCursor]=useState<string|null>(null),[note,setNote]=useState(''),[acting,setActing]=useState(false);
  const listRequest=useRef<AbortController|null>(null),listGeneration=useRef(0),detailRequest=useRef<AbortController|null>(null),detailGeneration=useRef(0),operation=useRef(false);
@@ -23,7 +24,7 @@ export function SentinelIncidentsPanel({refreshToken=0}:{refreshToken?:number}){
    setIncidents(old=>append?[...old,...(data.incidents as Incident[]).filter(row=>!old.some(existing=>existing.id===row.id))]:data.incidents);setCursor(data.nextCursor??null);
   }catch(reason){if(version===listGeneration.current)setError(reason instanceof Error?reason.message:'Incidents could not be loaded');}
   finally{if(version===listGeneration.current){listRequest.current=null;setLoading(false);}}
- },[]);
+ },[request]);
  const cancel=useCallback(()=>{listGeneration.current++;listRequest.current?.abort();listRequest.current=null;},[]);
  useEffect(()=>{let active=true;void Promise.resolve().then(()=>{if(active)void load(filters,null,false);});return()=>{active=false;cancel();};},[filters,refreshToken,load,cancel]);
  useEffect(()=>()=>{detailGeneration.current++;detailRequest.current?.abort();operation.current=false;},[]);

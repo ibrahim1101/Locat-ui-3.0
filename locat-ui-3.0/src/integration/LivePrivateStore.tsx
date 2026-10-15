@@ -1,4 +1,4 @@
-import {privateStoreRequest as request} from './privateStoreRequest';
+import {privateStoreRequest} from './privateStoreRequest';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useSession} from '../app/session';
 import {Screen} from '../layouts/Screen';
@@ -16,6 +16,7 @@ export function LivePrivateStore({kind}:{kind:PrivateModule}){
 }
 function ScopedPrivateStore({kind}:{kind:PrivateModule}){
  const {user}=useSession();const userId=user?.id;const base='/api/private/'+kind;
+ const request=useCallback((path:string,input?:unknown,signal?:AbortSignal)=>privateStoreRequest(path,input,signal,userId),[userId]);
  const [statusAttempt,setStatusAttempt]=useState(0),[loadingStatus,setLoadingStatus]=useState(true);
  const [status,setStatus]=useState<Status|null>(null),[records,setRecords]=useState<RecordValue[]>([]),[passphrase,setPassphrase]=useState(''),[confirmation,setConfirmation]=useState(''),[unlocked,setUnlocked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editor,setEditor]=useState(false),[editing,setEditing]=useState<RecordValue|null>(null),[form,setForm]=useState(emptyForm),[removing,setRemoving]=useState<RecordValue|null>(null),[viewing,setViewing]=useState<RecordValue|null>(null);
@@ -26,7 +27,7 @@ function ScopedPrivateStore({kind}:{kind:PrivateModule}){
  const generation=useRef(0),key=useRef<CryptoKey|null>(null),config=useRef<PrivateConfig|null>(null);
  const invalidate=useCallback(()=>{generation.current++;operation.current=false;key.current=null;config.current=null;},[]);
  const lock=useCallback(()=>{invalidate();setUnlocked(false);setRecords([]);setQuery('');setFolder('');setPassphrase('');setConfirmation('');setForm(emptyForm());setEditor(false);setEditing(null);setRemoving(null);setViewing(null);setBackup(null);setRestorePassphrase('');setChangingPassphrase(false);setCurrentPhrase('');setNewPhrase('');setRepeatPhrase('');setNotice('');setBusy(false);setError('');},[invalidate]);
- useEffect(()=>{if(!userId)return;const controller=new AbortController();void request(base,undefined,controller.signal).then(data=>{if(!controller.signal.aborted)setStatus(data);}).catch(error=>{if(!controller.signal.aborted)setError(error.message);}).finally(()=>{if(!controller.signal.aborted)setLoadingStatus(false);});return()=>{controller.abort();invalidate();};},[base,userId,statusAttempt,invalidate]);
+ useEffect(()=>{if(!userId)return;const controller=new AbortController();void request(base,undefined,controller.signal).then(data=>{if(!controller.signal.aborted)setStatus(data);}).catch(error=>{if(!controller.signal.aborted)setError(error.message);}).finally(()=>{if(!controller.signal.aborted)setLoadingStatus(false);});return()=>{controller.abort();invalidate();};},[base,userId,statusAttempt,invalidate,request]);
  useEffect(()=>{let timer:ReturnType<typeof setTimeout>;const reset=()=>{clearTimeout(timer);timer=setTimeout(lock,5*60*1000);};const visibility=()=>{if(document.hidden)lock();};reset();document.addEventListener('pointerdown',reset);document.addEventListener('keydown',reset);document.addEventListener('visibilitychange',visibility);return()=>{clearTimeout(timer);document.removeEventListener('pointerdown',reset);document.removeEventListener('keydown',reset);document.removeEventListener('visibilitychange',visibility);};},[lock]);
  const scope:PrivateScope={userId:user?.id??'',module:kind};
  async function run(task:(version:number)=>Promise<void>){if(operation.current)return;operation.current=true;const version=generation.current;setBusy(true);setError('');try{await task(version);}catch(error){if(version===generation.current)setError(error instanceof Error?error.message:'Private-store operation failed');}finally{if(version===generation.current){operation.current=false;setBusy(false);}}}
