@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, expect, it, vi } from "vitest";
 import { LiveMediaLibrary } from "./LiveMediaLibrary";
@@ -78,4 +78,9 @@ it("continues an explicitly enabled video playlist and stops at its end", () => 
   expect(screen.getByText("a.mp4 · manual")).toBeVisible();fireEvent.click(screen.getByRole("button", { name: "Finish video" }));
   expect(screen.getByText("b.mp4 · auto")).toBeVisible();fireEvent.click(screen.getByRole("button", { name: "Finish video" }));
   expect(screen.getByText("b.mp4 · auto")).toBeVisible();
+});
+
+it('saves bounded photo tags through the themed sheet and finds existing tags',async()=>{
+ state.items=[{id:'tag-photo',kind:'photo',name:'DSC0001.png',file:new Blob(),size:5,album:'Imported',favorite:false,position:0,addedAt:1,tags:['Family']}];vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:test');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+ render(<MemoryRouter><LiveMediaLibrary kind="photo"/></MemoryRouter>);fireEvent.change(screen.getByPlaceholderText('Search photos'),{target:{value:'family'}});expect(screen.getByText('DSC0001.png')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'Tags'}));expect(screen.getByRole('dialog',{name:'Photo tags'})).toBeVisible();fireEvent.change(screen.getByLabelText('Tags (comma-separated)'),{target:{value:' Family, Travel, family '}});fireEvent.click(screen.getByRole('button',{name:'Save tags'}));expect(state.update).toHaveBeenCalledWith(expect.objectContaining({id:'tag-photo',tags:['Family','Travel']}));await waitFor(()=>expect(screen.getByRole('button',{name:'Save tags'})).toBeEnabled());state.update.mockRejectedValueOnce(new Error('Storage full'));fireEvent.click(screen.getByRole('button',{name:'Save tags'}));await screen.findByText('Storage full');expect(screen.getByRole('dialog',{name:'Photo tags'})).toBeVisible();
 });

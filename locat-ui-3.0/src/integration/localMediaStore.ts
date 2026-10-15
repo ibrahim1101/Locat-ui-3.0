@@ -1,5 +1,5 @@
 export type LocalMediaKind = "video" | "audio" | "photo";
-export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; source?: "device" | "server"; streamUrl?: string };
+export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; tags?: string[]; source?: "device" | "server"; streamUrl?: string };
 export function mediaKind(file: Pick<File, "type" | "name">): LocalMediaKind | null {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";

@@ -7,6 +7,6 @@ export function mergeMedia(local: LocalMediaItem[], server: LocalMediaItem[]): L
   const metadata = new Map(local.filter(item => item.source === "server").map(item => [item.id, item]));
   return [...local.filter(item => item.source !== "server"), ...server.map(item => {
     const saved = metadata.get(item.id);
-    return saved ? { ...item, favorite: saved.favorite, position: saved.position, album: saved.album } : item;
+    return saved ? { ...item, favorite: saved.favorite, position: saved.position, album: saved.album, tags: saved.tags } : item;
   })];
 }
