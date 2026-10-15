@@ -79,7 +79,9 @@ function sessionUser(req) {
   const token = cookie(req);
   if (!token) return null;
   const digest = createHash("sha256").update(token).digest("hex");
-  return db.sessionUser(digest, Date.now()) ?? null;
+  const user=db.sessionUser(digest,Date.now())??null;
+  if(user&&req.headers['x-locat-account']!==undefined&&req.headers['x-locat-account']!==user.id)throw Object.assign(new Error('Signed-in account changed; reopen this tool'),{status:403});
+  return user;
 }
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");

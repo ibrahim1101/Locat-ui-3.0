@@ -91,11 +91,15 @@ jobs:
         env:
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
         run: npm run test:browser
+      - name: Repeated private-store foreground acceptance
+        env:
+          LOCAT_BROWSER_REPORT: test-results/private-store-repeat-results.json
+        run: npm run test:browser -- foundation.spec.mjs --repeat-each=3
       - name: Browser acceptance report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-foundation-report
-          path: locat-ui-3.0/test-results/browser-results.json
+          path: locat-ui-3.0/test-results/*results.json
           if-no-files-found: warn
           retention-days: 7
