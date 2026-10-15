@@ -51,16 +51,32 @@ export function normalizeWebhook(format, raw) {
   fail(400,'Unsupported webhook format');
 }
 export function sentinelStore(sql) {
+  function requireSession(userId,sessionHash){
+    if(sessionHash!==undefined&&(typeof sessionHash!=='string'||!/^[a-f0-9]{64}$/.test(sessionHash)||!sql.prepare('SELECT 1 FROM sessions WHERE hash=? AND userId=? AND expiresAt>?').get(sessionHash,userId,Date.now())))fail(401,'Session changed; sign in again');
+  }
+  function write(userId,sessionHash,event,task){
+    sql.exec('BEGIN IMMEDIATE');try{
+      requireSession(userId,sessionHash);const result=task();
+      sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES (?,?,?,?)').run(userId,event,'info',Date.now());
+      sql.exec('COMMIT');return result;
+    }catch(error){sql.exec('ROLLBACK');throw error;}
+  }
   return {
     tokens: userId => sql.prepare('SELECT id,name,prefix,createdAt,lastUsedAt,revokedAt FROM sentinelTokens WHERE userId=? ORDER BY createdAt DESC LIMIT 100').all(userId),
-    createToken(userId, name) {
-      if (sql.prepare('SELECT COUNT(*) AS count FROM sentinelTokens WHERE userId=? AND revokedAt IS NULL').get(userId).count >= 20) fail(409, 'Revoke an active token before creating another');
-      const token = 'lsk_' + randomBytes(32).toString('base64url');
-      const id = randomBytes(16).toString('hex');
-      sql.prepare('INSERT INTO sentinelTokens (id,userId,hash,name,prefix,createdAt) VALUES (?,?,?,?,?,?)').run(id,userId,tokenHash(token),name,token.slice(0,12),Date.now());
-      return { id, token };
+    createToken(userId,name,sessionHash){
+      return write(userId,sessionHash,'sentinel.token.created',()=>{
+        if(sql.prepare('SELECT COUNT(*) AS count FROM sentinelTokens WHERE userId=? AND revokedAt IS NULL').get(userId).count>=20)fail(409,'Revoke an active token before creating another');
+        const token='lsk_'+randomBytes(32).toString('base64url'),id=randomBytes(16).toString('hex');
+        sql.prepare('INSERT INTO sentinelTokens (id,userId,hash,name,prefix,createdAt) VALUES (?,?,?,?,?,?)').run(id,userId,tokenHash(token),name,token.slice(0,12),Date.now());
+        return {id,token};
+      });
     },
-    revokeToken: (userId,id) => sql.prepare('UPDATE sentinelTokens SET revokedAt=? WHERE userId=? AND id=? AND revokedAt IS NULL').run(Date.now(),userId,id).changes,
+    revokeToken(userId,id,sessionHash){
+      return write(userId,sessionHash,'sentinel.token.revoked',()=>{
+        const changed=sql.prepare('UPDATE sentinelTokens SET revokedAt=? WHERE userId=? AND id=? AND revokedAt IS NULL').run(Date.now(),userId,id).changes;
+        if(!changed)fail(404,'Active token not found');return changed;
+      });
+    },
     authenticate: token => sql.prepare('SELECT id,userId FROM sentinelTokens WHERE hash=? AND revokedAt IS NULL').get(tokenHash(token)),
     incidents: (userId,status) => incidentPage(sql,userId,{status:status||''}).incidents,
     incidentPage: (userId,options) => incidentPage(sql,userId,options),
@@ -72,6 +88,7 @@ export function sentinelStore(sql) {
       const now=Date.now();
       sql.exec('BEGIN IMMEDIATE');
       try {
+        if(!owner||!sql.prepare('SELECT 1 FROM sentinelTokens WHERE id=? AND userId=? AND revokedAt IS NULL').get(owner.id,owner.userId))fail(401,'Integration token was revoked');
         const existing=sql.prepare('SELECT * FROM sentinelIncidents WHERE userId=? AND source=? AND fingerprint=?').get(owner.userId,input.source,input.fingerprint);
         const id=existing?.id ?? randomBytes(16).toString('hex');
         if (existing) {
@@ -84,23 +101,31 @@ export function sentinelStore(sql) {
         sql.exec('COMMIT'); return id;
       } catch(error) { sql.exec('ROLLBACK'); throw error; }
     },
-    action(userId,id,action,note='') {
+    action(userId,id,action,note='',sessionHash) {
       sql.exec('BEGIN IMMEDIATE');
       try {
+        requireSession(userId,sessionHash);
         const incident=sql.prepare('SELECT status FROM sentinelIncidents WHERE userId=? AND id=?').get(userId,id);
         if (!incident) fail(404,'Incident not found');
         if (action === 'acknowledge' && incident.status === 'resolved') fail(409,'Reopen this incident first');
         const status={acknowledge:'acknowledged',resolve:'resolved',reopen:'open'}[action];
         if (status) sql.prepare('UPDATE sentinelIncidents SET status=?,updatedAt=? WHERE id=?').run(status,Date.now(),id);
         sql.prepare('INSERT INTO sentinelEvents (incidentId,action,note,createdAt) VALUES (?,?,?,?)').run(id,action,note,Date.now());
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES (?,?,?,?)').run(userId,'sentinel.incident.'+action,'info',Date.now());
         sql.exec('COMMIT');
       } catch(error) { sql.exec('ROLLBACK'); throw error; }
     },
   };
 }
-export function createSentinelHandler({store,sessionUser,body,json}) {
+export function createSentinelHandler({store,sessionUser,sessionToken,body,json}) {
   const webhookLimit=createRateLimiter(120);
-  const tokenLimit=createRateLimiter(20,3600000);
+  const tokenLimit=createRateLimiter(20,3600000),mutationLimit=createRateLimiter(60);
+  async function ownedBody(req,user){
+    const retryAfter=mutationLimit(user.id);if(retryAfter)throw Object.assign(new Error('Sentinel action rate limit exceeded'),{status:429,retryAfter});
+    const input=await body(req,4096),current=sessionUser(req),token=sessionToken?.(req);
+    if(!current||current.id!==user.id||!token)fail(401,'Session changed; sign in again');
+    return {input,sessionHash:tokenHash(token)};
+  }
   return async (req,res,url,origin) => {
     if (!url.pathname.startsWith('/api/sentinel/')) return false;
     if (url.pathname === '/api/sentinel/webhook' && req.method === 'POST') {
@@ -119,15 +144,17 @@ export function createSentinelHandler({store,sessionUser,body,json}) {
     if(req.method === 'POST' && req.headers.origin !== origin) fail(403,'Origin mismatch');
     if(url.pathname === '/api/sentinel/tokens' && req.method === 'GET') json(res,200,{tokens:store.tokens(user.id)});
     else if(url.pathname === '/api/sentinel/tokens' && req.method === 'POST') {
-      const input=await body(req);
+      const {input,sessionHash}=await ownedBody(req,user);
+      if(!input||Array.isArray(input)||Object.keys(input).some(key=>key!=='name'))fail(400,'Invalid token request');
       if(typeof input?.name !== 'string' || !input.name.trim() || input.name.trim().length>80) fail(400,'Token name must contain 1–80 characters');
       const retryAfter=tokenLimit(user.id);
       if(retryAfter) throw Object.assign(new Error('Token creation rate limit exceeded'),{status:429,retryAfter});
-      json(res,201,store.createToken(user.id,input.name.trim()));
+      json(res,201,store.createToken(user.id,input.name.trim(),sessionHash));
     } else if(url.pathname === '/api/sentinel/tokens/revoke' && req.method === 'POST') {
-      const input=await body(req);
-      if(typeof input?.id !== 'string') fail(400,'Invalid token');
-      if(!store.revokeToken(user.id,input.id)) fail(404,'Active token not found');
+      const {input,sessionHash}=await ownedBody(req,user);
+      if(!input||Array.isArray(input)||Object.keys(input).some(key=>key!=='id'))fail(400,'Invalid token request');
+      if(typeof input?.id !== 'string'||!/^[a-f0-9]{32}$/.test(input.id)) fail(400,'Invalid token');
+      if(!store.revokeToken(user.id,input.id,sessionHash)) fail(404,'Active token not found');
       json(res,200,{ok:true});
     } else if(url.pathname === '/api/sentinel/incidents' && req.method === 'GET') {
       json(res,200,store.incidentPage(user.id,parseIncidentQuery(url.searchParams)));
@@ -136,10 +163,11 @@ export function createSentinelHandler({store,sessionUser,body,json}) {
       if(!match) fail(404,'Not found');
       if(req.method === 'GET') { const detail=store.detail(user.id,match[1]); if(!detail) fail(404,'Incident not found'); json(res,200,detail); }
       else if(req.method === 'POST') {
-        const input=await body(req);
+        const {input,sessionHash}=await ownedBody(req,user);
+        if(!input||Array.isArray(input)||Object.keys(input).some(key=>!['action','note'].includes(key)))fail(400,'Invalid incident action');
         if(!['acknowledge','resolve','reopen','note'].includes(input?.action)) fail(400,'Invalid action');
         if(input.action === 'note' && (typeof input.note !== 'string' || !input.note.trim() || input.note.trim().length>500)) fail(400,'Note must contain 1–500 characters');
-        store.action(user.id,match[1],input.action,input.action === 'note' ? input.note.trim() : ''); json(res,200,{ok:true});
+        store.action(user.id,match[1],input.action,input.action === 'note' ? input.note.trim() : '',sessionHash); json(res,200,{ok:true});
       } else fail(405,'Method not allowed');
     }
     return true;

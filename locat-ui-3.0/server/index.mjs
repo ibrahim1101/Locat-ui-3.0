@@ -84,7 +84,7 @@ const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindin
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
-const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
+const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,sessionToken:cookie,body,json});
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });

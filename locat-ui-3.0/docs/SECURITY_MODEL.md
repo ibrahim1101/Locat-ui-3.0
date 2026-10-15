@@ -29,3 +29,5 @@ Vault/Secrets account/module changes mount a fresh locked state; generation guar
 Private-store passphrase changes rewrap the existing master key in the browser. SQLite validates owner/live session/config continuity and audits atomically, but cannot verify passphrase knowledge or cryptographic key continuity itself. Older backups and unlocked clients retain access. See PRIVATE_STORAGE.md.
 
 All private-store HTTP mutations now check their live owning session under SQLite BEGIN IMMEDIATE and commit data plus a single metadata-only audit together. Failed audits roll back configuration/entry changes. Internal maintenance APIs are distinct from the authenticated router; see PRIVATE_STORAGE.md.
+
+Sentinel ingestion rechecks integration-token revocation inside its write transaction. Token/user incident mutations recheck live owning sessions after body reading and under the SQLite write lock, and commit metadata-only audit events atomically. SENTINEL_INCIDENTS.md documents ordering, limits and remaining acceptance.

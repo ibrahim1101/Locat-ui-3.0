@@ -1,3 +1,9 @@
+Sentinel authorization validation: check, lint, all 191 frontend tests / 50 files, all 99 backend tests and production build passed. Vendor/browser/native/independent review remain open.
+
+## Latest — Sentinel commit-time authorization and atomic audits
+
+Webhook ingest rechecks the exact token ID/owner/non-revoked state inside its SQLite transaction, closing the authenticated-before-body revocation race. Token create/revoke and incident actions now pass server-derived session hashes, recheck current session after bounded body reading and under the write lock, and atomically commit metadata-only account audits with token/incident/history changes. Active-token count and insertion now share the transaction. Strict user-action fields and a 60/account/minute mutation bucket complement existing token-creation/webhook limits. Regression tests pause real handler bodies then revoke tokens/sessions, reject stale/foreign/expired context, force audit rollback and check rate/field bounds. No schema migration or operator credential exposure. SENTINEL_INCIDENTS.md records commit ordering and already-committed-action limits; monitoring/vendor/browser/native/full roadmap remain open.
+
 Sentinel paging validation: check, lint, all 191 frontend tests / 50 files, all 93 backend tests and production build passed. Native/browser/vendor acceptance and the complete master roadmap remain open.
 
 ## Latest — Sentinel server-filtered incident history
