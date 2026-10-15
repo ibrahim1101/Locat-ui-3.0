@@ -154,6 +154,17 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/private/vault/'+privateId,'GET',undefined,bobCookie)).status,404);
     assert.equal((await request('/api/private/secrets/'+privateId,'GET',undefined,aliceCookie)).status,404);
     const privateStatus=await (await request('/api/private/vault','GET',undefined,aliceCookie)).json();assert.equal(privateStatus.objects.length,1);assert.ok(!JSON.stringify(privateStatus.objects).includes('envelope'));
+    const nextPrivateConfig={...privateConfig,salt:Buffer.alloc(16,3).toString('base64'),wrappedKey:{v:1,iv:Buffer.alloc(12,3).toString('base64'),data:Buffer.alloc(48,3).toString('base64')}};
+    const rewrap={expectedConfig:privateConfig,config:nextPrivateConfig};
+    assert.equal((await request('/api/private/vault/rewrap','POST',rewrap)).status,401);
+    assert.equal((await request('/api/private/vault/rewrap','POST',rewrap,bobCookie)).status,409);
+    assert.equal((await request('/api/private/vault/rewrap','POST',rewrap,aliceCookie,{Origin:'https://evil.invalid'})).status,403);
+    assert.equal((await request('/api/private/vault/rewrap','POST',{...rewrap,passphrase:'never-send-this'},aliceCookie)).status,400);
+    assert.equal((await request('/api/private/vault/rewrap','POST',{...rewrap,config:{...nextPrivateConfig,storeId:privateId}},aliceCookie)).status,400);
+    assert.equal((await request('/api/private/vault/rewrap','POST',rewrap,aliceCookie)).status,200);
+    assert.equal((await request('/api/private/vault/rewrap','POST',rewrap,aliceCookie)).status,409);
+    const afterRewrap=await(await request('/api/private/vault','GET',undefined,aliceCookie)).json();
+    assert.deepEqual(afterRewrap.config,nextPrivateConfig);assert.deepEqual(afterRewrap.objects,privateStatus.objects);
     assert.equal((await request('/api/private/vault/remove','POST',{id:privateId,expectedRevision:2},aliceCookie)).status,409);
     assert.equal((await request('/api/private/vault/remove','POST',{id:privateId,expectedRevision:1},aliceCookie)).status,200);
     async function registerDevice(name,cookieValue) {

@@ -14,3 +14,16 @@ export async function unlockPrivateStore(passphrase:string,input:PrivateConfig,s
 export async function encryptPrivateEntry(key:CryptoKey,config:PrivateConfig,scope:PrivateScope,id:string,entry:PrivateEntry){const valid=validateEntry(entry);if((scope.module==='vault')!==(valid.kind==='file'))throw new Error('Wrong private module');return seal(key,encoder.encode(JSON.stringify(valid)),aad(scope,config.storeId,id));}
 export async function decryptPrivateEntry(key:CryptoKey,config:PrivateConfig,scope:PrivateScope,id:string,envelope:PrivateEnvelope){const valid=validateEntry(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await open(key,envelope,aad(scope,config.storeId,id)))));if((scope.module==='vault')!==(valid.kind==='file') || (valid.kind==='file' && decodeBase64(valid.data).length!==valid.bytes))throw new Error('Invalid decrypted entry');return valid;}
 export function generatePrivatePassword(length=24){if(!Number.isInteger(length)||length<15||length>128)throw new Error('Invalid password length');const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-_=?.';const limit=256-(256%alphabet.length);let value='';while(value.length<length)for(const byte of crypto.getRandomValues(new Uint8Array(64)))if(byte<limit&&value.length<length)value+=alphabet[byte%alphabet.length];return value;}
+
+/** Rewrap the same master key; entries and their account/store AAD do not change. */
+export async function changePrivatePassphrase(currentPassphrase:string,newPassphrase:string,input:PrivateConfig,scope:PrivateScope){
+ const current=validateConfig(input);validatePassphrase(newPassphrase);
+ if(currentPassphrase===newPassphrase)throw new Error('Choose a different private-store passphrase.');
+ const raw=new Uint8Array(await open(await wrappingKey(currentPassphrase,current),current.wrappedKey,aad(scope,current.storeId,'master-key')));
+ try{
+  if(raw.length!==32)throw new Error('Invalid master key');
+  const config:PrivateConfig={...current,salt:encodeBase64(crypto.getRandomValues(new Uint8Array(16))),iterations:PRIVATE_KDF_ITERATIONS};
+  config.wrappedKey=await seal(await wrappingKey(newPassphrase,config),raw,aad(scope,current.storeId,'master-key'));
+  return validateConfig(config);
+ }finally{raw.fill(0);}
+}

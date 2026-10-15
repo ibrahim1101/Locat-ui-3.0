@@ -8,7 +8,7 @@ Implemented, tested, platform-verified and independently security-reviewed are s
 | Connect | Discovery/manual browser navigation, retry monitor, proxy termination, authenticated health WebSockets and qualified local addresses | Local client/config/HTTP/TLS | No real LAN/global/Docker | Device subscriptions/global trust/E2EE/federation pending |
 | Link/Remote | Proved paired browser identities, encrypted chunks/signaling, consent/cleanup | Crypto/API/UI tests | No real two-device/native | Resume/LAN/native/control/TURN pending |
 | Cinema/Music/Photos | Local/server media, conversion, playlists/EQ/crop/text | Unit/API/real FFmpeg | No physical codec/browser acceptance | Broader roadmap remains planned |
-| Vault/Secrets | Experimental client-encrypted records/files/backup | Crypto/API/UI | No native/independent review | Rotation/recovery/autofill expansion planned |
+| Vault/Secrets | Experimental client-encrypted records/files/backup | Crypto/API/UI | No native/independent review | Full key rotation/recovery/autofill expansion planned |
 | Sentinel | Scoped token webhooks, owned incidents/history/actions | API/unit/UI | No native agent acceptance | Monitoring/notifications/retention planned |
 | Messages/Calls | Contacts; reviewed Matrix synthetic integration and unwired persistent-crypto lifecycle; no live conversation/call flow | API/UI messaging gate enforced; legacy DB tests are not E2EE | None | Security gate closed |
 | Remaining master ecosystem | Truthful unavailable live states | Some preview contract tests only | None | Planned; see full MASTER_ROADMAP.md sections A–AM |
@@ -44,3 +44,5 @@ Account audit date windows and bounded loaded-result JSON export are implemented
 Operator-only standalone SQLite backup verification is available through verify:backup; BACKUP_VERIFICATION.md defines integrity/checksum/schema scope and excludes full ecosystem restore or decryption claims.
 
 Operator restore:server can publish a checksum-verified standalone SQLite snapshot to a new unused file without activation; see BACKUP_VERIFICATION.md for isolation, stale authentication state and separate sidecar/browser/media recovery scope.
+
+Private-store wrapping passphrase changes are implemented with current-phrase verification in the client and atomic session/config/audit checks in SQLite. This preserves the data key and does not revoke older backups or already-unlocked clients; see PRIVATE_STORAGE.md.

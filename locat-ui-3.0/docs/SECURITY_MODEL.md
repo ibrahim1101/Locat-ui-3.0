@@ -25,3 +25,5 @@ Operator-only standalone SQLite backup verification is available through verify:
 Operator restore:server can publish a checksum-verified standalone SQLite snapshot to a new unused file without activation; see BACKUP_VERIFICATION.md for isolation, stale authentication state and separate sidecar/browser/media recovery scope.
 
 Vault/Secrets account/module changes mount a fresh locked state; generation guards and synchronous operation exclusion prevent stale client-state attachment and duplicate form operations. PRIVATE_STORAGE.md documents already-dispatched write and JavaScript-erasure limits.
+
+Private-store passphrase changes rewrap the existing master key in the browser. SQLite validates owner/live session/config continuity and audits atomically, but cannot verify passphrase knowledge or cryptographic key continuity itself. Older backups and unlocked clients retain access. See PRIVATE_STORAGE.md.

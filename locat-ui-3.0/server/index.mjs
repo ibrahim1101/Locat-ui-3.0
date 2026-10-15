@@ -83,7 +83,7 @@ const sessionSecurity=createSessionSecurityHandler({db,sessionUser,sessionToken:
 const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=verifyLinkProof(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
-const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
+const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json,audit:db.audit});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);

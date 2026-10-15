@@ -9,3 +9,5 @@ export function validateConfig(value:unknown):PrivateConfig;
 export function validateEntry(value:unknown):PrivateEntry;
 export type PrivateBackup={format:"locat-ui3-private-backup-v1";scope:{userId:string;module:PrivateModule};config:PrivateConfig;objects:{id:string;revision:number;envelope:PrivateEnvelope}[]};
 export function validateBackup(value:unknown,userId:string,module:PrivateModule):PrivateBackup;
+
+export function samePrivateConfig(a:PrivateConfig,b:PrivateConfig):boolean;

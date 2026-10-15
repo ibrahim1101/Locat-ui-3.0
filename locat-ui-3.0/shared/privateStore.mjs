@@ -10,6 +10,11 @@ const base64=(value,min,max)=>{
 export const isPrivateId=value=>typeof value==='string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
 export function validateEnvelope(value){object(value,['v','iv','data']);if(value.v!==1)fail();base64(value.iv,16,16);if(value.iv.includes("="))fail();base64(value.data,24,PRIVATE_CIPHER_LIMIT);return value;}
 export function validateConfig(value){object(value,['v','storeId','salt','iterations','wrappedKey']);if(value.v!==1 || !isPrivateId(value.storeId) || value.iterations!==PRIVATE_KDF_ITERATIONS)fail();base64(value.salt,24,24);if(!value.salt.endsWith('=='))fail();validateEnvelope(value.wrappedKey);if(value.wrappedKey.data.length!==64 || value.wrappedKey.data.includes('='))fail();return value;}
+/** Compare validated configurations independently of JSON property order. */
+export function samePrivateConfig(a,b){
+ validateConfig(a);validateConfig(b);
+ return a.v===b.v&&a.storeId===b.storeId&&a.salt===b.salt&&a.iterations===b.iterations&&a.wrappedKey.v===b.wrappedKey.v&&a.wrappedKey.iv===b.wrappedKey.iv&&a.wrappedKey.data===b.wrappedKey.data;
+}
 export function validateEntry(value){
  const file=value?.kind==='file';object(value,file?['kind','name','folder','mime','bytes','data','createdAt']:['kind','name','folder','username','password','url','note','createdAt']);
  if(!['file','credential'].includes(value.kind) || !Number.isSafeInteger(value.createdAt) || value.createdAt<=0)fail();

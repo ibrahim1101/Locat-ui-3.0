@@ -1,9 +1,11 @@
 import {webcrypto} from 'node:crypto';
-import {fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {MemoryRouter} from 'react-router';
 import {afterEach,expect,it,vi} from 'vitest';
 import {createPrivateStore,encryptPrivateEntry} from './privateStoreCrypto';
 import {LivePrivateStore} from './LivePrivateStore';
+import {unlockPrivateStore} from './privateStoreCrypto';
+import * as privateCrypto from './privateStoreCrypto';
 const {session}=vi.hoisted(()=>({session:{user:{id:'test-private-user'}}}));
 vi.mock('../app/session',()=>({useSession:()=>session}));
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
@@ -88,4 +90,64 @@ it('ignores duplicate form submission while an encrypted write is pending',async
  fireEvent.submit(form);fireEvent.submit(form);
  await waitFor(()=>expect(writes).toBe(1));
  release();await screen.findByText('Single saved entry');expect(writes).toBe(1);
+});
+
+it('changes a store passphrase without uploading plaintext, locks and reopens retained entries',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const scope={userId:session.user.id,module:'secrets' as const},phrase='the original store passphrase',next='the replacement store passphrase';
+ const created=await createPrivateStore(phrase,scope);let config=created.config;
+ const id=crypto.randomUUID(),entry={kind:'credential' as const,name:'Retained encrypted secret',folder:'',username:'',password:'retained-value',url:'',note:'',createdAt:1};
+ const envelope=await encryptPrivateEntry(created.key,config,scope,id,entry),writes:{expectedConfig:typeof config;config:typeof config}[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{
+  if(options?.method==='POST'){
+   expect(path).toBe('/api/private/secrets/rewrap');
+   const input=JSON.parse(String(options.body));writes.push(input);expect(input.expectedConfig).toEqual(config);config=input.config;
+  }
+  return {ok:true,json:async()=>options?.method==='POST'?{ok:true}:path.endsWith(id)?{revision:1,envelope}:{config,objects:[{id,revision:1,bytes:100,updatedAt:1}],quota:67108864,maxObjects:128}};
+ }));
+ render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:phrase}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+ await screen.findByText(entry.name);fireEvent.click(screen.getByRole('button',{name:'Change store passphrase'}));
+ fireEvent.change(screen.getByLabelText('Current store passphrase'),{target:{value:phrase}});fireEvent.change(screen.getByLabelText('New store passphrase'),{target:{value:next}});fireEvent.change(screen.getByLabelText('Confirm new store passphrase'),{target:{value:next}});
+ fireEvent.click(screen.getByRole('button',{name:'Change passphrase and lock'}));
+ await screen.findByText('Private-store passphrase changed. Unlock with the new passphrase and download a fresh encrypted backup.');
+ expect(writes).toHaveLength(1);expect(screen.queryByText(entry.name)).toBeNull();expect(screen.queryByLabelText('Current store passphrase')).toBeNull();
+ expect(JSON.stringify(writes)).not.toContain(phrase);expect(JSON.stringify(writes)).not.toContain(next);expect(JSON.stringify(writes)).not.toContain(entry.password);
+ await expect(unlockPrivateStore(phrase,config,scope)).rejects.toThrow();
+ fireEvent.change(screen.getByLabelText('Private-store passphrase'),{target:{value:next}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+ await screen.findByText(entry.name);
+});
+
+it('clears passphrase change fields and sends no writes when current passphrase verification fails',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const scope={userId:session.user.id,module:'secrets' as const},phrase='the original store passphrase',created=await createPrivateStore(phrase,scope);
+ const fetch=vi.fn(async()=>({ok:true,json:async()=>({config:created.config,objects:[],quota:67108864,maxObjects:128})}));vi.stubGlobal('fetch',fetch);
+ render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:phrase}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Change store passphrase'}));
+ fireEvent.change(screen.getByLabelText('Current store passphrase'),{target:{value:'an incorrect current passphrase'}});fireEvent.change(screen.getByLabelText('New store passphrase'),{target:{value:'a replacement store passphrase'}});fireEvent.change(screen.getByLabelText('Confirm new store passphrase'),{target:{value:'a replacement store passphrase'}});
+ fireEvent.click(screen.getByRole('button',{name:'Change passphrase and lock'}));
+ await screen.findAllByText(/Could not change passphrase/);
+ for(const label of ['Current store passphrase','New store passphrase','Confirm new store passphrase'])expect(screen.getByLabelText(label)).toHaveValue('');
+ expect(screen.getByRole('button',{name:'Change passphrase and lock'})).not.toBeDisabled();expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('does not submit a late passphrase derivation after hidden-page locking',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const scope={userId:session.user.id,module:'secrets' as const},phrase='the original store passphrase',created=await createPrivateStore(phrase,scope);
+ let release:(value:typeof created.config)=>void=()=>{};
+ const pending=new Promise<typeof created.config>(resolve=>{release=resolve;});
+ const change=vi.spyOn(privateCrypto,'changePrivatePassphrase').mockReturnValue(pending);
+ const fetch=vi.fn(async()=>({ok:true,json:async()=>({config:created.config,objects:[],quota:67108864,maxObjects:128})}));vi.stubGlobal('fetch',fetch);
+ render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:phrase}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Change store passphrase'}));
+ fireEvent.change(screen.getByLabelText('Current store passphrase'),{target:{value:phrase}});fireEvent.change(screen.getByLabelText('New store passphrase'),{target:{value:'a replacement store passphrase'}});fireEvent.change(screen.getByLabelText('Confirm new store passphrase'),{target:{value:'a replacement store passphrase'}});
+ fireEvent.click(screen.getByRole('button',{name:'Change passphrase and lock'}));
+ expect(change).toHaveBeenCalledTimes(1);
+ vi.spyOn(document,'hidden','get').mockReturnValue(true);fireEvent(document,new Event('visibilitychange'));
+ expect(screen.queryByLabelText('Current store passphrase')).toBeNull();
+ await act(async()=>{release(created.config);await pending;});
+ expect(fetch).toHaveBeenCalledTimes(2);expect(screen.queryByRole('button',{name:'Lock now'})).toBeNull();
+ expect(screen.getByLabelText('Private-store passphrase')).toHaveValue('');
 });
