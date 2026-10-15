@@ -46,3 +46,46 @@ it('rejects a corrupted backup before sending any initialization or object write
  await waitFor(()=>expect(screen.getByRole('button',{name:'Validate and restore missing entries'})).not.toBeDisabled());
  expect(fetch.mock.calls.every(call=>!call[1]||(call[1] as RequestInit).method!=='POST')).toBe(true);
 });
+
+it('discards unlocked plaintext and open editors when the account or private module changes',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const phrase='a scoped private passphrase',original=session.user;
+ const created=await createPrivateStore(phrase,{userId:original.id,module:'secrets'});
+ const id=crypto.randomUUID(),entry={kind:'credential' as const,name:'Account A private record',folder:'',username:'',password:'scope-secret',url:'',note:'',createdAt:1};
+ const envelope=await encryptPrivateEntry(created.key,created.config,{userId:original.id,module:'secrets'},id,entry);
+ vi.stubGlobal('fetch',vi.fn(async(path:string)=>({ok:true,json:async()=>path.endsWith(id)?{revision:1,envelope}:session.user.id===original.id&&path==='/api/private/secrets'?{config:created.config,objects:[{id,revision:1,bytes:100,updatedAt:1}],quota:67108864,maxObjects:128}:{config:null,objects:[],quota:67108864,maxObjects:128}})));
+ const view=render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ try{
+  fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:phrase}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+  await screen.findByText(entry.name);fireEvent.click(screen.getByRole('button',{name:'Edit secret'}));
+  expect(screen.getByLabelText('Password')).toHaveValue(entry.password);
+  session.user={id:'different-private-user'};
+  view.rerender(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+  expect(screen.queryByText(entry.name)).toBeNull();expect(screen.queryByLabelText('Password')).toBeNull();
+  expect(await screen.findByLabelText('Private-store passphrase')).toHaveValue('');
+  session.user=original;
+  view.rerender(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+  fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:phrase}});fireEvent.click(screen.getByRole('button',{name:'Unlock store'}));
+  await screen.findByText(entry.name);
+  view.rerender(<MemoryRouter><LivePrivateStore kind="vault"/></MemoryRouter>);
+  expect(screen.queryByText(entry.name)).toBeNull();expect(screen.queryByRole('button',{name:'Lock now'})).toBeNull();
+  expect(await screen.findByLabelText('Private-store passphrase')).toHaveValue('');
+ }finally{session.user=original;}
+});
+
+it('ignores duplicate form submission while an encrypted write is pending',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ let release:()=>void=()=>{};const pending=new Promise<void>(resolve=>{release=resolve;});let writes=0;
+ vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{
+  if(path.endsWith('/put')){writes++;await pending;}
+  return {ok:true,json:async()=>options?.method==='POST'?(path.endsWith('/put')?{revision:1}:{ok:true}):{config:null,objects:[],quota:67108864,maxObjects:128}};
+ }));
+ render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:'a separate long passphrase'}});fireEvent.change(screen.getByLabelText('Confirm private-store passphrase'),{target:{value:'a separate long passphrase'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted store'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Add credential or note'}));
+ fireEvent.change(screen.getByLabelText('Entry name'),{target:{value:'Single saved entry'}});
+ const form=screen.getByRole('button',{name:'Encrypt and save'}).closest('form')!;
+ fireEvent.submit(form);fireEvent.submit(form);
+ await waitFor(()=>expect(writes).toBe(1));
+ release();await screen.findByText('Single saved entry');expect(writes).toBe(1);
+});

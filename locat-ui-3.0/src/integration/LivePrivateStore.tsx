@@ -10,18 +10,24 @@ type RecordValue=ObjectMeta&{entry:PrivateEntry;envelope:PrivateEnvelope};
 const emptyForm=()=>({name:'',folder:'',username:'',password:'',url:'',note:''});
 async function request(path:string,input?:unknown,signal?:AbortSignal){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',signal,...(input===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)})});const data=await response.json();if(!response.ok)throw new Error(data.error??'Private-store request failed');return data;}
 export function LivePrivateStore({kind}:{kind:PrivateModule}){
+ const {user}=useSession();
+ // React state, forms and key references belong to exactly one account/module.
+ return <ScopedPrivateStore key={JSON.stringify([user?.id??null,kind])} kind={kind}/>;
+}
+function ScopedPrivateStore({kind}:{kind:PrivateModule}){
  const {user}=useSession();const userId=user?.id;const base='/api/private/'+kind;
  const [status,setStatus]=useState<Status|null>(null),[records,setRecords]=useState<RecordValue[]>([]),[passphrase,setPassphrase]=useState(''),[confirmation,setConfirmation]=useState(''),[unlocked,setUnlocked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editor,setEditor]=useState(false),[editing,setEditing]=useState<RecordValue|null>(null),[form,setForm]=useState(emptyForm),[removing,setRemoving]=useState<RecordValue|null>(null),[viewing,setViewing]=useState<RecordValue|null>(null);
  const [query,setQuery]=useState(''),[folder,setFolder]=useState('');
  const [backup,setBackup]=useState<PrivateBackup|null>(null),[restorePassphrase,setRestorePassphrase]=useState('');
+ const operation=useRef(false);
  const generation=useRef(0),key=useRef<CryptoKey|null>(null),config=useRef<PrivateConfig|null>(null);
- const invalidate=useCallback(()=>{generation.current++;key.current=null;config.current=null;},[]);
+ const invalidate=useCallback(()=>{generation.current++;operation.current=false;key.current=null;config.current=null;},[]);
  const lock=useCallback(()=>{invalidate();setUnlocked(false);setRecords([]);setQuery('');setFolder('');setPassphrase('');setConfirmation('');setForm(emptyForm());setEditor(false);setEditing(null);setRemoving(null);setViewing(null);setBackup(null);setRestorePassphrase('');setBusy(false);setError('');},[invalidate]);
  useEffect(()=>{if(!userId)return;const controller=new AbortController();void request(base,undefined,controller.signal).then(setStatus).catch(error=>{if(!controller.signal.aborted)setError(error.message);});return()=>{controller.abort();invalidate();};},[base,userId,invalidate]);
  useEffect(()=>{let timer:ReturnType<typeof setTimeout>;const reset=()=>{clearTimeout(timer);timer=setTimeout(lock,5*60*1000);};const visibility=()=>{if(document.hidden)lock();};reset();document.addEventListener('pointerdown',reset);document.addEventListener('keydown',reset);document.addEventListener('visibilitychange',visibility);return()=>{clearTimeout(timer);document.removeEventListener('pointerdown',reset);document.removeEventListener('keydown',reset);document.removeEventListener('visibilitychange',visibility);};},[lock]);
  const scope:PrivateScope={userId:user?.id??'',module:kind};
- async function run(task:(version:number)=>Promise<void>){const version=generation.current;setBusy(true);setError('');try{await task(version);}catch(error){if(version===generation.current)setError(error instanceof Error?error.message:'Private-store operation failed');}finally{if(version===generation.current)setBusy(false);}}
+ async function run(task:(version:number)=>Promise<void>){if(operation.current)return;operation.current=true;const version=generation.current;setBusy(true);setError('');try{await task(version);}catch(error){if(version===generation.current)setError(error instanceof Error?error.message:'Private-store operation failed');}finally{if(version===generation.current){operation.current=false;setBusy(false);}}}
  async function unlock(version:number){const phrase=passphrase,repeat=confirmation;setPassphrase('');setConfirmation('');const fresh:Status=await request(base);if(version!==generation.current)return;setStatus(fresh);let unlockedKey:CryptoKey;let current=fresh.config;
   if(!current){if(phrase!==repeat)throw new Error('The passphrases do not match.');const created=await createPrivateStore(phrase,scope);if(version!==generation.current)return;await request(base+'/initialize',{config:created.config});current=created.config;unlockedKey=created.key;}else{try{unlockedKey=await unlockPrivateStore(phrase,current,scope);}catch{throw new Error('Could not unlock: passphrase, account scope or stored data does not match.');}}
   const loaded:RecordValue[]=[];for(const row of fresh.objects){if(version!==generation.current)return;const value=await request(base+'/'+row.id);const entry=await decryptPrivateEntry(unlockedKey,current,scope,row.id,value.envelope);loaded.push({...row,revision:value.revision,entry,envelope:value.envelope});}
@@ -37,7 +43,7 @@ export function LivePrivateStore({kind}:{kind:PrivateModule}){
   if(fresh.objects.length+missing.length>fresh.maxObjects || used+missing.reduce((sum,row)=>sum+row.bytes,0)>fresh.quota)throw new Error('Not enough capacity to restore these missing entries.');
   if(version!==generation.current)return;if(!fresh.config)await request(base+'/initialize',{config:archive.config});
   for(const row of missing){if(version!==generation.current)return;await request(base+'/put',{id:row.id,expectedRevision:0,envelope:row.envelope});}
-  if(version!==generation.current)return;lock();const next:Status=await request(base);setStatus(next);
+  if(version!==generation.current)return;lock();const lockedVersion=generation.current;const next:Status=await request(base);if(lockedVersion===generation.current)setStatus(next);
  }
  function download(bytes:Uint8Array<ArrayBuffer>|string,name:string,type:string){const url=URL.createObjectURL(new Blob([bytes],{type}));const anchor=document.createElement('a');anchor.href=url;anchor.download=name.replace(/[\\/]/g,'_');anchor.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
  if(!user)return <Screen title={kind==='vault'?'Vault':'Secrets'} subtitle="Encrypted private storage"><StateView kind="offline" title="A signed-in account is required" body="Local device mode does not authorize server storage."/></Screen>;

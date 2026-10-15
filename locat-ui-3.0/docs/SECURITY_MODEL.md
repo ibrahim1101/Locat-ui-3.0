@@ -23,3 +23,5 @@ Account audit date windows and bounded loaded-result JSON export are implemented
 Operator-only standalone SQLite backup verification is available through verify:backup; BACKUP_VERIFICATION.md defines integrity/checksum/schema scope and excludes full ecosystem restore or decryption claims.
 
 Operator restore:server can publish a checksum-verified standalone SQLite snapshot to a new unused file without activation; see BACKUP_VERIFICATION.md for isolation, stale authentication state and separate sidecar/browser/media recovery scope.
+
+Vault/Secrets account/module changes mount a fresh locked state; generation guards and synchronous operation exclusion prevent stale client-state attachment and duplicate form operations. PRIVATE_STORAGE.md documents already-dispatched write and JavaScript-erasure limits.

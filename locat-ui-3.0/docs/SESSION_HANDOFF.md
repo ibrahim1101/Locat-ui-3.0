@@ -1,3 +1,7 @@
+## Latest — private-store scope reset and operation exclusion
+
+Vault/Secrets now mounts an independent state/key lifecycle for each exact account/module scope. Account change, logout or switching Vault/Secrets replaces all previously unlocked records, editors, passphrase fields and status with a fresh locked screen. Existing unmount generation invalidation prevents old async results from reattaching. A synchronous operation guard rejects duplicate save/unlock/restore submissions before a React disabled-state render; lock invalidation releases that scope's guard, and old completions cannot release a newer operation. Post-restore status refresh also checks the locked generation before updating. UI3 theme/controls and server authorization are unchanged. Regression tests cover unlocked account/module transitions, open secret editor removal, empty replacement passphrase fields and duplicate encrypted writes. Validation passes: check, lint, all 174 frontend tests / 48 files, all 84 backend tests and production build. No claim of guaranteed JavaScript/clipboard erasure, rollback of already dispatched writes, browser/native acceptance or audited password-manager readiness. Full roadmap remains active.
+
 Recovery validation checkpoint: check, lint, all 172 frontend tests across 48 files, all 84 backend tests, and production build passed. Matrix transport was unchanged; no new browser/native/full ecosystem recovery acceptance is claimed.
 
 ## Latest — read-only operator backup creation
