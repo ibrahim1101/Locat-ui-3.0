@@ -40,3 +40,6 @@ Managed revocation follow-on: this browser's matching managed Matrix device can 
 
 
 Current durable follow-on: schema 13 now queues cleanup of bound Matrix devices atomically with Link revocation. The managed worker retries and records confirmed/manual results, and UI3 renders that status. See MATRIX_DEVICE_REVOCATION.md for scope and remaining limits; the earlier separate-action description is historical.
+
+
+Managed setup now records deterministic device intent before upstream issuance under schema 14; this metadata neither grants gateway access nor replaces key binding. Unbound cleanup and operation-lease boundaries are documented in MATRIX_MANAGED_SETUP.md.

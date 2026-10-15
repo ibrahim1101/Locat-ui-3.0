@@ -40,7 +40,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
  async function json(path,options,status=200){const response=await api(path,options);assert.equal(response.status,status,'HTTPS '+path+' status');return response.json();}
  try{
   await until(async()=>{if(child.exitCode!==null)throw new Error('Production HTTPS server exited during acceptance');try{return (await api('/api/ready')).ok;}catch{return false;}},'production HTTPS server readiness');
-  async function account(username){
+  async function account(username,bind=true){
    const password=randomBytes(24).toString('base64url'),user=(await json('/api/auth/register',{method:'POST',data:{username,displayName:'Synthetic HTTPS '+username,password}},201)).user;
    const login=await api('/api/auth/login',{method:'POST',data:{username,password}});assert.equal(login.status,200);const setCookie=login.headers.get('set-cookie');assert.match(setCookie,/; Secure/);assert.match(setCookie,/; HttpOnly/);assert.match(setCookie,/SameSite=Strict/);const cookie=setCookie.split(';')[0];
    const identity=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);assert.equal(identity.privateKey.extractable,false);
@@ -54,6 +54,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
    const proof=(await json('/api/link/prove',{method:'POST',cookie,data:{id:challenge.id,answer}})).token;
    assert.equal((await api('/api/link/prove',{method:'POST',cookie,data:{id:challenge.id,answer}})).status,403,'Device challenge replay must fail');
    const auth={cookie,proof},issued=await json('/api/link/matrix/provision',{...auth,method:'POST',data:{}});
+   if(!bind)return {user,password,username,auth,issued,linkDeviceId:device.id};
    const fetchFn=(input,init={})=>{const headers=new Headers(init.headers);headers.set('Cookie',cookie);headers.set('Origin',origin);headers.set('X-Locat-Device-Proof',proof);headers.set('Authorization','Bearer '+issued.accessToken);return transport(input,{...init,headers});};
    const client=createClient({baseUrl:origin,fetchFn,userId:issued.userId,deviceId:issued.deviceId,accessToken:issued.accessToken,verificationMethods:['m.sas.v1'],logger:quiet});clients.push(client);
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'synthetic-https-'+user.id});const publicKeys=await client.getCrypto().getOwnDeviceKeys();
@@ -61,6 +62,13 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
    const controller=createMatrixVerificationSession(client,query=>json('/api/link/matrix/peer?'+new URLSearchParams(query),auth));controllers.push(controller);let state;controller.subscribe(value=>{state=value;});
    return {user,password,username,auth,issued,client,controller,state:()=>state};
   }
+  const unbound=await account('https_unbound',false),unboundStatus=await json('/api/link/matrix/status',unbound.auth);
+  assert.equal(unboundStatus.device,null);assert.equal(unboundStatus.authorizedHere,false);assert.equal(unboundStatus.managedDevice.deviceId,unbound.issued.deviceId);assert.equal(unboundStatus.managedDevice.operationActive,false);
+  assert.equal((await api('/_matrix/client/v3/account/whoami',{...unbound.auth,headers:{Authorization:'Bearer '+unbound.issued.accessToken}})).status,403,'Recorded setup does not authorize the Matrix gateway');
+  await json('/api/link/matrix/revoke-managed-device',{...unbound.auth,method:'POST',data:{}});
+  assert.equal((await fetch(upstream+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer '+unbound.issued.accessToken}})).status,401,'Unbound managed device can be revoked without returning its token');
+  const abandoned=await account('https_abandoned',false);await json('/api/link/revoke',{...abandoned.auth,method:'POST',data:{id:abandoned.linkDeviceId}});
+  await until(async()=>(await fetch(upstream+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer '+abandoned.issued.accessToken}})).status===401,'queued revocation of unbound managed device');
   const alice=await account('https_alice'),bob=await account('https_bob');
   await json('/api/contacts/request',{...alice.auth,method:'POST',data:{userId:bob.user.id}});
   await json('/api/contacts/respond',{...bob.auth,method:'POST',data:{userId:alice.user.id,accept:true}});
@@ -88,10 +96,10 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await json('/api/link/revoke',{...alice.auth,method:'POST',data:{id:ownLink.id}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,403,'Revoked Link identity blocks the Matrix gateway');
   await until(async()=>(await fetch(upstream+protectedPath,{headers:bearer})).status===401,'queued Link revocation invalidates actual Matrix session');
-  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [alice.password,bob.password,alice.auth.cookie.split('=')[1],bob.auth.cookie.split('=')[1],alice.auth.proof,bob.auth.proof,alice.issued.accessToken,bob.issued.accessToken])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
+  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken]))assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, unbound-device cleanup, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}

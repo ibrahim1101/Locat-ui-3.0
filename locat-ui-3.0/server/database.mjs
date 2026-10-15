@@ -1,3 +1,4 @@
+import {managedMatrixDeviceStore} from './matrixManagedDevices.mjs';
 import {matrixRevocationStore} from './matrixRevocation.mjs';
 import { matrixBindingStore } from './matrixBinding.mjs';
 import { linkStore } from './link.mjs';
@@ -16,7 +17,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 13) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 14) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -110,7 +111,11 @@ export function openDatabase(filename) {
       SELECT b.userId,b.linkDeviceId,b.matrixUserId,b.matrixDeviceId,'pending',0,0,0,d.revokedAt,d.revokedAt FROM matrixBindings b JOIN linkDevices d ON d.userId=b.userId AND d.id=b.linkDeviceId WHERE d.revokedAt IS NOT NULL;
     UPDATE matrixBindings SET expiresAt=0 WHERE linkDeviceId IN (SELECT linkDeviceId FROM matrixRevocations);
     PRAGMA user_version=13;COMMIT;`);
+  if(version<14)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE matrixManagedDevices(userId TEXT NOT NULL REFERENCES matrixAccounts(userId),linkDeviceId INTEGER NOT NULL REFERENCES linkDevices(id),matrixUserId TEXT NOT NULL,matrixDeviceId TEXT NOT NULL,operationToken TEXT,operationUntil INTEGER NOT NULL DEFAULT 0,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL,PRIMARY KEY(userId,linkDeviceId),UNIQUE(matrixUserId,matrixDeviceId));
+    PRAGMA user_version=14;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
+  const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
@@ -118,7 +123,8 @@ export function openDatabase(filename) {
     serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
     link,
     matrixRevocations,
-    matrixBindings:matrixBindingStore(sql,link),
+    matrixManagedDevices,
+    matrixBindings:matrixBindingStore(sql,link,matrixManagedDevices),
     sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
     acceptedContact: (a,b) => { const [low,high]=[a,b].sort(); return !!sql.prepare("SELECT 1 FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").get(low,high); },

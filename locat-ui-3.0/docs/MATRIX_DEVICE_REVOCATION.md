@@ -14,4 +14,6 @@ UI3 Devices uses its existing themed cards, confirmation Sheet, Button and refre
 
 Tests cover v12 migration/backfill and preserved bindings, atomic rollback when queue insertion fails, durable retry across database reopen, competing database connections, expired-lease completion rejection, exact identity scope, idempotent deletion, manual fallback, shutdown waiting and UI status wording. Real Synapse acceptance through the actual HTTPS/auth/proof server now revokes a Link identity and waits for its Matrix token to become invalid upstream.
 
-Remaining work includes durable inventory of provisioned-but-unbound tokens, account-wide session policy, operator handling for manually linked/changed-authority identities, actual browser/native acceptance and full cross-signing/identity recovery. The conversation gate remains closed. No public service or operator configuration was activated by this change.
+Schema 14 adds pre-issuance managed-device intent, including cleanup before binding, operation leases and late-settlement re-arming; see MATRIX_MANAGED_SETUP.md. No raw-token inventory is stored.
+
+Remaining work includes historical unrecorded sessions, account-wide token/session policy, operator handling for manually linked/changed-authority identities, actual browser/native acceptance and full cross-signing/identity recovery. The conversation gate remains closed. No public service or operator configuration was activated by this change.

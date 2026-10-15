@@ -7,17 +7,21 @@ export function matrixRevocationStore(sql){
    sql.prepare(`INSERT INTO matrixRevocations(userId,linkDeviceId,matrixUserId,matrixDeviceId,status,attempts,nextAttemptAt,leaseUntil,createdAt,updatedAt)
     SELECT userId,linkDeviceId,matrixUserId,matrixDeviceId,'pending',0,?,0,?,? FROM matrixBindings WHERE userId=? AND linkDeviceId=?
     ON CONFLICT(userId,linkDeviceId) DO NOTHING`).run(now,now,now,userId,deviceId);
+   sql.prepare(`INSERT INTO matrixRevocations(userId,linkDeviceId,matrixUserId,matrixDeviceId,status,attempts,nextAttemptAt,leaseUntil,createdAt,updatedAt)
+    SELECT userId,linkDeviceId,matrixUserId,matrixDeviceId,'pending',0,?,0,?,? FROM matrixManagedDevices WHERE userId=? AND linkDeviceId=?
+    ON CONFLICT(userId,linkDeviceId) DO NOTHING`).run(now,now,now,userId,deviceId);
   },
   claim(now=Date.now()){
    sql.exec('BEGIN IMMEDIATE');try{
-    const row=sql.prepare("SELECT * FROM matrixRevocations WHERE status='pending' AND nextAttemptAt<=? AND leaseUntil<=? ORDER BY nextAttemptAt,createdAt LIMIT 1").get(now,now);
+    const row=sql.prepare("SELECT * FROM matrixRevocations WHERE status='pending' AND nextAttemptAt<=? AND leaseUntil<=? AND NOT EXISTS (SELECT 1 FROM matrixManagedDevices m WHERE m.userId=matrixRevocations.userId AND m.linkDeviceId=matrixRevocations.linkDeviceId AND m.operationUntil>?) ORDER BY nextAttemptAt,createdAt LIMIT 1").get(now,now,now);
     if(!row){sql.exec('COMMIT');return null;}const leaseToken=randomUUID();
     sql.prepare('UPDATE matrixRevocations SET leaseToken=?,leaseUntil=?,attempts=attempts+1,updatedAt=? WHERE userId=? AND linkDeviceId=?').run(leaseToken,now+30000,now,row.userId,row.linkDeviceId);
     sql.exec('COMMIT');return {...row,leaseToken,attempts:row.attempts+1};
    }catch(error){sql.exec('ROLLBACK');throw error;}
   },
-  revoked(job){return !!sql.prepare(`SELECT 1 FROM linkDevices d JOIN matrixBindings b ON b.userId=d.userId AND b.linkDeviceId=d.id
-   WHERE d.userId=? AND d.id=? AND d.revokedAt IS NOT NULL AND b.matrixUserId=? AND b.matrixDeviceId=?`).get(job.userId,job.linkDeviceId,job.matrixUserId,job.matrixDeviceId);},
+  revoked(job){return !!sql.prepare(`SELECT 1 FROM linkDevices d WHERE d.userId=? AND d.id=? AND d.revokedAt IS NOT NULL AND (
+   EXISTS (SELECT 1 FROM matrixBindings b WHERE b.userId=d.userId AND b.linkDeviceId=d.id AND b.matrixUserId=? AND b.matrixDeviceId=?) OR
+   EXISTS (SELECT 1 FROM matrixManagedDevices m WHERE m.userId=d.userId AND m.linkDeviceId=d.id AND m.matrixUserId=? AND m.matrixDeviceId=?))`).get(job.userId,job.linkDeviceId,job.matrixUserId,job.matrixDeviceId,job.matrixUserId,job.matrixDeviceId);},
   finish(job,status,now=Date.now()){
    if(!['confirmed','manual','pending'].includes(status))throw new Error('Invalid Matrix cleanup state');
    const retry=now+Math.min(3600000,5000*2**Math.min(10,job.attempts-1));

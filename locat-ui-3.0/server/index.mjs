@@ -35,7 +35,7 @@ const matrix = matrixProvider();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
 const matrixServiceFile=process.env.LOCAT_MATRIX_APPSERVICE_FILE;
 if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a configured sidecar');
-const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings}):null;
+const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();

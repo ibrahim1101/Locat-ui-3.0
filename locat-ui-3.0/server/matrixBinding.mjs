@@ -30,7 +30,7 @@ export function matrixProvider(env=process.env){
  }};
 }
 function publicKeys(input){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['ed25519','curve25519'].includes(k)))fail(400,'Invalid Matrix public keys');for(const key of ['ed25519','curve25519'])if(typeof input[key]!=='string'||!/^[A-Za-z0-9+/]{43}$/.test(input[key])||Buffer.from(input[key],'base64').length!==32||Buffer.from(input[key],'base64').toString('base64').replace(/=+$/,'')!==input[key])fail(400,'Invalid Matrix public key encoding');return input;}
-export function matrixBindingStore(sql,devices){
+export function matrixBindingStore(sql,devices,managedDevices){
  const current=(userId,actor)=>sql.prepare('SELECT * FROM matrixBindings WHERE userId=? AND linkDeviceId=?').get(userId,actor);
  const acceptedPeer=sql.prepare("SELECT m.userId AS accountId,m.matrixUserId FROM matrixAccounts m JOIN contacts c ON ((c.lowId=? AND c.highId=m.userId) OR (c.highId=? AND c.lowId=m.userId)) WHERE m.userId=? AND c.status='accepted' AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blockerId=? AND b.blockedId=m.userId) OR (b.blockedId=? AND b.blockerId=m.userId))");
  const peer=(userId,peerId)=>acceptedPeer.get(userId,userId,peerId,userId,userId);
@@ -39,11 +39,12 @@ export function matrixBindingStore(sql,devices){
  peerByMatrix(userId,actor,matrixUserId){const target=sql.prepare('SELECT userId FROM matrixAccounts WHERE matrixUserId=?').get(matrixUserId);if(!target)fail(404,'Messaging contact is unavailable');return this.peer(userId,actor,target.userId);},
  permitsMatrixDevice(userId,matrixUserId,deviceId){const target=sql.prepare('SELECT b.userId FROM matrixBindings b JOIN linkDevices d ON d.id=b.linkDeviceId AND d.userId=b.userId WHERE b.matrixUserId=? AND b.matrixDeviceId=? AND b.expiresAt>? AND d.revokedAt IS NULL').get(matrixUserId,deviceId,Date.now());return !!target&&(target.userId===userId||!!peer(userId,target.userId));},
  permitsMatrixPeer(userId,matrixUserId){const value=sql.prepare('SELECT userId FROM matrixAccounts WHERE matrixUserId=?').get(matrixUserId);return !!value&&!!peer(userId,value.userId);},
- status(userId,actor){devices.owned(userId,actor);const account=sql.prepare('SELECT matrixUserId FROM matrixAccounts WHERE userId=?').get(userId);const binding=current(userId,actor);return {matrixUserId:account?.matrixUserId??null,device:binding?{deviceId:binding.matrixDeviceId,publicKeys:JSON.parse(binding.publicKeys),expiresAt:binding.expiresAt}:null};},
+ status(userId,actor){devices.owned(userId,actor);const account=sql.prepare('SELECT matrixUserId FROM matrixAccounts WHERE userId=?').get(userId);const binding=current(userId,actor);return {managedDevice:managedDevices.status(userId,actor),matrixUserId:account?.matrixUserId??null,device:binding?{deviceId:binding.matrixDeviceId,publicKeys:JSON.parse(binding.publicKeys),expiresAt:binding.expiresAt}:null};},
  bind(userId,actor,sessionHash,input,remote){
   devices.owned(userId,actor);const keys=publicKeys(input.publicKeys);if(remote.userId!==input.userId||remote.deviceId!==input.deviceId)fail(409,'Matrix session does not match the requested account and device');
   const expiresAt=Date.now()+24*60*60*1000;const encoded=JSON.stringify({ed25519:keys.ed25519,curve25519:keys.curve25519});
   sql.exec('BEGIN IMMEDIATE');try{
+  const managed=managedDevices.current(userId,actor);if(managed&&(managed.matrixUserId!==remote.userId||managed.matrixDeviceId!==remote.deviceId))fail(409,'This device has a reserved managed Matrix identity');
   const existing=current(userId,actor);
   if(existing&&(existing.matrixUserId!==remote.userId||existing.matrixDeviceId!==remote.deviceId||existing.publicKeys!==JSON.stringify({ed25519:keys.ed25519,curve25519:keys.curve25519})))fail(409,'This Locat device is already bound to a different Matrix identity');
   if(!existing&&remote.keys)fail(409,'Use a new Matrix device session without published keys; importing an existing device without its private keys is not supported');
