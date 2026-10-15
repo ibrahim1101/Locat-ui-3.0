@@ -23,7 +23,7 @@ function OwnedDevices({accountId}:{accountId:string}){
  const cancelled=useRef(false);
  const proofRequest=useRef<Promise<Proof>|null>(null);
  const busyRef=useRef(false),lifetime=useRef(new AbortController());
- const request=useCallback((path:string,input?:unknown,deviceProof?:string)=>linkRequest(path,input,deviceProof,lifetime.current.signal),[]);
+ const request=useCallback((path:string,input?:unknown,deviceProof?:string)=>linkRequest(path,input,deviceProof,lifetime.current.signal,accountId),[accountId]);
  const invalidate=useCallback(()=>{generation.current++;cancelled.current=true;identity.current=null;proof.current=null;proofRequest.current=null;},[]);
  const getProof=useCallback(async()=>{
   if(!accountId)throw new Error('A signed-in account is required');

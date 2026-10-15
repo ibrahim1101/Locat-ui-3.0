@@ -30,6 +30,10 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  if(!url.pathname.startsWith('/api/link/'))return false;
  const user=sessionUser(req);if(!user)fail(401,'Not authenticated');
  const session=sessionToken(req);if(!session)fail(401,'Not authenticated');
+ // A client-owned expected account is a consistency guard, never authorization.
+ // It prevents an old tab from registering its old private key under a new cookie owner.
+ const expectedAccount=req.headers['x-locat-account'];
+ if(expectedAccount!==undefined&&expectedAccount!==user.id)fail(403,'Signed-in account changed; reopen this tool');
  let actor;
  const recheck=()=>{
   if(req.aborted||res.destroyed||sessionToken(req)!==session||sessionUser(req)?.id!==user.id)fail(401,'Locat session changed during device operation');

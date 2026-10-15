@@ -41,3 +41,15 @@ test('an independently revoked proof or device cannot rename after a paused body
   await paused(value,'rename',{name:'Late name'},()=>revokeDevice?value.db.link.revoke('a',value.ids[1],value.ids[0]):revokeLinkProofs('a',value.ids[0]));assert.equal(value.db.link.list('a',value.ids[1]).devices.find(row=>row.id===value.ids[0]).name,'Device 0');
  });
 });
+
+test('an old tab expected-account guard rejects a new cookie owner before registration or proof setup',async()=>{
+ await fixture(async({db,session,hash,ids,token})=>{
+  let read=false,response;
+  const handler=createLinkHandler({store:db.link,sessionUser:()=>db.sessionUser(hash,Date.now()),sessionToken:()=>session,body:async()=>{read=true;return {};},json(_res,status,value){response={status,value};},audit(){}});
+  for(const action of ['register','challenge','prove','rename','payload/create','remote/create']){
+   await assert.rejects(handler({method:'POST',headers:{origin:'https://locat.test','x-locat-account':'another-owner','x-locat-device-proof':token}},{},new URL('https://locat.test/api/link/'+action),'https://locat.test'),error=>error.status===403&&/account changed/.test(error.message));
+  }
+  assert.equal(read,false);assert.equal(db.link.list('a',ids[0]).devices.length,2);
+  await handler({method:'GET',headers:{'x-locat-account':'a','x-locat-device-proof':token}},{},new URL('https://locat.test/api/link/devices'),'https://locat.test');assert.equal(response.status,200);assert.equal(response.value.currentDeviceId,ids[0]);
+ });
+});
