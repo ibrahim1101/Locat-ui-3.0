@@ -4,5 +4,5 @@ export default defineConfig({
  outputDir:'test-results/browser-artifacts',
  timeout:120000,expect:{timeout:15000},
  reporter:[['line'],['json',{outputFile:process.env.LOCAT_BROWSER_REPORT??'test-results/browser-results.json'}]],
- use:{browserName:'chromium',headless:true,serviceWorkers:'block'},
+ use:{browserName:'chromium',headless:true,serviceWorkers:'block',actionTimeout:15000,navigationTimeout:20000},
 });

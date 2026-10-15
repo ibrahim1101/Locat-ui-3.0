@@ -30,7 +30,7 @@ test('real browser managed Matrix Rust keys reopen, exclude a second writer and 
 });
 
 test('two real browser accounts reject a SAS comparison then mutually verify through the protected gateway',async({browser})=>{
- const contexts=[];
+ const contexts=[];let failure;
  async function account(name){
   const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'});contexts.push(context);await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
   const page=await context.newPage(),username='sas_'+randomBytes(6).toString('hex'),password=randomBytes(24).toString('base64url');await page.goto(fixture.origin);await expect(page.getByTestId('login-submit')).toBeVisible();
@@ -41,16 +41,16 @@ test('two real browser accounts reject a SAS comparison then mutually verify thr
  async function bind(value){await value.page.goto(fixture.origin+'/settings');await value.page.getByRole('button',{name:'Set up messaging device',exact:true}).click();const dialog=value.page.getByRole('dialog',{name:'Messaging device setup',exact:true});await dialog.getByRole('button',{name:'Create and bind managed session',exact:true}).click();await expect(dialog.getByText('Device bound and local crypto initialized. Conversation access remains gated.',{exact:true})).toBeVisible({timeout:45000});return dialog;}
  const verified='The SDK reports this exact device signing key as verified. Other devices and future key changes require their own checks.';
  try{
-  const alice=await account('Browser SAS Alice'),bob=await account('Browser SAS Bob');
-  await alice.page.getByPlaceholder('Exact username or LC code').fill(bob.user.username);await alice.page.getByRole('button',{name:'Find contact',exact:true}).click();await alice.page.getByRole('button',{name:'Send friend request',exact:true}).click();await expect(alice.page.getByText('outgoing request',{exact:true})).toBeVisible();await bob.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await bob.page.getByRole('button',{name:'Accept',exact:true}).click();await expect(bob.page.getByText('Friend',{exact:true})).toBeVisible();await alice.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await expect(alice.page.getByText('Friend',{exact:true})).toBeVisible();
-  const a=await bind(alice),b=await bind(bob);
+  const alice=await test.step('Sign in Alice',()=>account('Browser SAS Alice')),bob=await test.step('Sign in Bob',()=>account('Browser SAS Bob'));
+  await test.step('Request and accept friendship in Contacts',async()=>{await alice.page.getByPlaceholder('Exact username or LC code').fill(bob.user.username);await alice.page.getByRole('button',{name:'Find contact',exact:true}).click();await alice.page.getByRole('button',{name:'Send friend request',exact:true}).click();await expect(alice.page.getByText('outgoing request',{exact:true})).toBeVisible();await bob.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await bob.page.getByRole('button',{name:'Accept',exact:true}).click();await expect(bob.page.getByText('Friend',{exact:true})).toBeVisible();await alice.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await expect(alice.page.getByText('Friend',{exact:true})).toBeVisible();});
+  const a=await test.step('Bind Alice device',()=>bind(alice)),b=await test.step('Bind Bob device',()=>bind(bob));
   for(const dialog of [a,b]){await dialog.getByRole('button',{name:'Enable device verification',exact:true}).click();await expect(dialog.getByText(/Verification sync: ready/)).toBeVisible({timeout:30000});}
   await a.getByRole('button',{name:'Browser SAS Bob · '+bob.user.lcCode,exact:true}).click();await b.getByRole('button',{name:'Browser SAS Alice · '+alice.user.lcCode,exact:true}).click();await expect(b.getByRole('button',{name:/^Request verification ·/})).toBeEnabled();
   async function compare(){await a.getByRole('button',{name:/^Request verification ·/}).click();await b.getByRole('button',{name:'Accept verification request',exact:true}).click();const left=a.locator('p.font-mono.text-xl'),right=b.locator('p.font-mono.text-xl');await expect(left).toBeVisible({timeout:30000});await expect(right).toBeVisible({timeout:30000});const code=await left.innerText();expect(code).toMatch(/^\d+ · \d+ · \d+$/);await expect(right).toHaveText(code);}
   await compare();await a.getByRole('button',{name:'Codes differ — reject',exact:true}).click();await expect(a.getByText(verified,{exact:true})).toHaveCount(0);await expect(b.getByText(/Verification sync: ready\. Request: (cancelled|error)\./)).toBeVisible({timeout:30000});await expect(b.getByText(verified,{exact:true})).toHaveCount(0);
   await compare();await a.getByRole('button',{name:'Codes match on both screens',exact:true}).click();await expect(a.getByText(/Verification sync: ready\. Request: checking\./)).toBeVisible();await expect(a.getByText(verified,{exact:true})).toHaveCount(0);await expect(b.getByText(verified,{exact:true})).toHaveCount(0);await b.getByRole('button',{name:'Codes match on both screens',exact:true}).click();await expect(a.getByText(verified,{exact:true})).toBeVisible({timeout:30000});await expect(b.getByText(verified,{exact:true})).toBeVisible({timeout:30000});
   expect(await alice.page.evaluate(async()=>(await fetch('/api/messages')).status)).toBe(501);
- }finally{await Promise.all(contexts.map(context=>context.close()));}
+ }catch(error){failure=error;throw error;}finally{const closed=await Promise.allSettled(contexts.map(context=>context.close()));if(!failure){const rejected=closed.find(result=>result.status==='rejected');if(rejected?.status==='rejected')throw rejected.reason;}}
 });
 
 test('browser history workers reject a wrong passphrase, import a real key and export it after reload',async({browser})=>{
