@@ -18,11 +18,16 @@ export function createMatrixGateway({provider,store,sessionUser,sessionToken,dev
   if(!allowed)fail(501,'This Matrix endpoint is gated until its Locat integration is accepted');
   const retryAfter=limit(user.id);if(retryAfter)throw Object.assign(new Error('Matrix bootstrap rate limit exceeded'),{status:429,retryAfter});
   if((active.get(user.id)??0)>=8)fail(429,'Matrix bootstrap connection limit exceeded');
+  const queriedPeers=new Set();
   let input;if(req.method==='POST'){input=await body(req,1024*1024);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix request');
+   if(path.endsWith('/keys/query')||path.endsWith('/keys/claim')){
+    const users=input[path.endsWith('/keys/query')?'device_keys':'one_time_keys'];if(!users||typeof users!=='object'||Array.isArray(users)||Object.keys(users).length>50)fail(400,'Invalid or oversized Matrix device-key lookup');
+    for(const matrixUserId of Object.keys(users)){if(matrixUserId===binding.matrixUserId)continue;if(!store.permitsMatrixPeer?.(user.id,matrixUserId))fail(403,'Matrix key lookup requires an accepted, unblocked Locat contact');queriedPeers.add(matrixUserId);}
+   }
    if(path.endsWith('/keys/upload')&&input.device_keys){const device=input.device_keys,keys=JSON.parse(binding.publicKeys);if(device.user_id!==binding.matrixUserId||device.device_id!==binding.matrixDeviceId||(typeof device.keys?.['ed25519:'+binding.matrixDeviceId]==='string'?device.keys['ed25519:'+binding.matrixDeviceId].replace(/=+$/,''):null)!==keys.ed25519||(typeof device.keys?.['curve25519:'+binding.matrixDeviceId]==='string'?device.keys['curve25519:'+binding.matrixDeviceId].replace(/=+$/,''):null)!==keys.curve25519)fail(409,'Matrix device upload differs from the bound public keys');}
   }
   // Body reads and upstream calls can overlap logout/revocation. Recheck before forwarding and returning.
-  const check=()=>{if(sessionUser(req)?.id!==user.id||deviceActor(req,user.id,session)!==actor)fail(401,'Locat authorization changed');store.authorize(user.id,actor,matrixTokenHash(session),token);};check();
+  const check=()=>{for(const peer of queriedPeers)if(!store.permitsMatrixPeer?.(user.id,peer))fail(403,'Messaging contact authorization changed');if(sessionUser(req)?.id!==user.id||deviceActor(req,user.id,session)!==actor)fail(401,'Locat authorization changed');store.authorize(user.id,actor,matrixTokenHash(session),token);};check();
   const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),65000);const closed=()=>controller.abort();res.once('close',closed);active.set(user.id,(active.get(user.id)??0)+1);
   try{
    let response;try{response=await fetch(provider.origin+path+url.search,{method:req.method,headers:{Authorization:'Bearer '+token,Accept:'application/json',...(input?{'Content-Type':'application/json'}:{})},body:input?JSON.stringify(input):undefined,redirect:'error',signal:controller.signal});}catch{fail(502,'Matrix bootstrap service is unavailable');}

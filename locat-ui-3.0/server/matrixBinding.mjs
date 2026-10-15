@@ -32,7 +32,11 @@ export function matrixProvider(env=process.env){
 function publicKeys(input){if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['ed25519','curve25519'].includes(k)))fail(400,'Invalid Matrix public keys');for(const key of ['ed25519','curve25519'])if(typeof input[key]!=='string'||!/^[A-Za-z0-9+/]{43}$/.test(input[key])||Buffer.from(input[key],'base64').length!==32||Buffer.from(input[key],'base64').toString('base64').replace(/=+$/,'')!==input[key])fail(400,'Invalid Matrix public key encoding');return input;}
 export function matrixBindingStore(sql,devices){
  const current=(userId,actor)=>sql.prepare('SELECT * FROM matrixBindings WHERE userId=? AND linkDeviceId=?').get(userId,actor);
+ const acceptedPeer=sql.prepare("SELECT m.userId AS accountId,m.matrixUserId FROM matrixAccounts m JOIN contacts c ON ((c.lowId=? AND c.highId=m.userId) OR (c.highId=? AND c.lowId=m.userId)) WHERE m.userId=? AND c.status='accepted' AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blockerId=? AND b.blockedId=m.userId) OR (b.blockedId=? AND b.blockerId=m.userId))");
+ const peer=(userId,peerId)=>acceptedPeer.get(userId,userId,peerId,userId,userId);
  return {current,
+ peer(userId,actor,peerId){devices.owned(userId,actor);const value=peer(userId,peerId);if(!value)fail(404,'Messaging contact is unavailable');return {...value,verification:'requires-client-verification'};},
+ permitsMatrixPeer(userId,matrixUserId){const value=sql.prepare('SELECT userId FROM matrixAccounts WHERE matrixUserId=?').get(matrixUserId);return !!value&&!!peer(userId,value.userId);},
  status(userId,actor){devices.owned(userId,actor);const account=sql.prepare('SELECT matrixUserId FROM matrixAccounts WHERE userId=?').get(userId);const binding=current(userId,actor);return {matrixUserId:account?.matrixUserId??null,device:binding?{deviceId:binding.matrixDeviceId,publicKeys:JSON.parse(binding.publicKeys),expiresAt:binding.expiresAt}:null};},
  bind(userId,actor,sessionHash,input,remote){
   devices.owned(userId,actor);const keys=publicKeys(input.publicKeys);if(remote.userId!==input.userId||remote.deviceId!==input.deviceId)fail(409,'Matrix session does not match the requested account and device');
@@ -56,10 +60,16 @@ export function matrixBindingStore(sql,devices){
  };
 }
 export function createMatrixBindingHandler({store,provider,provisioner,body,json,audit}){
- const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30);
+ const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30),peerLimit=createRateLimiter(30);
  return async({req,res,url,userId,actor,session,recheck})=>{
   const action=url.pathname.slice('/api/link/matrix/'.length);
   if(req.method==='GET'&&action==='status'){json(res,200,{configured:!!provider,managedProvisioning:!!provisioner,serverName:provider?.serverName??null,...store.status(userId,actor),authorizedHere:store.current(userId,actor)?.sessionHash===matrixTokenHash(session)&&store.current(userId,actor)?.expiresAt>Date.now()});return true;}
+  if(req.method==='GET'&&action==='peer'){
+   if(!provider)fail(503,'Matrix sidecar is not configured');const retryAfter=peerLimit(userId);if(retryAfter)throw Object.assign(new Error('Messaging contact lookup rate limit exceeded'),{status:429,retryAfter});
+   if([...url.searchParams.keys()].some(key=>key!=='accountId')||url.searchParams.getAll('accountId').length!==1||!/^[a-f0-9]{32}$/.test(url.searchParams.get('accountId')??''))fail(400,'Choose one local contact account identity');
+   const own=store.current(userId,actor);if(!own||own.sessionHash!==matrixTokenHash(session)||own.expiresAt<=Date.now())fail(403,'Bind this messaging device to the current Locat session first');
+   recheck();json(res,200,store.peer(userId,actor,url.searchParams.get('accountId')));return true;
+  }
   if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device'].includes(action))fail(404,'Unknown Matrix binding action');
   const retryAfter=(action==='cancel-provision'?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
   const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');

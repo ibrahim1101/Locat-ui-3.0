@@ -1,0 +1,20 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';import {openDatabase} from './database.mjs';import {createMatrixBindingHandler,matrixTokenHash} from './matrixBinding.mjs';
+test('Matrix peer resolution shares only accepted unblocked contact mappings and never device tokens or pins',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'locat-matrix-peer-'));let db;try{
+  db=openDatabase(join(root,'db.sqlite'));const [owner,peer,stranger]=['a','b','c'].map(c=>c.repeat(32));for(const [index,id] of [owner,peer,stranger].entries())db.addUser({id,username:'user'+index,displayName:'Synthetic',salt:'salt',hash:'hash'});
+  const actor=db.link.register(owner,'Owner','web','synthetic-owner-key').id,peerActor=db.link.register(peer,'Peer','web','synthetic-peer-key').id;
+  const publicKeys={ed25519:Buffer.alloc(32,1).toString('base64').replace(/=+$/,''),curve25519:Buffer.alloc(32,2).toString('base64').replace(/=+$/,'')};
+  const input={userId:'@peer:matrix.test',deviceId:'PEER',accessToken:'synthetic-peer-token-0001',publicKeys};db.matrixBindings.bind(peer,peerActor,'peer-session',input,{userId:input.userId,deviceId:input.deviceId,keys:null});
+  const unavailable=()=>assert.throws(()=>db.matrixBindings.peer(owner,actor,peer),{status:404,message:'Messaging contact is unavailable'});unavailable();db.requestContact(owner,peer);unavailable();db.respondContact(peer,owner,true);
+  const result=db.matrixBindings.peer(owner,actor,peer);assert.deepEqual(result,{accountId:peer,matrixUserId:'@peer:matrix.test',verification:'requires-client-verification'});assert.ok(!JSON.stringify(result).includes(input.accessToken));assert.ok(!JSON.stringify(result).includes(publicKeys.ed25519));assert.equal(db.matrixBindings.permitsMatrixPeer(owner,input.userId),true);assert.equal(db.matrixBindings.permitsMatrixPeer(stranger,input.userId),false);
+  db.removeContact(owner,peer);unavailable();assert.equal(db.matrixBindings.permitsMatrixPeer(owner,input.userId),false);db.requestContact(owner,peer);db.respondContact(peer,owner,true);db.block(peer,owner,true);unavailable();assert.equal(db.matrixBindings.permitsMatrixPeer(owner,input.userId),false);
+  db.block(peer,owner,false);unavailable();assert.throws(()=>db.matrixBindings.peer(owner,actor,stranger),{status:404});
+ }finally{db?.close();await rm(root,{recursive:true,force:true});}
+});
+test('peer lookup requires current bound Locat session and exactly one local account identity',async()=>{
+ const peer='b'.repeat(32);let sessionHash=matrixTokenHash('owner-session'),status,value,called=0;
+ const handler=createMatrixBindingHandler({provider:{},store:{current:()=>({sessionHash,expiresAt:Date.now()+60000}),peer:(user,actor,id)=>{called++;assert.equal(user,'owner');assert.equal(actor,1);assert.equal(id,peer);return {accountId:id,matrixUserId:'@peer:matrix.test'};}},json:(_res,code,data)=>{status=code;value=data;}});
+ const context={req:{method:'GET'},res:{},url:new URL('http://localhost/api/link/matrix/peer?accountId='+peer),userId:'owner',actor:1,session:'owner-session',recheck(){}};
+ await handler(context);assert.equal(status,200);assert.equal(value.accountId,peer);sessionHash='different';await assert.rejects(handler(context),{status:403});assert.equal(called,1);sessionHash=matrixTokenHash('owner-session');
+ for(const query of ['','?accountId='+peer+'&accountId='+peer,'?accountId='+peer+'&unknown=1','?accountId=@remote:server'])await assert.rejects(handler({...context,url:new URL('http://localhost/api/link/matrix/peer'+query)}),{status:400});
+});

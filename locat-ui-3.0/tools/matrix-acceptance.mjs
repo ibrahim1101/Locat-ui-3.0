@@ -52,6 +52,7 @@ try{
  const aliceAccount=await register('alice'),bobAccount=await register('bob');const alice=await client(aliceAccount),bob=await client(bobAccount);
  const room=(await alice.createRoom({visibility:'private',preset:'private_chat',invite:[bobAccount.user_id],initial_state:[{type:'m.room.encryption',state_key:'',content:{algorithm:'m.megolm.v1.aes-sha2'}}]})).room_id;
  await bob.joinRoom(room);await until(()=>alice.getRoom(room)?.getMember(bobAccount.user_id)?.membership==='join'&&bob.getRoom(room)?.getMyMembership()==='join','room membership');
+ locat.requestContact(aliceAccount.locatAccountId,bobAccount.locatAccountId);locat.respondContact(bobAccount.locatAccountId,aliceAccount.locatAccountId,true);assert.equal(locat.matrixBindings.peer(aliceAccount.locatAccountId,aliceAccount.linkDeviceId,bobAccount.locatAccountId).matrixUserId,bob.getUserId());
  // Exercise Matrix's actual SAS protocol, not a locally invented verification exchange.
  await alice.getCrypto().getUserDeviceInfo([bob.getUserId()],true);await bob.getCrypto().getUserDeviceInfo([alice.getUserId()],true);
  async function sasRound(matches){
@@ -65,7 +66,7 @@ try{
   }finally{bob.off('crypto.verificationRequestReceived',receive);}
  }
  await sasRound(false);assert.notEqual((await alice.getCrypto().getDeviceVerificationStatus(bob.getUserId(),bob.getDeviceId())).isVerified(),true);assert.notEqual((await bob.getCrypto().getDeviceVerificationStatus(alice.getUserId(),alice.getDeviceId())).isVerified(),true);
- await sasRound(true);assert.equal((await alice.getCrypto().getDeviceVerificationStatus(bob.getUserId(),bob.getDeviceId())).isVerified(),true);assert.equal((await bob.getCrypto().getDeviceVerificationStatus(alice.getUserId(),alice.getDeviceId())).isVerified(),true);
+ await sasRound(true);await until(async()=>{const a=await alice.getCrypto().getDeviceVerificationStatus(bob.getUserId(),bob.getDeviceId()),b=await bob.getCrypto().getDeviceVerificationStatus(alice.getUserId(),alice.getDeviceId());return a?.isVerified()===true&&b?.isVerified()===true;},'SAS verified trust persistence');
  // Synthetic out-of-band comparison: never mark a device trusted merely because the homeserver says so.
  async function verify(observer,peer){const devices=await observer.getCrypto().getUserDeviceInfo([peer.getUserId()],true);const own=await peer.getCrypto().getOwnDeviceKeys();const remote=devices.get(peer.getUserId())?.get(peer.getDeviceId());assert.ok(remote,'Peer device published');assert.equal(remote.getFingerprint(),own.ed25519);await observer.getCrypto().setDeviceVerified(peer.getUserId(),peer.getDeviceId(),true);assert.equal((await observer.getCrypto().getDeviceVerificationStatus(peer.getUserId(),peer.getDeviceId())).isVerified(),true);}
  await verify(alice,bob);await verify(bob,alice);alice.getCrypto().globalBlacklistUnverifiedDevices=true;bob.getCrypto().globalBlacklistUnverifiedDevices=true;
