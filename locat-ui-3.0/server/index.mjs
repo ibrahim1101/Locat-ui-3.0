@@ -1,3 +1,6 @@
+import { createMatrixGateway } from './matrixGateway.mjs';
+import { verifyLinkProof } from './linkProof.mjs';
+import { matrixProvider, createMatrixBindingHandler } from './matrixBinding.mjs';
 import { iceConfiguration } from './ice.mjs';
 import { accountIdentity, localDiscoveryQuery } from './globalIdentity.mjs';
 import { attachRealtime } from './realtime.mjs';
@@ -25,6 +28,7 @@ const scrypt = promisify(scryptCallback);
 if (process.env.LOCAT_DATA_FILE) throw new Error("LOCAT_DATA_FILE is retired; set LOCAT_DATABASE_FILE to a new SQLite path. Legacy JSON is never overwritten.");
 const config = serverConfig();
 const connectivity = iceConfiguration();
+const matrix = matrixProvider();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();
@@ -66,7 +70,9 @@ function sessionUser(req) {
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
-const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity});
+const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=verifyLinkProof(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
+const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,body,json,audit:db.audit});
+const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
 async function handle(req, res) {
@@ -77,6 +83,7 @@ async function handle(req, res) {
     const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
+  if (await matrixGateway(req,res,url,trustedOrigin)) return;
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;

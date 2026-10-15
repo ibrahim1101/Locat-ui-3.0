@@ -1,22 +1,25 @@
 # Include inside the existing exact-host HTTPS server block only after activation approval.
-# Synapse is private on 127.0.0.1:8008. Preserve existing Locat / route and TLS settings.
+# Route through the Locat proof/binding gateway, never directly to Synapse.
+# Synapse stays private on 127.0.0.1:8008. Preserve the existing Locat / route and TLS.
 location ^~ /_matrix/client/ {
-    proxy_pass http://127.0.0.1:8008;
-    proxy_set_header Host $host;
-    proxy_set_header Cookie "";
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $http_host;
+    proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Locat-Device-Proof $http_x_locat_device_proof;
     proxy_set_header Authorization $http_authorization;
     proxy_http_version 1.1;
     proxy_read_timeout 75s;
-    client_max_body_size 10m;
+    client_max_body_size 1m;
 }
 location ^~ /_matrix/media/ {
-    proxy_pass http://127.0.0.1:8008;
-    proxy_set_header Host $host;
-    proxy_set_header Cookie "";
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $http_host;
+    proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Locat-Device-Proof $http_x_locat_device_proof;
     proxy_set_header Authorization $http_authorization;
     proxy_http_version 1.1;
     proxy_read_timeout 75s;
-    client_max_body_size 10m;
+    client_max_body_size 1m;
 }
 # Closed initial topology. Never expose Synapse administration through this proxy.
 location ^~ /_synapse/ { return 404; }

@@ -1,3 +1,4 @@
+import {BrowserLinkClient} from './linkClient';
 import type {MatrixClient} from 'matrix-js-sdk';
 
 export type MatrixSessionBinding={accountId:string;userId:string;deviceId:string;accessToken:string};
@@ -8,9 +9,10 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
  if(signal?.aborted)throw new Error('Messaging initialization cancelled.');
  // Matrix tokens are supplied by future authorized account mapping; never reuse a Locat password/cookie.
  const scope=JSON.stringify([window.location.origin,binding.accountId,binding.userId,binding.deviceId]);
+ const link=new BrowserLinkClient(binding.accountId);
  let client:MatrixClient|null=null,closed=false,release:()=>void=()=>{};
  const held=new Promise<void>(resolve=>{release=resolve;});
- type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;close():Promise<void>};
+ type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;close():Promise<void>};
  let ready:(result:Result)=>void=()=>{},failed:(error:unknown)=>void=()=>{};
  const initialized=new Promise<Result>((resolve,reject)=>{ready=resolve;failed=reject;});
  const cancel=()=>{closed=true;release();};signal?.addEventListener('abort',cancel,{once:true});
@@ -19,15 +21,22 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
   try{
    const sdk=await import('matrix-js-sdk');if(closed)throw new Error('Messaging initialization cancelled.');
    const quiet={trace(){},debug(){},info(){},warn(){},error(){},getChild(){return this;}};
-   client=sdk.createClient({baseUrl:window.location.origin,userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,logger:quiet});
+   const fetchFn:typeof fetch=async(input,init)=>{
+    const target=new URL(input instanceof Request?input.url:String(input),window.location.origin);
+    if(target.origin!==window.location.origin||!target.pathname.startsWith('/_matrix/'))throw new Error('Matrix transport must stay on the protected same-origin gateway.');
+    if(closed)throw new Error('Messaging device closed');const proof=await link.connect();if(closed)throw new Error('Messaging device closed');
+    const headers=new Headers(init?.headers??(input instanceof Request?input.headers:undefined));headers.set('X-Locat-Device-Proof',proof.token);
+    return fetch(input,{...init,headers,credentials:'same-origin',cache:'no-store'});
+   };
+   client=sdk.createClient({fetchFn,baseUrl:window.location.origin,userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,logger:quiet});
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'locat-ui3-matrix:'+scope});
    if(closed)throw new Error('Messaging initialization cancelled.');
    const crypto=client.getCrypto();if(!crypto)throw new Error('Reviewed messaging encryption is unavailable.');
    crypto.globalBlacklistUnverifiedDevices=true;
    const publicKeys=await crypto.getOwnDeviceKeys();if(closed)throw new Error('Messaging initialization cancelled.');
-   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async close(){cancel();await task;}});
+   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async close(){cancel();await task;}});
    await held;
-  }finally{closed=true;client?.stopClient();signal?.removeEventListener('abort',cancel);}
+  }finally{closed=true;client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
  });
  void task.catch(error=>{closed=true;signal?.removeEventListener('abort',cancel);failed(error);});
  return initialized;

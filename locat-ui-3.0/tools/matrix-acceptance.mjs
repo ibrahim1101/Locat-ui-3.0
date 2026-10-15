@@ -1,3 +1,5 @@
+import {openDatabase} from '../server/database.mjs';
+import {matrixProvider,matrixTokenHash} from '../server/matrixBinding.mjs';
 /** Isolated synthetic acceptance only. Never points at an existing homeserver/account. */
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
@@ -12,7 +14,7 @@ import {createClient,MatrixEvent} from 'matrix-js-sdk';
 const exec=promisify(execFile),python=process.env.LOCAT_TEST_SYNAPSE_PYTHON;
 if(!python)throw new Error('Set LOCAT_TEST_SYNAPSE_PYTHON to an isolated Python environment with matrix-synapse==1.163.0');
 const version=await exec(python,['-c','import synapse;print(synapse.__version__)']);assert.equal(version.stdout.trim(),'1.163.0','Use the pinned test Synapse version');
-const dir=await mkdtemp(join(tmpdir(),'locat-matrix-acceptance-'));let child;const clients=[];
+const dir=await mkdtemp(join(tmpdir(),'locat-matrix-acceptance-'));let child,locat;const clients=[];
 const quiet={trace(){},debug(){},info(){},warn(){},error(){},getChild(){return this;}};
 const {logger}=await import('matrix-js-sdk/lib/logger.js');for(const level of ['trace','debug','info','warn','error','log'])logger[level]=()=>{};logger.getChild=()=>quiet;
 const networks=new Map();
@@ -27,7 +29,12 @@ try{
  child=spawn(python,['-m','synapse.app.homeserver','--config-path',config],{cwd:dir,stdio:'ignore'});
  await until(async()=>{if(child.exitCode!==null)throw new Error('Test homeserver exited');try{return (await fetch(baseUrl+'/_matrix/client/versions',{signal:AbortSignal.timeout(1000)})).ok;}catch{return false;}},'test homeserver startup');
  async function register(username){const response=await fetch(baseUrl+'/_matrix/client/v3/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password:randomBytes(32).toString('hex'),auth:{type:'m.login.dummy'}})});assert.equal(response.status,200,'Synthetic registration');return response.json();}
- async function client(account){const network={online:true,pending:new Set()};networks.set(account.user_id,network);const fetchFn=async(input,init)=>{if(!network.online)throw new Error('Synthetic offline client');const control=new AbortController();network.pending.add(control);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([init.signal,control.signal]):control.signal});}finally{network.pending.delete(control);}};const c=createClient({fetchFn,baseUrl,accessToken:account.access_token,userId:account.user_id,deviceId:account.device_id,logger:quiet});clients.push(c);await c.initRustCrypto({useIndexedDB:false});const rust=await import('@matrix-org/matrix-sdk-crypto-wasm');new rust.Tracing(rust.LoggerLevel.Error).turnOff();await c.startClient({initialSyncLimit:20});await until(()=>c.getSyncState()==='PREPARED'||c.getSyncState()==='SYNCING','client initial sync');return c;}
+ locat=openDatabase(join(dir,'locat-binding.sqlite'));
+ const provider=matrixProvider({LOCAT_MATRIX_UPSTREAM:baseUrl,LOCAT_MATRIX_SERVER_NAME:'locat-test.invalid'});
+ async function client(account){const network={online:true,pending:new Set()};networks.set(account.user_id,network);const fetchFn=async(input,init)=>{if(!network.online)throw new Error('Synthetic offline client');const control=new AbortController();network.pending.add(control);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([init.signal,control.signal]):control.signal});}finally{network.pending.delete(control);}};const c=createClient({fetchFn,baseUrl,accessToken:account.access_token,userId:account.user_id,deviceId:account.device_id,logger:quiet});clients.push(c);await c.initRustCrypto({useIndexedDB:false});const rust=await import('@matrix-org/matrix-sdk-crypto-wasm');new rust.Tracing(rust.LoggerLevel.Error).turnOff();
+ const accountId=account.user_id.includes('alice')?'a'.repeat(32):'b'.repeat(32);locat.addUser({id:accountId,username:accountId.slice(0,3),displayName:'Synthetic',salt:'synthetic-salt',hash:'synthetic-hash'});const device=locat.link.register(accountId,'Synthetic browser','web','synthetic-public-'+accountId).id;
+ const publicKeys=await c.getCrypto().getOwnDeviceKeys(),binding={userId:account.user_id,deviceId:account.device_id,accessToken:account.access_token,publicKeys};const inspected=await provider.inspect(account.access_token);locat.matrixBindings.bind(accountId,device,matrixTokenHash('synthetic-locat-session'),binding,inspected);assert.equal(locat.matrixBindings.authorize(accountId,device,matrixTokenHash('synthetic-locat-session'),account.access_token).matrixDeviceId,account.device_id);
+ await c.startClient({initialSyncLimit:20});await until(()=>c.getSyncState()==='PREPARED'||c.getSyncState()==='SYNCING','client initial sync');return c;}
  const aliceAccount=await register('alice'),bobAccount=await register('bob');const alice=await client(aliceAccount),bob=await client(bobAccount);
  const room=(await alice.createRoom({visibility:'private',preset:'private_chat',invite:[bobAccount.user_id],initial_state:[{type:'m.room.encryption',state_key:'',content:{algorithm:'m.megolm.v1.aes-sha2'}}]})).room_id;
  await bob.joinRoom(room);await until(()=>alice.getRoom(room)?.getMember(bobAccount.user_id)?.membership==='join'&&bob.getRoom(room)?.getMyMembership()==='join','room membership');
@@ -51,9 +58,9 @@ try{
  await bob.decryptEventIfNeeded(tampered);assert.equal(tampered.isDecryptionFailure(),true,'Modified ciphertext must not decrypt');
  // Server storage, including SQLite WAL, must not contain the unique synthetic content marker.
  for(const file of [database,database+'-wal']){let bytes;try{bytes=await readFile(file);}catch(error){if(error.code==='ENOENT')continue;throw error;}assert.equal(bytes.includes(Buffer.from(marker)),false,'Server database must not contain message plaintext');}
- console.log(JSON.stringify({status:'passed',sdk:'44.0.0',synapse:'1.163.0',checks:['real Rust crypto','manual peer fingerprint comparison','verified device trust','live Megolm ciphertext and decryption','offline delivery after actual server restart','timeline duplicate suppression','ciphertext tamper rejection','database and WAL plaintext scan'],limitations:['ephemeral client crypto store','no Locat account mapping or live chat UI','no cross-signing/SAS/recovery acceptance','no federation or public-network acceptance']}));
+ console.log(JSON.stringify({status:'passed',sdk:'44.0.0',synapse:'1.163.0',checks:['real Rust crypto and fresh device binding','manual peer fingerprint comparison','verified device trust','live Megolm ciphertext and decryption','offline delivery after actual server restart','timeline duplicate suppression','ciphertext tamper rejection','database and WAL plaintext scan'],limitations:['ephemeral client crypto store','no automated account provisioning or live chat UI','no cross-signing/SAS/recovery acceptance','no federation or public-network acceptance']}));
 }finally{
- for(const client of clients)client.stopClient();
+ for(const client of clients)client.stopClient();locat?.close();
  if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(5000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}
  await rm(dir,{recursive:true,force:true});
 }

@@ -1,0 +1,33 @@
+# Experimental Locat/Matrix account and device binding
+
+This checkpoint connects explicit setup, not private conversations. Live Send, room mutation/media APIs, automated account provisioning, verification/recovery UX and complete revocation integration remain gated. MATRIX_INTEGRATION.md describes the separate synthetic encrypted-message acceptance.
+
+## Operator configuration
+
+LOCAT_MATRIX_UPSTREAM is one fixed HTTP(S) origin without credentials, query or path. HTTP is accepted only for literal loopback/localhost; other upstreams require trusted HTTPS. LOCAT_MATRIX_SERVER_NAME is the exact canonical Matrix authority and must match validated whoami identities. Neither URL nor server name is supplied by a browser. Default is unconfigured. No DNS, service, tunnel or existing database is activated or moved automatically. The initial HTTP sidecar topology assumes Node on the host accessing loopback 8008; Docker-contained Node needs an explicitly designed trusted route/TLS configuration and is not certified by this profile.
+
+Settings > Messaging device lazily enrolls/proves this browser and checks configuration only after the setup click. An unconfigured server shows no access-token field. Configured experimental setup accepts a separate freshly authenticated Matrix user/device/access token; never reuse a Locat password. Automatic Matrix login/provisioning is not implemented. A token from an existing device is not an import of that device's private keys.
+
+The browser initializes persistent Rust crypto under its account/user/device store prefix while holding an exclusive Web Lock, then explicitly binds its own public keys. SDK transport stays on the same-origin protected gateway with HttpOnly Locat cookie, renewed Link proof and Matrix bearer token. The token is memory-only and cleared from the input after each attempt; closing/failure stops the crypto instance and releases its lock. IndexedDB keys are retained; this is not a key deletion operation or a claim of OS-backed storage protection. Human peer verification remains separate.
+
+## Validation and storage
+
+POST /api/link/matrix/bind requires exact Origin, current Locat session and device proof, bounded exact fields and ten binding actions/minute/account. The server validates whoami and this exact device's public keys against the fixed upstream with an eight-second deadline, no redirects and bounded JSON. Guest, foreign-server, mismatched user/device and key replacement fail. Initial binding requires a device with no previously published keys; returning bindings must match the stored identity and current public-key pin. Rebinding another Matrix account/device is not exposed as an implicit migration.
+
+Schema 12 adds account-unique Matrix identity mapping and unique Locat-device/Matrix-device association. It stores public keys, Matrix IDs, token SHA-256 digest, current Locat-session digest and a 24-hour gateway authorization expiry. It stores no Matrix access token or private encryption key. Exact fields and account/device uniqueness are enforced transactionally; prior schemas and account IDs remain intact. Fresh initialization on an already published foreign device fails rather than replacing its keys.
+
+The server necessarily handles the Matrix bearer token for validation/proxying. A server compromise can observe that bearer token and server-visible metadata; hashing at rest is not a claim that the server can never authenticate to Matrix. Browser/client key authenticity, peer verification and recovery protections remain critical. A discarded/expired local token requires deliberate Matrix reauthentication with the correct device/key state; no insecure token-recovery endpoint exists.
+
+## Gateway and revocation boundary
+
+The same-origin /_matrix gateway requires all three credentials on each request: current Locat cookie, current Link proof and the exact bound Matrix bearer token. Bindings cannot be moved between accounts, Link devices or Locat login sessions. The bootstrap allowlist covers versions/whoami/sync/key changes/backup-version lookup and key upload/query/claim. Other Matrix endpoints return 501. Conversation Send remains unavailable. Key upload must match the bound user/device/public keys.
+
+Limits: eight concurrent upstream requests/account, 240 requests/minute/account, one MiB JSON request, two MiB JSON response and 65-second upstream deadline. Cookies/upstream Set-Cookie and arbitrary headers are not relayed. Query-string access tokens and redirects are rejected. Authorization is rechecked before forwarding and before returning responses; logout/revocation suppresses pending results. A previously authorized upstream side effect cannot be rolled back by this check.
+
+Disconnect expires this device's gateway authorization while preserving identity/pins. It does not revoke the Matrix token at an independently exposed Matrix endpoint or recall content already received. Upstream token/device revocation, rotation and recovery remain pending; do not claim full messaging-device loss protection. Route Matrix client/media prefixes through the Locat gateway, not directly to Synapse. The updated nginx snippet does that; Synapse administration/federation/key paths stay blocked. A separately exposed Synapse endpoint bypasses Locat gateway policy and is a separate trust boundary.
+
+## Browser packaging and evidence
+
+The SDK/WASM is lazy loaded from the application assets. The static server serves application/wasm and permits CSP wasm-unsafe-eval for WebAssembly compilation; general unsafe-eval/inline-script permission is not added. Production build emits the WASM asset and separate SDK chunks. The SDK chunk is over the existing 500 KiB warning threshold; it is loaded only during experimental setup. Actual browser persistence/CSP/lifecycle acceptance is the next test, not implied by build success.
+
+Tests cover transactional mapping, token digests, key replacement/uniqueness/session isolation, fixed upstream whoami/key validation, guest/redirect/oversize rejection, gateway cookie isolation, proof/session checks, messaging gate, key upload pin checks, concurrency and revocation during response. The real Synapse harness now performs fresh device binding before actual SDK key upload and encryption. UI tests check explicit setup, unconfigured state, successful/failed binding and token-field clearing; SDK transport tests reject cross-origin destinations. No independent audit or public-beta readiness is asserted.

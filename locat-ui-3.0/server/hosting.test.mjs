@@ -17,6 +17,7 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     const key = join(dir, 'key.pem'), cert = join(dir, 'cert.pem'), web = join(dir, 'web');
     await mkdir(join(web, 'assets'), { recursive: true });
     await writeFile(join(web, 'index.html'), '<title>Locat test shell</title>');
+    await writeFile(join(web,'assets','crypto.wasm'),Buffer.from([0,97,115,109,1,0,0,0]));
     await writeFile(join(web, 'assets', 'app.js'), 'export const app = "Locat";');
     await writeFile(join(dir, 'private.js'), 'DO NOT EXPOSE');
     try { await symlink(join(dir, 'private.js'), join(web, 'assets', 'escape.js')); } catch {}
@@ -36,6 +37,7 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     for (let i = 0; i < 60; i++) { try { if ((await request('/api/ready')).status === 200) { ready = true; break; } } catch {} if (child.exitCode !== null) throw new Error('TLS server exited'); await new Promise(resolve => setTimeout(resolve, 50)); }
     assert.ok(ready);
     const shell = await request('/cinema'); assert.equal(shell.status, 200); assert.match(shell.body, /Locat test shell/); assert.match(shell.headers['content-security-policy'], /frame-ancestors 'none'/);
+    const wasm=await request('/assets/crypto.wasm');assert.equal(wasm.status,200);assert.equal(wasm.headers['content-type'],'application/wasm');assert.ok(shell.headers['content-security-policy'].includes("'wasm-unsafe-eval'"));assert.ok(!shell.headers['content-security-policy'].includes("'unsafe-eval'"));
     assert.equal((await request('/assets/app.js')).status, 200);
     assert.equal((await request('/assets/app.js', 'HEAD')).body, '');
     assert.equal((await request('/assets/escape.js')).status, 404);

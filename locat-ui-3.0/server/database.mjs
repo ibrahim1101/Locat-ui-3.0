@@ -1,3 +1,4 @@
+import { matrixBindingStore } from './matrixBinding.mjs';
 import { linkStore } from './link.mjs';
 import { privateStore } from './privateStore.mjs';
 import { sentinelStore } from './sentinel.mjs';
@@ -14,7 +15,7 @@ export function openDatabase(filename) {
   chmodSync(file, 0o600);
   sql.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;');
   const version = sql.prepare('PRAGMA user_version').get().user_version;
-  if (version > 11) { sql.close(); throw new Error('Database schema is newer than this application'); }
+  if (version > 12) { sql.close(); throw new Error('Database schema is newer than this application'); }
   if (version === 0) {
     sql.exec(`BEGIN IMMEDIATE;
       CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE,
@@ -97,11 +98,17 @@ export function openDatabase(filename) {
     try { sql.prepare('INSERT INTO serverMetadata VALUES (?,?)').run('serverId',randomUUID()); sql.exec('PRAGMA user_version = 11; COMMIT;'); }
     catch(error) { sql.exec('ROLLBACK'); throw error; }
   }
+  if(version<12)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE matrixAccounts(userId TEXT PRIMARY KEY REFERENCES users(id),matrixUserId TEXT NOT NULL UNIQUE,createdAt INTEGER NOT NULL);
+    CREATE TABLE matrixBindings(userId TEXT NOT NULL REFERENCES matrixAccounts(userId),linkDeviceId INTEGER NOT NULL REFERENCES linkDevices(id),matrixUserId TEXT NOT NULL,matrixDeviceId TEXT NOT NULL,publicKeys TEXT NOT NULL,tokenHash TEXT NOT NULL UNIQUE,sessionHash TEXT NOT NULL,expiresAt INTEGER NOT NULL,PRIMARY KEY(userId,linkDeviceId),UNIQUE(matrixUserId,matrixDeviceId));
+    PRAGMA user_version=12;COMMIT;`);
+  const link=linkStore(sql);
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
     serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
-    link: linkStore(sql),
+    link,
+    matrixBindings:matrixBindingStore(sql,link),
     sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
     acceptedContact: (a,b) => { const [low,high]=[a,b].sort(); return !!sql.prepare("SELECT 1 FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").get(low,high); },

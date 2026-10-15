@@ -108,7 +108,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 11); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 12); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/sentinel/incidents')).status, 401);
     const createdToken = await request('/api/sentinel/tokens', 'POST', {name:'Monitor'}, aliceCookie);
@@ -173,6 +173,10 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/link/devices')).status,401);
     assert.equal((await request('/api/link/devices','GET',undefined,aliceCookie)).status,403);
     const firstDevice=await registerDevice('First',aliceCookie),secondDevice=await registerDevice('Second',aliceCookie),foreignDevice=await registerDevice('Foreign',bobCookie);
+    assert.equal((await request('/api/link/matrix/status')).status,401);
+    assert.equal((await request('/api/link/matrix/status','GET',undefined,aliceCookie)).status,403);
+    const matrixStatus=await (await request('/api/link/matrix/status','GET',undefined,aliceCookie,firstDevice.headers)).json();assert.equal(matrixStatus.configured,false);assert.equal(matrixStatus.device,null);
+    assert.equal((await request('/_matrix/client/v3/account/whoami','GET',undefined,aliceCookie)).status,503);
     assert.equal((await request('/api/link/connectivity')).status,401);
     assert.equal((await request('/api/link/connectivity','GET',undefined,aliceCookie)).status,403);
     assert.deepEqual(await (await request('/api/link/connectivity','GET',undefined,aliceCookie,firstDevice.headers)).json(),{iceServers:[],hasRelay:false,expiresAt:null});

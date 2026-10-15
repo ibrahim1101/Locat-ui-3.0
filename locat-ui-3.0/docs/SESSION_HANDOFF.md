@@ -1,3 +1,11 @@
+# Latest checkpoint — Matrix binding and protected bootstrap
+
+Starting remote 36a2bca32a804263c8b3a19aa3e2dd2bb0fb6dae; fetched/merged. Added schema 12 Matrix account/device association, whoami/key validation, token/session hashes, explicit UI3 setup, protected same-origin bootstrap gateway and lazy SDK/WASM packaging. See MATRIX_ACCOUNT_BINDING.md for exact limits/security boundaries. Source validation passes 121 frontend tests/39 files, 29 backend tests, check/lint/build; separate real Synapse acceptance passes with fresh Matrix device binding before SDK key upload. No private conversations, automated provisioning, upstream revocation/recovery or public deployment enabled.
+
+Next: real browser CSP/WebAssembly/IndexedDB/exclusive-lock/reload acceptance, then deliberate account provisioning/token lifecycle, verification UX and upstream revocation/recovery integration before conversation APIs. Static gateway deliberately denies room/media mutation. The next browser-tooling batch is separate from these passed tests. Full roadmap remains open; continue independent work without routine permission questions.
+
+## Previous handoff history
+
 # Current handoff — Matrix feasibility checkpoint
 
 Starting remote bf0f2e1a13daa557b9eacda56171d5092edc17ed; fetched/merged. Active repo/branch remain ibrahim1101/Locat-ui-3.0, integration/locat-core. Original Locat is read-only. This checkpoint implements pinned Matrix SDK 44.0.0, a real isolated Synapse 1.163.0 acceptance harness and an unwired exclusive browser persistent-crypto lifecycle. See MATRIX_INTEGRATION.md for behavior, files, reproduction and limitations. Check/lint/build, 117 frontend tests/38 files, 25 backend tests and the separate real Matrix acceptance passed. npm production audit reports zero vulnerabilities. Live /api/messages stays 501; no public hosting or DNS changes.
