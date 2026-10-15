@@ -4,6 +4,7 @@ import { LiveMediaContext } from "./liveMedia";
 import { mediaKind, readMedia, writeMedia, type LocalMediaItem } from "./localMediaStore";
 import { mergeMedia, safeMediaUrl } from "./mediaSource";
 import {accountRequest} from "./accountRequest";
+import {createPhotoThumbnail,PHOTO_THUMBNAIL_BATCH_MS} from "./photoThumbnail";
 type ServerSnapshot = { items: LocalMediaItem[]; libraries: { name: string; count: number; available: boolean }[] };
 async function fetchServer(account:string,signal:AbortSignal): Promise<ServerSnapshot> {
   const data = await accountRequest("/api/media",account,undefined,signal);
@@ -16,6 +17,7 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
   const [local, setLocal] = useState<LocalMediaItem[]>([]);
   const [server, setServer] = useState<ServerSnapshot>({ items: [], libraries: [] });
   const [loading, setLoading] = useState(true);
+  const [imports,setImports]=useState(0);
   const [error, setError] = useState("");
   const [serverError, setServerError] = useState("");
   const items = useMemo(() => mergeMedia(local, server.items), [local, server]);
@@ -40,16 +42,27 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
     setError("");
     try { await operation(); } catch (error) { setError(error instanceof Error ? error.message : "Media operation failed"); }
   }
-  return <LiveMediaContext.Provider value={{ items, loading, error, serverError, serverLibraries: server.libraries,
+  return <LiveMediaContext.Provider value={{ items, loading, importing:imports>0, error, serverError, serverLibraries: server.libraries,
     refreshServer: async()=>{if(!authenticated){setServerError("Sign in to read server media");return;}await loadServer();},
     importFiles: files => run(async () => {
-      const additions: LocalMediaItem[] = [];
-      for (const file of Array.from(files)) {
-        const kind = mediaKind(file);
-        if (!kind) throw new Error(`Unsupported media file: ${file.name}`);
-        additions.push({ id: crypto.randomUUID(), kind, name: file.name, file, size: file.size, addedAt: Date.now(), album: "Imported", favorite: false, position: 0, source: "device" });
-      }
-      await writeMedia(account, additions); setLocal(old => [...old, ...additions]);
+      setImports(count=>count+1);
+      try{
+        let additions:LocalMediaItem[]=[];const started=performance.now();
+        for(const file of Array.from(files)){
+          const kind=mediaKind(file);if(!kind)throw new Error(`Unsupported media file: ${file.name}`);
+          const addedAt=Date.now(),remaining=PHOTO_THUMBNAIL_BATCH_MS-(performance.now()-started);
+          const thumbnail=kind==='photo'&&remaining>0?await createPhotoThumbnail(file,remaining):null;
+          additions.push({id:crypto.randomUUID(),kind,name:file.name,file,size:file.size,addedAt,album:'Imported',favorite:false,position:0,source:'device',...(thumbnail?{thumbnail}:{})});
+        }
+        try{await writeMedia(account,additions);}
+        catch(error){
+          if(!additions.some(item=>item.thumbnail))throw error;
+          // The first atomic transaction failed. Retry the same IDs once without the optional cache.
+          additions=additions.map(item=>{const original={...item};delete original.thumbnail;return original;});
+          await writeMedia(account,additions);
+        }
+        setLocal(old=>[...old,...additions]);
+      }finally{setImports(count=>count-1);}
     }),
     update: item => run(async () => {
       const saved = item.source === "server" ? { ...item, file: new Blob() } : item;

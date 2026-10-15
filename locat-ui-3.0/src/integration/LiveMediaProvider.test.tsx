@@ -1,11 +1,15 @@
 import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
-import {afterEach,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {LiveMediaProvider} from './LiveMediaProvider';
 import {useLiveMedia} from './liveMedia';
+import {writeMedia} from './localMediaStore';
+import {createPhotoThumbnail} from './photoThumbnail';
 vi.mock('../app/session',()=>({useSession:()=>({user:{id:'media-owner'},connection:{mode:'server'}})}));
-vi.mock('./localMediaStore',async()=>({...await vi.importActual('./localMediaStore'),readMedia:vi.fn(async()=>[])}));
+vi.mock('./localMediaStore',async()=>({...await vi.importActual('./localMediaStore'),readMedia:vi.fn(async()=>[]),writeMedia:vi.fn(async()=>{})}));
+vi.mock('./photoThumbnail',async()=>({...await vi.importActual('./photoThumbnail'),createPhotoThumbnail:vi.fn(async()=>null)}));
+beforeEach(()=>vi.clearAllMocks());
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
-function Probe(){const media=useLiveMedia();return <><button onClick={()=>void media.refreshServer?.()}>Refresh</button><p>{media.serverLibraries?.map(row=>row.name).join(',')}</p><p>{media.serverError}</p></>;}
+function Probe(){const media=useLiveMedia();return <><button onClick={()=>void media.refreshServer?.()}>Refresh</button><p>{media.serverLibraries?.map(row=>row.name).join(',')}</p><p>{media.serverError}</p><p>{media.error}</p><p>{media.importing?"Importing":"Idle"}</p><p>{media.items.map(item=>item.name).join(",")}</p><input type="file" aria-label="Test import" onChange={event=>{if(event.target.files)void media.importFiles(Array.from(event.target.files));}}/></>;}
 function deferred(){let resolve!:(value:Response)=>void;const promise=new Promise<Response>(done=>{resolve=done;});return {promise,resolve};}
 const snapshot=(name:string)=>new Response(JSON.stringify({items:[],libraries:[{name,count:0,available:true}]}),{status:200});
 it('sends the expected owner, cancels replaced loads and ignores late older refreshes',async()=>{
@@ -17,4 +21,9 @@ it('sends the expected owner, cancels replaced loads and ignores late older refr
 it('reports a failed refresh without replacing the last successful snapshot',async()=>{
  vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(snapshot('Existing library')).mockResolvedValueOnce(new Response(JSON.stringify({error:'Media access denied'}),{status:403})));
  render(<LiveMediaProvider><Probe/></LiveMediaProvider>);await screen.findByText('Existing library');fireEvent.click(screen.getByRole('button',{name:'Refresh'}));await screen.findByText('Media access denied');expect(screen.getByText('Existing library')).toBeVisible();
+});
+
+it('keeps originals and the same IDs when an optional thumbnail batch cannot be stored',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>snapshot('Existing library')));const thumbnail=new Blob(['cache'],{type:'image/webp'});vi.mocked(createPhotoThumbnail).mockResolvedValueOnce(thumbnail);vi.mocked(writeMedia).mockRejectedValueOnce(new DOMException('Storage full','QuotaExceededError')).mockResolvedValueOnce(undefined);
+ render(<LiveMediaProvider><Probe/></LiveMediaProvider>);await screen.findByText('Existing library');const file=new File(['original'],'original.png',{type:'image/png'});fireEvent.change(screen.getByLabelText('Test import'),{target:{files:[file]}});await screen.findByText('original.png');await waitFor(()=>expect(screen.getByText('Idle')).toBeVisible());expect(writeMedia).toHaveBeenCalledTimes(2);const first=vi.mocked(writeMedia).mock.calls[0][1][0],second=vi.mocked(writeMedia).mock.calls[1][1][0];expect(first.thumbnail).toBe(thumbnail);expect(second.thumbnail).toBeUndefined();expect(second.id).toBe(first.id);expect(second.file).toBe(file);expect(first.file).toBe(file);expect(writeMedia).toHaveBeenNthCalledWith(2,'media-owner',[second]);
 });

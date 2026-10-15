@@ -1,5 +1,5 @@
 export type LocalMediaKind = "video" | "audio" | "photo";
-export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; tags?: string[]; source?: "device" | "server"; streamUrl?: string };
+export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; tags?: string[]; thumbnail?: Blob; source?: "device" | "server"; streamUrl?: string };
 export function mediaKind(file: Pick<File, "type" | "name">): LocalMediaKind | null {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
@@ -37,11 +37,17 @@ export async function writeMedia(accountId: string, items: LocalMediaItem[], rem
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction("items", "readwrite");
       const store = tx.objectStore("items");
-      items.forEach(item => store.put(item));
-      if (removeId) store.delete(removeId);
+      let failure:unknown;
       tx.oncomplete = () => resolve();
-      tx.onabort = () => reject(tx.error ?? new Error("Media save aborted; browser storage may be full."));
-      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(failure ?? tx.error ?? new Error("Media save aborted; browser storage may be full."));
+      // Request errors abort by default; wait for that outcome before reporting failure.
+      tx.onerror = () => {};
+      try {
+        items.forEach(item => store.put(item));
+        if (removeId) store.delete(removeId);
+      } catch(error) {
+        failure=error;tx.abort();
+      }
     });
   } finally { db.close(); }
 }

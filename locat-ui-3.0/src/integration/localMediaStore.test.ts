@@ -19,3 +19,9 @@ it("persists metadata and isolates account libraries", async () => {
   await writeMedia(account, [], item.id);
   expect(await readMedia(account)).toEqual([]);
 });
+it('aborts the entire batch when a later item cannot be cloned',async()=>{
+ const account=crypto.randomUUID(),valid:LocalMediaItem={id:'valid',kind:'photo',name:'valid.png',file:new Blob(),size:0,addedAt:1,album:'Imported',favorite:false,position:0};
+ const existing={...valid,id:'existing',name:'existing.png'};await writeMedia(account,[existing]);
+ const invalid={...valid,id:'invalid',uncloneable:()=>{}} as LocalMediaItem;
+ await expect(writeMedia(account,[valid,{...existing,name:'changed.png'},invalid])).rejects.toThrow();const rows=await readMedia(account);expect(rows).toHaveLength(1);expect(rows[0]).toMatchObject({id:'existing',name:'existing.png'});
+});
