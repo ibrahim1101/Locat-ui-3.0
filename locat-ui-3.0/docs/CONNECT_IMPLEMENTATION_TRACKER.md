@@ -5,7 +5,7 @@
 | P0 existing stabilization | Auth, direct TLS, Host/Origin, proofs, UI3 account privacy/contact actions | Foundation API/TLS/negative/migration tests | Independent security review pending |
 | P1 homeserver connection | Discovery, instance UUID, manual browser server navigation, readiness retry, authenticated health WebSockets/session inspection; explicit proxy mode and optional deployment templates | Client/unit/real HTTP and HTTPS tests | Public/LAN hardware, Docker/ARM64 and DNS inactive/unverified |
 | P2 global identity | Local IDs preserved; qualified local addresses/search and browser device proof | Existing isolation/revocation tests | Authenticated global authority/key lifecycle pending |
-| P3 E2EE/offline | Preferred Matrix feasibility direction documented | No messaging crypto acceptance | Gate closed; no real private Send |
+| P3 E2EE/offline | Pinned SDK 44.0.0, real synthetic Synapse/Rust crypto and offline-delivery harness, unwired exclusive browser crypto lifecycle | Local synthetic encryption/verification/offline/tamper acceptance; full Locat integration pending | Gate closed; no real private Send |
 | P4 federation | Standards-based direction/dependencies documented | None | Not implemented |
 | P5 relay | Encrypted paired Remote signaling plus opt-in shared STUN/TURN configuration and temporary credential issuance | Existing API/crypto tests | Real TURN allocation/relay frames, quality diagnostics and native acceptance pending |
 | P6 native | Original source references only | Three-OS source CI does not certify native clients | Windows/Android/Pi physical testing pending |

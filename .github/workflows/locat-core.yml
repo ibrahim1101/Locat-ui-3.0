@@ -40,3 +40,20 @@ jobs:
       - run: npm run lint
       - run: npm run test:all
       - run: npm run build
+      - name: Set up isolated Matrix acceptance Python
+        if: runner.os == 'Linux'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: locat-ui-3.0/tools/matrix-test-requirements.txt
+      - name: Install pinned synthetic homeserver test environment
+        if: runner.os == 'Linux'
+        run: |
+          python -m venv "$RUNNER_TEMP/locat-matrix-python"
+          "$RUNNER_TEMP/locat-matrix-python/bin/pip" install -r tools/matrix-test-requirements.txt
+      - name: Real Matrix crypto and durable offline acceptance
+        if: runner.os == 'Linux'
+        env:
+          LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-matrix-python/bin/python
+        run: npm run test:matrix

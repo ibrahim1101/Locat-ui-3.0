@@ -1,3 +1,13 @@
+# Current handoff — Matrix feasibility checkpoint
+
+Starting remote bf0f2e1a13daa557b9eacda56171d5092edc17ed; fetched/merged. Active repo/branch remain ibrahim1101/Locat-ui-3.0, integration/locat-core. Original Locat is read-only. This checkpoint implements pinned Matrix SDK 44.0.0, a real isolated Synapse 1.163.0 acceptance harness and an unwired exclusive browser persistent-crypto lifecycle. See MATRIX_INTEGRATION.md for behavior, files, reproduction and limitations. Check/lint/build, 117 frontend tests/38 files, 25 backend tests and the separate real Matrix acceptance passed. npm production audit reports zero vulnerabilities. Live /api/messages stays 501; no public hosting or DNS changes.
+
+Next work: authorized Locat-to-Matrix account/device mapping and token lifecycle (never share/reuse Locat passwords), same-origin sidecar transport, browser verification/key persistence/crash-recovery/SAS or cross-signing, revocation, group/attachment/backup acceptance. Matrix standalone test uses ephemeral client keys and does not certify real-user chat. Synthetic server fixtures are loopback-only with insecure test-only registration, removed on exit. Do not deploy those fixtures. Linux CI step added but remote execution is not yet observed.
+
+Resume: inspect git status and actual remote HEAD, preserve any local work, read AGENTS.md, MATRIX_INTEGRATION.md and CONNECT_IMPLEMENTATION_TRACKER.md. App commands: npm ci; npm run check; npm run lint; npm run test:all; npm run build. Real acceptance: set LOCAT_TEST_SYNAPSE_PYTHON to a Python 3.12 venv installed with tools/matrix-test-requirements.txt, then npm run test:matrix. Current scratch interpreter is /workspace/scratch/8b3ebd8f9a46/synapse-test-env/bin/python. Continue the entire master roadmap; no routine feature-selection approval is needed. Preserve deployment/destructive boundaries.
+
+## Earlier checkpoints (historical)
+
 # Session handoff — 2026-10-15 Connect foundation
 
 Approved repository: ibrahim1101/Locat-ui-3.0; branch integration/locat-core; application locat-ui-3.0/. Original Locat remains read-only. Starting remote commit verified via connected GitHub: 6f4aff34a88848b9e058740359d2ac489670f715. This checkpoint's ending source commit is the development commit containing this file; resolve with git log -1 after fetching, and verify actual current remote before new edits. A publication checkpoint does not end the full authorized roadmap.

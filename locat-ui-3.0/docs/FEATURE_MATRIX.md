@@ -10,7 +10,7 @@ Implemented, tested, platform-verified and independently security-reviewed are s
 | Cinema/Music/Photos | Local/server media, conversion, playlists/EQ/crop/text | Unit/API/real FFmpeg | No physical codec/browser acceptance | Broader roadmap remains planned |
 | Vault/Secrets | Experimental client-encrypted records/files/backup | Crypto/API/UI | No native/independent review | Rotation/recovery/autofill expansion planned |
 | Sentinel | Scoped token webhooks, owned incidents/history/actions | API/unit/UI | No native agent acceptance | Monitoring/notifications/retention planned |
-| Messages/Calls | Contacts; no real private conversation/call flow | API/UI messaging gate enforced; legacy DB tests are not E2EE | None | Security gate closed |
+| Messages/Calls | Contacts; reviewed Matrix synthetic integration and unwired persistent-crypto lifecycle; no live conversation/call flow | API/UI messaging gate enforced; legacy DB tests are not E2EE | None | Security gate closed |
 | Remaining master ecosystem | Truthful unavailable live states | Some preview contract tests only | None | Planned; see full MASTER_ROADMAP.md sections A–AM |
 
 Original requirement register: ORIGINAL_LOCAT_REQUIREMENTS.md (all 49 retained). Current live provenance: PORTED_INTEGRATIONS.md. MASTER_ROADMAP.md preserves the complete expanded user directive including Identity, Wallet, emergency, health and all other modules; no feature is dropped by the connectivity reprioritization.
