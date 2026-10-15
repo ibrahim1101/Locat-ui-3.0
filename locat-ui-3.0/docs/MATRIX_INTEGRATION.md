@@ -2,7 +2,9 @@
 
 Pinned matrix-js-sdk 44.0.0 (Apache-2.0) is now a source dependency; package-lock locks its Rust crypto WASM dependency (18.9.0). Existing Locat source remains GPLv3; SDK/WASM licenses remain upstream Apache-2.0 and must be retained in distribution. The isolated test server is Synapse 1.163.0, a separate service with its own upstream licensing; this checkpoint does not bundle or deploy a production homeserver. No independent license/security audit is claimed.
 
-`tools/matrix-acceptance.mjs` creates only a new temporary synthetic homeserver with 127.0.0.1 listener, private room, two synthetic accounts/device keys and disabled federation/statistics. It has no parameter for an existing server, production account or Locat database. Its temporary insecure test-only registration configuration is generated outside the repository, never exposed, and removed after child-process shutdown. Do not adapt that registration configuration into a public deployment.
+`tools/matrix-acceptance.mjs` creates only a new temporary synthetic homeserver with 127.0.0.1 listener, private room, synthetic accounts/device keys and disabled federation/statistics. It has no parameter for an existing server, production account or Locat database. Its temporary insecure test-only registration configuration is generated outside the repository, never exposed, and removed after child-process shutdown. Do not adapt that registration configuration into a public deployment.
+
+The harness additionally runs production HTTPS server acceptance with real Locat authentication/device proof and managed provisioning; see MATRIX_HTTPS_ACCEPTANCE.md. The direct and synthetic-guard tests remain complementary protocol fixtures.
 
 Actual local acceptance passed:
 
