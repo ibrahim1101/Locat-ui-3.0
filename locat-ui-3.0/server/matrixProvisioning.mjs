@@ -4,14 +4,21 @@ const fail=(status,message)=>{throw Object.assign(new Error(message),{status});}
 export function createManagedMatrixProvisioner({provider,serviceToken,serverId,store}){
  if(!provider||typeof serviceToken!=='string'||!/^[A-Za-z0-9_-]{64,256}$/.test(serviceToken))throw new Error('Invalid managed Matrix configuration');
  const active=new Set();
- async function request(path,payload,signal){
-  let response;try{response=await fetch(provider.origin+path,{method:'POST',headers:{Authorization:'Bearer '+serviceToken,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload),redirect:'error',signal});}catch{fail(502,'Managed messaging service is unavailable');}
+ async function request(path,payload,signal,method='POST'){
+  let response;try{response=await fetch(provider.origin+path,{method,headers:{Authorization:'Bearer '+serviceToken,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload),redirect:'error',signal});}catch{fail(502,'Managed messaging service is unavailable');}
   const reader=response.body?.getReader();if(!reader)fail(502,'Invalid managed messaging response');const chunks=[];let size=0;
   try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>32768)fail(502,'Managed messaging response exceeds the limit');chunks.push(value);}}catch(error){if(error.status)throw error;fail(502,'Managed messaging response interrupted');}finally{await reader.cancel();}
   let value;try{value=JSON.parse(new TextDecoder('utf8',{fatal:true}).decode(Buffer.concat(chunks)));}catch{fail(502,'Invalid managed messaging response');}
   if(!value||typeof value!=='object'||Array.isArray(value))fail(502,'Invalid managed messaging response');return {status:response.status,ok:response.ok,value};
  }
- return {async cancel(userId,actor,token,recheck){
+ return {async revokeDevice(userId,actor,recheck){
+  const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const local=store.status(userId,actor);
+  if(local.matrixUserId!==identity.userId||local.device?.deviceId!==identity.deviceId)fail(409,'This device has no matching managed Matrix binding');
+  // Fail closed locally before asking the homeserver to remove all sessions for this device.
+  store.disconnect(userId,actor);
+  const result=await request('/_matrix/client/v3/devices/'+encodeURIComponent(identity.deviceId)+'?user_id='+encodeURIComponent(identity.userId),{},AbortSignal.timeout(10000),'DELETE');
+  if(!result.ok)fail(502,'Locat gateway is blocked; Matrix device revocation was not confirmed');recheck();
+ },async cancel(userId,actor,token,recheck){
   if(typeof token!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(token)||token===serviceToken)fail(400,'Invalid managed device token');
   const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const remote=await provider.inspect(token);recheck();if(remote.userId!==identity.userId||remote.deviceId!==identity.deviceId)fail(403,'Managed device token belongs to another identity');await provider.logout(token);recheck();
  },async provision(userId,actor,recheck){
