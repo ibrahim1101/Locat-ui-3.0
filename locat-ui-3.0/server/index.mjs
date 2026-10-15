@@ -64,6 +64,11 @@ async function body(req, maximum = 16384) {
   try { return JSON.parse(new TextDecoder("utf-8", {fatal:true}).decode(Buffer.concat(chunks))); }
   catch { throw Object.assign(new Error("Invalid JSON or UTF-8"), {status:400}); }
 }
+async function authenticatedBody(req,user,maximum){
+  const input=await body(req,maximum);
+  if(req.aborted||sessionUser(req)?.id!==user.id)throw Object.assign(new Error('Session changed during account operation'),{status:401});
+  return input;
+}
 function visibleTo(user,viewerId,policy) { return user.id===viewerId || (!db.blocked(user.id,viewerId) && (policy==='everyone' || policy==='contacts' && db.acceptedContact(user.id,viewerId))); }
 function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,globalIdentity:accountIdentity(user,config.origin,db.serverId),bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
 function cookie(req) {
@@ -142,7 +147,7 @@ async function handle(req, res) {
     if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
-    const input = await body(req);
+    const input = await authenticatedBody(req,user);
     if (!input || typeof input.userId !== "string" || !/^[a-f0-9]{32}$/.test(input.userId) || input.userId === user.id) return json(res, 400, { error: "Invalid contact" });
     if (!db.userById(input.userId)) return json(res, 404, { error: "Contact unavailable" });
     if (url.pathname === "/api/contacts/block") {
@@ -170,7 +175,7 @@ async function handle(req, res) {
   if(url.pathname==='/api/profile/privacy'&&['GET','POST'].includes(req.method)){
     const user=sessionUser(req);if(!user)return json(res,401,{error:'Not authenticated'});
     if(req.method==='POST'){
-      if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});const input=await body(req);
+      if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});const input=await authenticatedBody(req,user);
       if(!input||Object.keys(input).some(key=>!['profileVisibility','usernameVisibility','allowContactRequests'].includes(key))||!['everyone','contacts','nobody'].includes(input.profileVisibility)||!['everyone','contacts','nobody'].includes(input.usernameVisibility)||typeof input.allowContactRequests!=='boolean')return json(res,400,{error:'Invalid privacy settings'});
       db.savePrivacy(user.id,input.profileVisibility,input.usernameVisibility,input.allowContactRequests);db.audit(user.id,'profile.privacy.changed');
     }
@@ -186,7 +191,7 @@ async function handle(req, res) {
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
     if (req.method === "GET") return json(res, 200, { preferences: db.preferences(user.id) });
-    const input = await body(req);
+    const input = await authenticatedBody(req,user);
     const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"] };
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.entries(input).some(([key, value]) => !allowed[key]?.includes(value))) return json(res, 400, { error: "Invalid preferences" });
     const preferences = { ...db.preferences(user.id), ...input };
@@ -203,7 +208,7 @@ async function handle(req, res) {
     if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
-    const input = await body(req);
+    const input = await authenticatedBody(req,user);
     if (!input || typeof input !== "object" || Array.isArray(input)) return json(res, 400, { error: "Invalid request" });
     if (url.pathname === "/api/auth/sessions/revoke") {
       if (typeof input.id !== "string" || !/^[a-f0-9]{64}$/.test(input.id)) return json(res, 400, { error: "Invalid session ID" });

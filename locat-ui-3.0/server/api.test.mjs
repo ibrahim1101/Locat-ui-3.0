@@ -7,6 +7,9 @@ import { mkdtemp, rm, mkdir, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
+import {request as httpRequest} from 'node:http';
+import {randomBytes,createHash} from 'node:crypto';
+import {openDatabase} from './database.mjs';
 
 async function freePort() {
   const server = createServer();
@@ -320,6 +323,26 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
     assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie)).status, 401);
+    // Keep a real request body incomplete while revoking its authenticated session.
+    // Use fixture-owned sessions to avoid interfering with login rate-limit acceptance.
+    const inspection=openDatabase(join(dir,'auth.sqlite'));
+    try{
+      const aliceId=inspection.userByName('alice').id,before=inspection.userById(bob.id),preferences=inspection.preferences(bob.id);
+      const cases=[
+        ['/api/profile',{displayName:'Revoked late profile',bio:'Must not persist'}],
+        ['/api/profile/privacy',{profileVisibility:'nobody',usernameVisibility:'nobody',allowContactRequests:false}],
+        ['/api/preferences',{theme:'daylight'}],
+        ['/api/contacts/block',{userId:aliceId,blocked:true}],
+        ['/api/auth/sessions/revoke',{id:createHash('sha256').update(bobCookie.split('=')[1]).digest('hex')}],
+      ];
+      for(const [path,input] of cases){
+        const token=randomBytes(32).toString('hex'),hash=createHash('sha256').update(token).digest('hex'),encoded=JSON.stringify(input);
+        inspection.addSession(hash,bob.id,Date.now()+60000);
+        let pending;const response=new Promise((resolve,reject)=>{pending=httpRequest(origin+path,{method:'POST',headers:{Origin:origin,Cookie:'locat_session='+token,'Content-Type':'application/json','Content-Length':Buffer.byteLength(encoded)}},res=>{res.resume();res.once('end',()=>resolve(res.statusCode));});pending.on('error',reject);pending.setTimeout(5000,()=>pending.destroy(new Error('Paused account request timed out')));});
+        try{pending.write(encoded.slice(0,1));await new Promise(resolve=>setTimeout(resolve,50));inspection.revokeSession(hash);pending.end(encoded.slice(1));assert.equal(await response,401,path+' must reject a session revoked during body reading');}finally{pending.destroy();}
+      }
+      const after=inspection.userById(bob.id);for(const key of ['displayName','bio','profileVisibility','usernameVisibility','allowContactRequests'])assert.equal(after[key],before[key]);assert.deepEqual(inspection.preferences(bob.id),preferences);assert.equal((await request('/api/auth/me','GET',undefined,bobCookie)).status,200,'Revoked actor must not revoke another owned session');
+    }finally{inspection.close();}
     let limited;
     for (let i = 0; i < 25; i++) limited = await request("/api/auth/login", "POST", { username: "x", password: "x" });
     assert.equal(limited.status, 429);
