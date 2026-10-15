@@ -1,3 +1,4 @@
+import {incidentPage,parseIncidentQuery} from './sentinelQueries.mjs';
 /** Account-owned Sentinel incidents. Tokens store only a SHA-256 digest. */
 import { createHash, randomBytes } from 'node:crypto';
 import { createRateLimiter } from './rateLimit.mjs';
@@ -61,7 +62,8 @@ export function sentinelStore(sql) {
     },
     revokeToken: (userId,id) => sql.prepare('UPDATE sentinelTokens SET revokedAt=? WHERE userId=? AND id=? AND revokedAt IS NULL').run(Date.now(),userId,id).changes,
     authenticate: token => sql.prepare('SELECT id,userId FROM sentinelTokens WHERE hash=? AND revokedAt IS NULL').get(tokenHash(token)),
-    incidents: (userId, status) => sql.prepare('SELECT * FROM sentinelIncidents WHERE userId=? AND (? IS NULL OR status=?) ORDER BY updatedAt DESC,id DESC LIMIT 100').all(userId,status,status),
+    incidents: (userId,status) => incidentPage(sql,userId,{status:status||''}).incidents,
+    incidentPage: (userId,options) => incidentPage(sql,userId,options),
     detail(userId,id) {
       const incident = sql.prepare('SELECT * FROM sentinelIncidents WHERE userId=? AND id=?').get(userId,id);
       return incident ? { incident, events: sql.prepare('SELECT id,action,note,createdAt FROM sentinelEvents WHERE incidentId=? ORDER BY id DESC LIMIT 200').all(id) } : null;
@@ -128,9 +130,7 @@ export function createSentinelHandler({store,sessionUser,body,json}) {
       if(!store.revokeToken(user.id,input.id)) fail(404,'Active token not found');
       json(res,200,{ok:true});
     } else if(url.pathname === '/api/sentinel/incidents' && req.method === 'GET') {
-      const status=url.searchParams.get('status');
-      if(status && !['open','acknowledged','resolved'].includes(status)) fail(400,'Invalid status');
-      json(res,200,{incidents:store.incidents(user.id,status || null)});
+      json(res,200,store.incidentPage(user.id,parseIncidentQuery(url.searchParams)));
     } else {
       const match=/^\/api\/sentinel\/incidents\/([a-f0-9]{32})$/.exec(url.pathname);
       if(!match) fail(404,'Not found');

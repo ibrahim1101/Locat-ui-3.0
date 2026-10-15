@@ -1,3 +1,9 @@
+Sentinel paging validation: check, lint, all 191 frontend tests / 50 files, all 93 backend tests and production build passed. Native/browser/vendor acceptance and the complete master roadmap remain open.
+
+## Latest — Sentinel server-filtered incident history
+
+Added owner-bound incident search/status/severity/exact-source filters and timestamp+ID cursor pages beyond the newest-100 cutoff. API retains incidents and adds nextCursor, validates all filters/cursors/page limits, rejects duplicate/foreign/unknown selectors, and uses literal SQL parameters. New UI3 Incident panel applies explicit filters, loads 25 records/older pages, deduplicates IDs, cancels stale reads, retains failed-page data, bounds requests and guards detail/action generations. Parent Sentinel is keyed by account, blocks local-mode fetching, and guards duplicate token creation/late token-sheet responses. Account activity and integrations remain separate real-data sections. Initial lint reported two cleanup-ref warnings; a stable invalidation callback removed them. SENTINEL_INCIDENTS.md describes mutable-order refresh semantics, existing detail/token limits and browser/native/vendor/monitoring gaps. No schema migration, retention deletion or public activation.
+
 Private-request validation: check, lint, all 185 frontend tests / 49 files, all 89 backend tests and production build passed. Network handling changed only in Vault/Secrets; actual browser/native acceptance remains pending.
 
 ## Latest — bounded private requests and recoverable status loading

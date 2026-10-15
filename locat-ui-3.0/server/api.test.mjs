@@ -133,6 +133,9 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request(incidentPath,'POST',{action:'acknowledge'},aliceCookie)).status,409);
     assert.equal((await request(incidentPath,'POST',{action:'reopen'},aliceCookie)).status,200);
     assert.equal((await request(incidentPath,'POST',{action:'note',note:'Investigating'},aliceCookie)).status,200);
+    for(const query of ['userId=foreign','status=open&status=resolved','severity=urgent','limit=101','before=invalid'])assert.equal((await request('/api/sentinel/incidents?'+query,'GET',undefined,aliceCookie)).status,400);
+    const filteredAlerts=await(await request('/api/sentinel/incidents?limit=1&status=open','GET',undefined,aliceCookie)).json();
+    assert.equal(filteredAlerts.incidents.length,1);assert.ok('nextCursor' in filteredAlerts);
     const detail=await (await request(incidentPath,'GET',undefined,aliceCookie)).json();
     assert.equal(detail.incident.status,'open'); assert.equal(detail.events[0].note,'Investigating');
     assert.equal((await request('/api/sentinel/tokens/revoke','POST',{id:integration.id},bobCookie)).status,404);
