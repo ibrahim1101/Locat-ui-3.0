@@ -1,3 +1,9 @@
+## Browser paused-inventory cleanup ordering
+
+Workflow 38784072597 at 353ca2b5a28302860aff548a95aa3917142dc4c4 / browser job 116591420150 passed six scenarios and reached the Photos native-thumbnail and delayed-inventory assertions, then failed with route.continue: Route is already handled. The fixture released its paused request concurrently with removing that handler. Cleanup now releases the gate, awaits the handler's completion and only then removes it. Any route error is retained and rethrown after successful assertions; an earlier assertion failure keeps its original error. Observation of the paused request is bounded to ten seconds. No application policy, media behavior or success assertion was weakened. The later native resize assertion was not reached in the failed run, and a complete Photos pass still requires observed CI.
+
+Production source remains locally validated by TypeScript, lint, 250 frontend tests / 62 files, 105 backend tests and build. Browser discovery lists seven scenarios; this fixture-only correction requires execution of the actual runner.
+
 ## Local media readiness independent of server inventory
 
 Device readiness now follows the initial account-scoped IndexedDB read rather than waiting for the authenticated server request. Server inventory has a separate loading status, and its initial unknown snapshot is no longer presented as a confirmed empty configuration. Local files/imports remain available while inventory is pending; new imports await initial local hydration before adding their results, preventing the initial snapshot from replacing those additions. Local-mode server views explain the sign-in requirement. Existing expected-owner headers, 15-second network/body deadlines, cancellation and obsolete-refresh suppression remain unchanged.
