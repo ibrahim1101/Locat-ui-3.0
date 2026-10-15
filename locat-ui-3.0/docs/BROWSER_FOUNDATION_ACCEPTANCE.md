@@ -27,7 +27,7 @@ Only the isolated browser context permits the generated self-signed certificate 
 
 The browser-foundation job installs Chromium/dependencies, builds the app and runs this test. It uploads only the runner JSON report for seven days; no production dataset or operator credentials are used. A successful source/unit build or test discovery is not evidence that this job ran. Record the exact successful workflow/commit when observed before claiming browser execution.
 
-At introduction, local checks include fixture HTTPS readiness, script syntax and one discovered test. The local environment has no Chromium executable; previous browser downloads returned invalid artifacts, so browser execution is delegated to CI rather than simulated. Full browser acceptance remains pending until a successful run is actually observed.
+At introduction, local checks include fixture HTTPS readiness, script syntax and one discovered test. The local environment has no Chromium executable; previous browser downloads returned invalid artifacts, so browser execution is delegated to CI rather than simulated. The initial foundation test has now passed in actual Chromium; the exact evidence follows. Broader browser acceptance remains open.
 
 Primary tooling references: https://playwright.dev/docs/intro and https://playwright.dev/docs/ci-intro.
 
@@ -36,3 +36,11 @@ Primary tooling references: https://playwright.dev/docs/intro and https://playwr
 Workflow 38745774227 on commit 4819b99 successfully installed Chromium and executed the test against the built app. It failed at synthetic account creation (HTTP 400): the fixture used browser.<suffix>, while server usernames accept only 3–32 lowercase letters/digits/underscores. The fixture now uses browser_<suffix> and reports the API error on a status assertion. The registration hint was corrected to the same server policy. This is an observed failed browser run, not acceptance success; later successful evidence must identify its exact commit/run.
 
 The login recovery notice was also corrected to distinguish existing room-history import/export from planned complete account/device identity recovery. Account creation no longer claims that all private-tool keys were already created; setup remains explicit. No authentication validation was weakened.
+
+## Observed successful foundation run
+
+Commit 523ffd4d5e05cf5cfe760e7aa983a35171d8a50e, workflow 38746294768, browser-foundation job 116460712411 completed successfully: one Chromium test passed (4.4 seconds). The Linux, Windows and macOS verification jobs in that same workflow also completed successfully. Evidence: https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/38746294768 . This certifies only the exercised foundation flow and the isolated certificate exception described above.
+
+## Browser-to-browser Link acceptance extension
+
+A second isolated test uses two browser contexts with independent native IndexedDB identities under one synthetic account. It renames the devices, compares the actual SAS values, confirms that one approval cannot enable Send, approves on the second device, transfers/decrypts text and a three-chunk binary file, compares downloaded bytes exactly, completes deliveries and revokes the second key. Refresh and reload must reject that revoked key. Captured chunk writes exclude the synthetic message plaintext. This is an executable acceptance target until its own successful Chromium run is observed. It does not establish LAN discovery, native clients, interrupted upload resume, Matrix verification or physical-device compatibility.
