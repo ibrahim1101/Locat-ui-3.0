@@ -1,4 +1,4 @@
-import {encryptHistoryExport} from './matrixHistory';
+import {encryptHistoryExport,decryptHistoryFile} from './matrixHistory';
 import {BrowserLinkClient} from './linkClient';
 import type {MatrixClient} from 'matrix-js-sdk';
 
@@ -14,8 +14,12 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
  const link=new BrowserLinkClient(binding.accountId);
  const lifecycle=new AbortController();
  let client:MatrixClient|null=null,closed=false,release:()=>void=()=>{};
+ let historyBusy=false;
+ async function history<T>(operation:()=>Promise<T>){if(closed)throw new Error('Messaging device closed');if(historyBusy)throw new Error('Another history-key operation is running.');historyBusy=true;try{return await operation();}finally{historyBusy=false;}}
+ const pendingCrypto=new Set<Promise<unknown>>();
+ async function runCrypto<T>(operation:()=>Promise<T>){if(closed)throw new Error('Messaging device closed');const task=Promise.resolve().then(()=>{if(closed)throw new Error('Messaging device closed');return operation();});pendingCrypto.add(task);try{return await task;}finally{pendingCrypto.delete(task);}}
  const held=new Promise<void>(resolve=>{release=resolve;});
- type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;revoke():Promise<void>;exportHistory(passphrase:string):Promise<string>;close():Promise<void>};
+ type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;revoke():Promise<void>;exportHistory(passphrase:string):Promise<string>;importHistory(encrypted:string,passphrase:string):Promise<number>;close():Promise<void>};
  let ready:(result:Result)=>void=()=>{},failed:(error:unknown)=>void=()=>{};
  const initialized=new Promise<Result>((resolve,reject)=>{ready=resolve;failed=reject;});
  const cancel=()=>{closed=true;lifecycle.abort();release();};signal?.addEventListener('abort',cancel,{once:true});
@@ -38,9 +42,9 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
    crypto.globalBlacklistUnverifiedDevices=true;
    const publicKeys=await crypto.getOwnDeviceKeys();if(closed)throw new Error('Messaging initialization cancelled.');
    if(binding.expectedPublicKeys&&(publicKeys.ed25519!==binding.expectedPublicKeys.ed25519||publicKeys.curve25519!==binding.expectedPublicKeys.curve25519))throw new Error('Stored messaging keys do not match this device binding. Recovery is required; existing keys were not replaced.');
-   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async exportHistory(passphrase){if(closed)throw new Error('Messaging device closed');const keys=await crypto.exportRoomKeysAsJson();if(closed)throw new Error('Messaging device closed');if(keys==='[]')throw new Error('There are no room history keys to export yet.');return encryptHistoryExport(keys,passphrase,lifecycle.signal);},async revoke(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/logout',{accessToken:binding.accessToken});},async close(){cancel();await task;}});
+   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async exportHistory(passphrase){return history(async()=>{if(closed)throw new Error('Messaging device closed');const keys=await runCrypto(()=>crypto.exportRoomKeysAsJson());if(closed)throw new Error('Messaging device closed');if(keys==='[]')throw new Error('There are no room history keys to export yet.');return encryptHistoryExport(keys,passphrase,lifecycle.signal);});},async importHistory(encrypted,passphrase){return history(async()=>{if(closed)throw new Error('Messaging device closed');const value=await decryptHistoryFile(encrypted,passphrase,lifecycle.signal);if(closed)throw new Error('History import cancelled');await runCrypto(()=>crypto.importRoomKeysAsJson(value.json));if(closed)throw new Error('History import completed locally while the device was closing; reopen setup to check its state.');return value.entries;});},async revoke(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/logout',{accessToken:binding.accessToken});},async close(){cancel();await task;}});
    await held;
-  }finally{closed=true;client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
+  }finally{closed=true;await Promise.allSettled([...pendingCrypto]);client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
  });
  void task.catch(error=>{closed=true;signal?.removeEventListener('abort',cancel);failed(error);});
  return initialized;

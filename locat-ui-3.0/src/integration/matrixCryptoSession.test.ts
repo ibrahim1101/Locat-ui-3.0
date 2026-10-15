@@ -1,7 +1,8 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {openMatrixCryptoSession} from './matrixCryptoSession';
-const {create,init,stop,crypto,linkRequest,linkClose}=vi.hoisted(()=>({create:vi.fn(),init:vi.fn(),stop:vi.fn(),linkRequest:vi.fn().mockResolvedValue({}),linkClose:vi.fn(),crypto:{globalBlacklistUnverifiedDevices:false,getOwnDeviceKeys:vi.fn(async()=>({ed25519:'synthetic-public-signing',curve25519:'synthetic-public-identity'}))}}));
+const {create,init,stop,crypto,linkRequest,linkClose,decryptHistory}=vi.hoisted(()=>({decryptHistory:vi.fn(),create:vi.fn(),init:vi.fn(),stop:vi.fn(),linkRequest:vi.fn().mockResolvedValue({}),linkClose:vi.fn(),crypto:{importRoomKeysAsJson:vi.fn(),globalBlacklistUnverifiedDevices:false,getOwnDeviceKeys:vi.fn(async()=>({ed25519:'synthetic-public-signing',curve25519:'synthetic-public-identity'}))}}));
 vi.mock('./linkClient',()=>({BrowserLinkClient:class{connect=async()=>({token:'synthetic-proof'});request=linkRequest;close=linkClose;}}));
+vi.mock('./matrixHistory',()=>({decryptHistoryFile:decryptHistory,encryptHistoryExport:vi.fn()}));
 vi.mock('matrix-js-sdk',()=>({createClient:create}));
 const binding={accountId:'a'.repeat(32),userId:'@alice:locat.test',deviceId:'DEVICE',accessToken:'synthetic-test-token'};
 beforeEach(()=>{vi.clearAllMocks();init.mockResolvedValue(undefined);create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop});vi.stubGlobal('isSecureContext',true);vi.stubGlobal('indexedDB',{});});
@@ -31,4 +32,10 @@ it('checks returning device keys against existing pins before exposing a bindabl
  const value=await openMatrixCryptoSession({...binding,expectedPublicKeys});await value.close();
  await expect(openMatrixCryptoSession({...binding,expectedPublicKeys:{...expectedPublicKeys,ed25519:'changed-signing-key'}})).rejects.toThrow('Recovery is required');
  expect(stop).toHaveBeenCalledTimes(2);expect(linkRequest).not.toHaveBeenCalled();
+});
+
+it('holds the crypto store lock until an in-progress history import settles during close',async()=>{
+ vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
+ decryptHistory.mockResolvedValue({json:'[{}]',entries:1});let finish:()=>void=()=>{};crypto.importRoomKeysAsJson.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+ const value=await openMatrixCryptoSession(binding);const importing=value.importHistory('synthetic encrypted file','synthetic-passphrase');const rejected=expect(importing).rejects.toThrow('completed locally');await vi.waitFor(()=>expect(crypto.importRoomKeysAsJson).toHaveBeenCalled());const closing=value.close();expect(stop).not.toHaveBeenCalled();finish();await rejected;await closing;expect(stop).toHaveBeenCalledOnce();
 });

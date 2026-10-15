@@ -1,0 +1,13 @@
+import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {Button,TextField} from '../ui';
+import {MAX_HISTORY_FILE} from '../../shared/matrixHistoryFormat.mjs';
+export function MatrixHistoryImport({onImportHistory,disabled=false}:{onImportHistory:(encrypted:string,passphrase:string)=>Promise<number>;disabled?:boolean}){
+ const [file,setFile]=useState<File|null>(null),[passphrase,setPassphrase]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ async function submit(event:FormEvent){event.preventDefault();if(!file||busy)return;setBusy(true);setError('');setNotice('');
+  try{if(file.size>MAX_HISTORY_FILE)throw new Error('Choose a history file of at most 32 MiB.');const encrypted=await file.text();if(!mounted.current)return;const count=await onImportHistory(encrypted,passphrase);if(mounted.current)setNotice(`Processed ${count} history-key ${count===1?'entry':'entries'} locally. Some may already have been stored.`);}
+  catch(error){if(mounted.current)setError(error instanceof Error?error.message:'History-key import failed.');}
+  finally{if(mounted.current){setPassphrase('');setFile(null);setBusy(false);}}
+ }
+ return <form onSubmit={submit} className="space-y-3 rounded-xl bg-s2 p-4 hairline"><h4 className="font-semibold">Import encrypted history keys</h4><p className="text-xs text-ink-3">Choose a trusted standard Matrix key file. Decryption and import stay in this browser. Imported history keys do not verify people or devices, restore your device identity, or grant room access. An import already being stored may finish if you close setup.</p><label className="block cursor-pointer rounded-xl bg-s1 p-3 text-sm font-semibold hairline">Choose encrypted key file · up to 32 MiB<input type="file" accept="text/plain,.txt" aria-label="Encrypted Matrix history file" className="sr-only" disabled={disabled||busy} onChange={event=>{const selected=event.target.files?.[0];event.target.value='';setError('');setNotice('');if(selected&&selected.size>MAX_HISTORY_FILE){setFile(null);setError('Choose a history file of at most 32 MiB.');}else setFile(selected??null);}}/></label>{file&&<p className="break-all text-xs text-ink-3">{file.name}</p>}<TextField label="History file passphrase" value={passphrase} onChange={event=>setPassphrase(event.target.value)} reveal autoComplete="off" required maxLength={1024}/><Button type="submit" disabled={disabled||busy||!file}>Decrypt and import history keys</Button>{error&&<p role="alert" className="text-sm text-danger">{error}</p>}{notice&&<p role="status" className="text-sm text-ember">{notice}</p>}</form>;
+}

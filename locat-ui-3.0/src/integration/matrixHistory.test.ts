@@ -12,3 +12,11 @@ it('returns only a bounded standard armored export and terminates its worker',as
  const pending=encryptHistoryExport('[]','synthetic-export-passphrase');receive({data:{encrypted:'-----BEGIN MEGOLM SESSION DATA-----\nsynthetic\n-----END MEGOLM SESSION DATA-----'}});expect(await pending).toContain('BEGIN MEGOLM');expect(terminate).toHaveBeenCalledOnce();
  const rejected=encryptHistoryExport('[]','synthetic-export-passphrase');receive({data:{encrypted:'plaintext keys'}});await expect(rejected).rejects.toThrow('could not be encrypted');
 });
+
+it('rejects excessive import derivation cost before worker creation',async()=>{
+ const {decryptHistoryFile}=await import('./matrixHistory');const bytes=Buffer.alloc(80);bytes[0]=1;bytes.writeUInt32BE(0xffffffff,33);const armored='-----BEGIN MEGOLM SESSION DATA-----\n'+bytes.toString('base64')+'\n-----END MEGOLM SESSION DATA-----';const construct=vi.fn();vi.stubGlobal('Worker',construct);await expect(decryptHistoryFile(armored,'synthetic-passphrase')).rejects.toThrow('derivation cost');expect(construct).not.toHaveBeenCalled();
+});
+it('validates decrypted worker output before exposing history keys to the local importer',async()=>{
+ const {decryptHistoryFile}=await import('./matrixHistory');const bytes=Buffer.alloc(80);bytes[0]=1;bytes.writeUInt32BE(500000,33);const armored='-----BEGIN MEGOLM SESSION DATA-----\n'+bytes.toString('base64')+'\n-----END MEGOLM SESSION DATA-----';let receive:((event:{data:unknown})=>void)|null=null;const terminate=vi.fn();vi.stubGlobal('Worker',class{terminate=terminate;set onmessage(value:NonNullable<typeof receive>){receive=value;}postMessage(){}});
+ const pending=decryptHistoryFile(armored,'synthetic-passphrase');const rejected=expect(pending).rejects.toThrow('could not be decrypted');await vi.waitFor(()=>expect(receive).not.toBeNull());receive!({data:{json:'{}'}});await rejected;expect(terminate).toHaveBeenCalledOnce();
+});
