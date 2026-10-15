@@ -1,0 +1,12 @@
+import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {Button,TextField} from '../ui';
+export function MatrixHistoryExport({onExportHistory,disabled=false}:{onExportHistory:(passphrase:string)=>Promise<string>;disabled?:boolean}){
+ const [passphrase,setPassphrase]=useState(''),[confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ async function submit(event:FormEvent){event.preventDefault();setError('');setNotice('');if(passphrase!==confirmation){setError('The export passphrases do not match.');return;}setBusy(true);
+  try{const encrypted=await onExportHistory(passphrase);if(!mounted.current)return;const url=URL.createObjectURL(new Blob([encrypted],{type:'text/plain;charset=utf-8'}));try{const link=document.createElement('a');link.href=url;link.download='locat-matrix-history-keys.txt';document.body.append(link);try{link.click();}finally{link.remove();}setNotice('Encrypted history key download prepared. Keep its passphrase separately.');}finally{const revoke=URL.revokeObjectURL.bind(URL);setTimeout(()=>revoke(url),1000);}}
+  catch(error){if(mounted.current)setError(error instanceof Error?error.message:'History key export failed.');}
+  finally{if(mounted.current){setPassphrase('');setConfirmation('');setBusy(false);}}
+ }
+ return <form onSubmit={submit} className="space-y-3 rounded-xl bg-s2 p-4 hairline"><h4 className="font-semibold">Encrypted history key file</h4><p className="text-xs text-ink-3">Exports room history keys held by this browser using the standard Matrix key-file format. The file and its passphrase can unlock that history. This does not back up your device identity, verification or account access. History import and full recovery are still being integrated.</p><TextField label="History export passphrase" value={passphrase} onChange={event=>setPassphrase(event.target.value)} reveal autoComplete="new-password" minLength={12} maxLength={1024} required/><TextField label="Confirm history export passphrase" value={confirmation} onChange={event=>setConfirmation(event.target.value)} reveal autoComplete="new-password" minLength={12} maxLength={1024} required/><Button type="submit" disabled={disabled||busy}>Download encrypted history keys</Button>{error&&<p role="alert" className="text-sm text-danger">{error}</p>}{notice&&<p role="status" className="text-sm text-ember">{notice}</p>}</form>;
+}

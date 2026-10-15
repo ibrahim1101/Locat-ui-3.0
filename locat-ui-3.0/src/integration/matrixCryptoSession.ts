@@ -1,21 +1,24 @@
+import {encryptHistoryExport} from './matrixHistory';
 import {BrowserLinkClient} from './linkClient';
 import type {MatrixClient} from 'matrix-js-sdk';
 
-export type MatrixSessionBinding={accountId:string;userId:string;deviceId:string;accessToken:string};
-/** Experimental lifecycle foundation. Not exposed as live messaging; account mapping and verification UI are pending. */
+export type MatrixPublicKeys={ed25519:string;curve25519:string};
+export type MatrixSessionBinding={accountId:string;userId:string;deviceId:string;accessToken:string;expectedPublicKeys?:MatrixPublicKeys};
+/** Experimental device setup lifecycle. Conversations and peer verification remain gated. */
 export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signal?:AbortSignal){
  if(!window.isSecureContext||!navigator.locks||!window.indexedDB)throw new Error('Persistent messaging keys require a secure context, IndexedDB and exclusive browser locks.');
  if(!/^[a-f0-9]{32}$/.test(binding.accountId)||!/^@[^\s:]{1,255}:[^\s]{1,255}$/.test(binding.userId)||!binding.deviceId||binding.deviceId.length>255||!binding.accessToken||binding.accessToken.length>8192)throw new Error('Invalid authorized messaging session binding.');
  if(signal?.aborted)throw new Error('Messaging initialization cancelled.');
- // Matrix tokens are supplied by future authorized account mapping; never reuse a Locat password/cookie.
+ // Matrix tokens are supplied by authorized account mapping; never reuse a Locat password/cookie.
  const scope=JSON.stringify([window.location.origin,binding.accountId,binding.userId,binding.deviceId]);
  const link=new BrowserLinkClient(binding.accountId);
+ const lifecycle=new AbortController();
  let client:MatrixClient|null=null,closed=false,release:()=>void=()=>{};
  const held=new Promise<void>(resolve=>{release=resolve;});
- type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;revoke():Promise<void>;close():Promise<void>};
+ type Result={accountId:string;userId:string;deviceId:string;publicKeys:{ed25519:string;curve25519:string};readonly closed:boolean;bind():Promise<void>;revoke():Promise<void>;exportHistory(passphrase:string):Promise<string>;close():Promise<void>};
  let ready:(result:Result)=>void=()=>{},failed:(error:unknown)=>void=()=>{};
  const initialized=new Promise<Result>((resolve,reject)=>{ready=resolve;failed=reject;});
- const cancel=()=>{closed=true;release();};signal?.addEventListener('abort',cancel,{once:true});
+ const cancel=()=>{closed=true;lifecycle.abort();release();};signal?.addEventListener('abort',cancel,{once:true});
  const task=navigator.locks.request('locat-ui3-matrix:'+scope,{ifAvailable:true},async lock=>{
   if(!lock)throw new Error('This messaging device is already open in another tab.');
   try{
@@ -34,7 +37,8 @@ export async function openMatrixCryptoSession(binding:MatrixSessionBinding,signa
    const crypto=client.getCrypto();if(!crypto)throw new Error('Reviewed messaging encryption is unavailable.');
    crypto.globalBlacklistUnverifiedDevices=true;
    const publicKeys=await crypto.getOwnDeviceKeys();if(closed)throw new Error('Messaging initialization cancelled.');
-   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async revoke(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/logout',{accessToken:binding.accessToken});},async close(){cancel();await task;}});
+   if(binding.expectedPublicKeys&&(publicKeys.ed25519!==binding.expectedPublicKeys.ed25519||publicKeys.curve25519!==binding.expectedPublicKeys.curve25519))throw new Error('Stored messaging keys do not match this device binding. Recovery is required; existing keys were not replaced.');
+   ready({accountId:binding.accountId,userId:binding.userId,deviceId:binding.deviceId,publicKeys,get closed(){return closed;},async bind(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys});if(closed)throw new Error('Messaging device closed');},async exportHistory(passphrase){if(closed)throw new Error('Messaging device closed');const keys=await crypto.exportRoomKeysAsJson();if(closed)throw new Error('Messaging device closed');if(keys==='[]')throw new Error('There are no room history keys to export yet.');return encryptHistoryExport(keys,passphrase,lifecycle.signal);},async revoke(){if(closed)throw new Error('Messaging device closed');await link.request('matrix/logout',{accessToken:binding.accessToken});},async close(){cancel();await task;}});
    await held;
   }finally{closed=true;client?.stopClient();link.close();signal?.removeEventListener('abort',cancel);}
  });

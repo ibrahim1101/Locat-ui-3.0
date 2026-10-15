@@ -24,3 +24,11 @@ it('sends SDK requests only through the same-origin proved gateway and binds onl
  await transport(window.location.origin+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer synthetic-token'}});expect(fetch.mock.calls[0][1].credentials).toBe('same-origin');expect(fetch.mock.calls[0][1].headers.get('X-Locat-Device-Proof')).toBe('synthetic-proof');
  await value.bind();expect(linkRequest).toHaveBeenCalledWith('matrix/bind',{userId:binding.userId,deviceId:binding.deviceId,accessToken:binding.accessToken,publicKeys:value.publicKeys});await value.revoke();expect(linkRequest).toHaveBeenCalledWith('matrix/logout',{accessToken:binding.accessToken});await value.close();expect(linkClose).toHaveBeenCalled();
 });
+
+it('checks returning device keys against existing pins before exposing a bindable session',async()=>{
+ vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
+ const expectedPublicKeys={ed25519:'synthetic-public-signing',curve25519:'synthetic-public-identity'};
+ const value=await openMatrixCryptoSession({...binding,expectedPublicKeys});await value.close();
+ await expect(openMatrixCryptoSession({...binding,expectedPublicKeys:{...expectedPublicKeys,ed25519:'changed-signing-key'}})).rejects.toThrow('Recovery is required');
+ expect(stop).toHaveBeenCalledTimes(2);expect(linkRequest).not.toHaveBeenCalled();
+});

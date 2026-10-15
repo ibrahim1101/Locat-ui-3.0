@@ -1,0 +1,14 @@
+import {fireEvent,render,screen,waitFor} from '@testing-library/react';import {afterEach,expect,it,vi} from 'vitest';import {MatrixHistoryExport} from './MatrixHistoryExport';
+afterEach(()=>vi.restoreAllMocks());
+it('requires matching passphrases and shows export errors without a success claim',async()=>{
+ const exportHistory=vi.fn().mockRejectedValue(new Error('There are no room history keys to export yet.'));render(<MatrixHistoryExport onExportHistory={exportHistory}/>);
+ fireEvent.change(screen.getByLabelText('History export passphrase'),{target:{value:'synthetic-passphrase'}});fireEvent.change(screen.getByLabelText('Confirm history export passphrase'),{target:{value:'different-passphrase'}});fireEvent.click(screen.getByRole('button',{name:'Download encrypted history keys'}));await screen.findByText('The export passphrases do not match.');expect(exportHistory).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText('Confirm history export passphrase'),{target:{value:'synthetic-passphrase'}});fireEvent.click(screen.getByRole('button',{name:'Download encrypted history keys'}));await screen.findByText('There are no room history keys to export yet.');await waitFor(()=>expect(screen.getByLabelText('History export passphrase')).toHaveValue(''));expect(screen.queryByText(/download prepared/)).toBeNull();
+});
+
+it('prepares only the encrypted file and clears both passphrase fields',async()=>{
+ const encrypted='-----BEGIN MEGOLM SESSION DATA-----\nsynthetic-ciphertext\n-----END MEGOLM SESSION DATA-----',exportHistory=vi.fn().mockResolvedValue(encrypted),create=vi.fn((_blob:Blob)=> 'blob:synthetic-encrypted-export');
+ const originalCreate=URL.createObjectURL,originalRevoke=URL.revokeObjectURL;URL.createObjectURL=create;URL.revokeObjectURL=vi.fn();const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(this:HTMLAnchorElement){expect(this.download).toBe('locat-matrix-history-keys.txt');expect(this.href).toBe('blob:synthetic-encrypted-export');});
+ try{render(<MatrixHistoryExport onExportHistory={exportHistory}/>);fireEvent.change(screen.getByLabelText('History export passphrase'),{target:{value:'synthetic-passphrase'}});fireEvent.change(screen.getByLabelText('Confirm history export passphrase'),{target:{value:'synthetic-passphrase'}});fireEvent.click(screen.getByRole('button',{name:'Download encrypted history keys'}));await screen.findByText(/Encrypted history key download prepared/);expect(exportHistory).toHaveBeenCalledWith('synthetic-passphrase');expect(click).toHaveBeenCalledOnce();expect(create.mock.calls[0][0]).toBeInstanceOf(Blob);expect(screen.getByLabelText('History export passphrase')).toHaveValue('');expect(screen.getByLabelText('Confirm history export passphrase')).toHaveValue('');}
+ finally{URL.createObjectURL=originalCreate;URL.revokeObjectURL=originalRevoke;}
+});
