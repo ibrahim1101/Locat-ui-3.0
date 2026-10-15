@@ -48,3 +48,5 @@ Operator restore:server can publish a checksum-verified standalone SQLite snapsh
 Private-store wrapping passphrase changes are implemented with current-phrase verification in the client and atomic session/config/audit checks in SQLite. This preserves the data key and does not revoke older backups or already-unlocked clients; see PRIVATE_STORAGE.md.
 
 Sentinel incident server filters and cursor paging are implemented in the UI3 live panel; SENTINEL_INCIDENTS.md records owner checks, mutable-order semantics and remaining history/token/vendor acceptance scope.
+
+Sentinel now pages incident lists, token inventory and per-incident event history in UI3. Existing API array fields/defaults remain; SENTINEL_INCIDENTS.md defines cursor/authorization/one-time-secret behavior.

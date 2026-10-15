@@ -136,6 +136,11 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     for(const query of ['userId=foreign','status=open&status=resolved','severity=urgent','limit=101','before=invalid'])assert.equal((await request('/api/sentinel/incidents?'+query,'GET',undefined,aliceCookie)).status,400);
     const filteredAlerts=await(await request('/api/sentinel/incidents?limit=1&status=open','GET',undefined,aliceCookie)).json();
     assert.equal(filteredAlerts.incidents.length,1);assert.ok('nextCursor' in filteredAlerts);
+    for(const query of ['userId=foreign','limit=201','before=0','before=1&before=2'])assert.equal((await request(incidentPath+'?'+query,'GET',undefined,aliceCookie)).status,400);
+    const smallHistory=await(await request(incidentPath+'?limit=1','GET',undefined,aliceCookie)).json();assert.equal(smallHistory.events.length,1);assert.ok(smallHistory.nextCursor);
+    const olderHistory=await(await request(incidentPath+'?limit=1&before='+smallHistory.nextCursor,'GET',undefined,aliceCookie)).json();assert.ok(olderHistory.events[0].id<smallHistory.events[0].id);
+    for(const query of ['userId=foreign','state=unknown','limit=101','before=invalid'])assert.equal((await request('/api/sentinel/tokens?'+query,'GET',undefined,aliceCookie)).status,400);
+    const activeTokens=await(await request('/api/sentinel/tokens?state=active&limit=1','GET',undefined,aliceCookie)).json();assert.equal(activeTokens.tokens.length,1);assert.equal(activeTokens.tokens[0].revokedAt,null);assert.ok('nextCursor' in activeTokens);
     const detail=await (await request(incidentPath,'GET',undefined,aliceCookie)).json();
     assert.equal(detail.incident.status,'open'); assert.equal(detail.events[0].note,'Investigating');
     assert.equal((await request('/api/sentinel/tokens/revoke','POST',{id:integration.id},bobCookie)).status,404);

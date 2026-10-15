@@ -1,4 +1,4 @@
-import {incidentPage,parseIncidentQuery} from './sentinelQueries.mjs';
+import {incidentPage,parseIncidentQuery,tokenPage,parseTokenQuery,incidentHistoryPage,parseIncidentHistoryQuery} from './sentinelQueries.mjs';
 /** Account-owned Sentinel incidents. Tokens store only a SHA-256 digest. */
 import { createHash, randomBytes } from 'node:crypto';
 import { createRateLimiter } from './rateLimit.mjs';
@@ -62,7 +62,8 @@ export function sentinelStore(sql) {
     }catch(error){sql.exec('ROLLBACK');throw error;}
   }
   return {
-    tokens: userId => sql.prepare('SELECT id,name,prefix,createdAt,lastUsedAt,revokedAt FROM sentinelTokens WHERE userId=? ORDER BY createdAt DESC LIMIT 100').all(userId),
+    tokens: userId => tokenPage(sql,userId).tokens,
+    tokenPage: (userId,options) => tokenPage(sql,userId,options),
     createToken(userId,name,sessionHash){
       return write(userId,sessionHash,'sentinel.token.created',()=>{
         if(sql.prepare('SELECT COUNT(*) AS count FROM sentinelTokens WHERE userId=? AND revokedAt IS NULL').get(userId).count>=20)fail(409,'Revoke an active token before creating another');
@@ -80,10 +81,7 @@ export function sentinelStore(sql) {
     authenticate: token => sql.prepare('SELECT id,userId FROM sentinelTokens WHERE hash=? AND revokedAt IS NULL').get(tokenHash(token)),
     incidents: (userId,status) => incidentPage(sql,userId,{status:status||''}).incidents,
     incidentPage: (userId,options) => incidentPage(sql,userId,options),
-    detail(userId,id) {
-      const incident = sql.prepare('SELECT * FROM sentinelIncidents WHERE userId=? AND id=?').get(userId,id);
-      return incident ? { incident, events: sql.prepare('SELECT id,action,note,createdAt FROM sentinelEvents WHERE incidentId=? ORDER BY id DESC LIMIT 200').all(id) } : null;
-    },
+    detail: (userId,id,options) => incidentHistoryPage(sql,userId,id,options),
     ingest(owner, input) {
       const now=Date.now();
       sql.exec('BEGIN IMMEDIATE');
@@ -142,7 +140,7 @@ export function createSentinelHandler({store,sessionUser,sessionToken,body,json}
     const user=sessionUser(req);
     if(!user) fail(401,'Not authenticated');
     if(req.method === 'POST' && req.headers.origin !== origin) fail(403,'Origin mismatch');
-    if(url.pathname === '/api/sentinel/tokens' && req.method === 'GET') json(res,200,{tokens:store.tokens(user.id)});
+    if(url.pathname === '/api/sentinel/tokens' && req.method === 'GET') json(res,200,store.tokenPage(user.id,parseTokenQuery(url.searchParams)));
     else if(url.pathname === '/api/sentinel/tokens' && req.method === 'POST') {
       const {input,sessionHash}=await ownedBody(req,user);
       if(!input||Array.isArray(input)||Object.keys(input).some(key=>key!=='name'))fail(400,'Invalid token request');
@@ -161,7 +159,7 @@ export function createSentinelHandler({store,sessionUser,sessionToken,body,json}
     } else {
       const match=/^\/api\/sentinel\/incidents\/([a-f0-9]{32})$/.exec(url.pathname);
       if(!match) fail(404,'Not found');
-      if(req.method === 'GET') { const detail=store.detail(user.id,match[1]); if(!detail) fail(404,'Incident not found'); json(res,200,detail); }
+      if(req.method === 'GET') { const detail=store.detail(user.id,match[1],parseIncidentHistoryQuery(url.searchParams)); if(!detail) fail(404,'Incident not found'); json(res,200,detail); }
       else if(req.method === 'POST') {
         const {input,sessionHash}=await ownedBody(req,user);
         if(!input||Array.isArray(input)||Object.keys(input).some(key=>!['action','note'].includes(key)))fail(400,'Invalid incident action');

@@ -1,3 +1,9 @@
+## Latest — complete paged Sentinel token inventory and incident event history
+
+Integration metadata is now lazy-loaded in a dedicated UI3 panel with Active/Revoked/All server views and 25-row createdAt+ID cursor pages. Old active tokens are reachable despite more than 100 newer revoked records; only public prefixes/creation/last-use/revocation metadata is listed. Per-incident history now loads 50 events and offers older-ID pages beyond 200, with owner joins, strict query validation, deduplication, cancellation and failed-page retry. Legacy API defaults/array fields are retained, adding nextCursor. Tabs/account scope clear one-time-token state; duplicate token minting remains excluded. Tests cover 132 tokens, 231 owned events interleaved with foreign history, new arrivals, UI state filters, retry/dedup and actual HTTP cursor guards. No schema migration, history deletion, token-secret enumeration or production activation. SENTINEL_INCIDENTS.md records mutable-filter and lost one-time-response limits. Full monitoring/notifications/retention/export/browser/native/master roadmap remain open.
+
+Validation: check, lint, all 194 frontend tests / 51 files, all 101 backend tests and production build passed.
+
 Sentinel authorization validation: check, lint, all 191 frontend tests / 50 files, all 99 backend tests and production build passed. Vendor/browser/native/independent review remain open.
 
 ## Latest — Sentinel commit-time authorization and atomic audits

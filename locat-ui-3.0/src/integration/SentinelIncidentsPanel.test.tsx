@@ -44,3 +44,15 @@ it('aborts its list read on unmount',async()=>{
  })));
  const view=render(<SentinelIncidentsPanel/>);await waitFor(()=>expect(controls).toHaveLength(1));await act(async()=>view.unmount());expect(controls[0].aborted).toBe(true);
 });
+it('loads older incident history, deduplicates event IDs and preserves loaded notes on retry',async()=>{
+ let older=0;const row=incident('a','History incident');
+ vi.stubGlobal('fetch',vi.fn(async(path:string)=>{
+  if(path.startsWith('/api/sentinel/incidents?'))return response([row]);
+  const params=new URL(path,'https://locat.test').searchParams;
+  if(params.has('before')){older++;if(older===1)throw new Error('History temporarily unavailable');return new Response(JSON.stringify({incident:row,events:[{id:5,action:'note',note:'Recent note',createdAt:1000},{id:2,action:'note',note:'Older note',createdAt:1000}],nextCursor:null}));}
+  expect(params.get('limit')).toBe('50');return new Response(JSON.stringify({incident:row,events:[{id:5,action:'note',note:'Recent note',createdAt:1000}],nextCursor:'5'}));
+ }));
+ render(<SentinelIncidentsPanel/>);await screen.findByText('History incident');fireEvent.click(screen.getByRole('button',{name:'View incident'}));await screen.findByText('Recent note');
+ fireEvent.click(screen.getByRole('button',{name:'Load older incident history'}));await screen.findAllByText('History temporarily unavailable');expect(screen.getByText('Recent note')).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Load older incident history'}));await screen.findByText('Older note');expect(screen.getAllByText('Recent note')).toHaveLength(1);expect(screen.queryByRole('button',{name:'Load older incident history'})).toBeNull();
+});

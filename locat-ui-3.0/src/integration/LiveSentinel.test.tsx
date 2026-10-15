@@ -8,7 +8,7 @@ vi.mock('../app/session',()=>({useSession:()=>session}));
 afterEach(()=>vi.unstubAllGlobals());
 it('shows real incidents and submits actions to their owned endpoint',async()=>{
  const incident={id:'abc',title:'Service down',description:'Host alert',source:'test',severity:'high',status:'open',occurrences:1,updatedAt:Date.now()};
- const fetch=vi.fn(async(path:string,options?:RequestInit)=>({ok:true,json:async()=>path==='/api/security/events'?{events:[]}:path==='/api/sentinel/tokens'?{tokens:[]}:path.startsWith('/api/sentinel/incidents?')?{incidents:[incident]}:options?.method==='POST'?{ok:true}:{incident,events:[]}}));vi.stubGlobal('fetch',fetch);
+ const fetch=vi.fn(async(path:string,options?:RequestInit)=>({ok:true,json:async()=>path==='/api/security/events'?{events:[]}:path.startsWith('/api/sentinel/tokens?')?{tokens:[]}:path.startsWith('/api/sentinel/incidents?')?{incidents:[incident]}:options?.method==='POST'?{ok:true}:{incident,events:[]}}));vi.stubGlobal('fetch',fetch);
  render(<MemoryRouter><BackProvider rootPath="/home"><LiveSentinel/></BackProvider></MemoryRouter>); await screen.findByText('Service down'); fireEvent.click(screen.getByRole('button',{name:'View incident'}));
  fireEvent.click(await screen.findByRole('button',{name:'Acknowledge'}));
  await waitFor(()=>expect(fetch).toHaveBeenCalledWith('/api/sentinel/incidents/abc',expect.objectContaining({body:JSON.stringify({action:'acknowledge'})})));
