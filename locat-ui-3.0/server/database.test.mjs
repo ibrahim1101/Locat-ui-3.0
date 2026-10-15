@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from "node:sqlite";
@@ -67,4 +67,23 @@ test('schema v1 upgrades preserve accounts and reject unknown future versions', 
     raw = new DatabaseSync(file); raw.exec('PRAGMA user_version = 999;'); raw.close();
     assert.throws(() => openDatabase(file), /newer/);
   } finally { db?.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+ test('concurrent backup publication never overwrites a destination and removes staging files', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'locat-backup-race-'));
+  const db = openDatabase(join(dir, 'source.sqlite'));
+  try {
+    const target = join(dir, 'winner.sqlite');
+    const results = await Promise.allSettled([db.backupTo(target), db.backupTo(target)]);
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.match(results.find(result => result.status === 'rejected').reason.message, /already exists/);
+    const bytes = await readFile(target);
+    await assert.rejects(db.backupTo(target), /already exists/);
+    assert.deepEqual(await readFile(target), bytes);
+    if (process.platform !== 'win32') assert.equal((await stat(target)).mode & 0o777, 0o600);
+    assert.equal((await readdir(dir)).some(name => name.startsWith('.locat-backup-')), false);
+    const snapshot = new DatabaseSync(target, { readOnly: true });
+    try { assert.equal(snapshot.prepare('PRAGMA integrity_check').get().integrity_check, 'ok'); }
+    finally { snapshot.close(); }
+  } finally { db.close(); await rm(dir, { recursive: true, force: true }); }
 });

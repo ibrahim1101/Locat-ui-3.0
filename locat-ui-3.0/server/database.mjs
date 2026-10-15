@@ -7,8 +7,8 @@ import { privateStore } from './privateStore.mjs';
 import { sentinelStore } from './sentinel.mjs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
-import { mkdirSync, chmodSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, chmodSync, existsSync, mkdtempSync, linkSync, rmSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
 
 export const DATABASE_SCHEMA_VERSION=14;
 
@@ -211,9 +211,17 @@ export function openDatabase(filename) {
       const target = resolve(destination);
       if (existsSync(target)) throw new Error('Backup destination already exists');
       mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-      await backup(sql, target);
-      chmodSync(target, 0o600);
-      return target;
+      const staging = mkdtempSync(join(dirname(target), '.locat-backup-'));
+      try {
+        const snapshot = join(staging, 'snapshot.sqlite');
+        await backup(sql, snapshot);
+        chmodSync(snapshot, 0o600);
+        // Same-filesystem hard linking publishes a complete file exclusively.
+        // Unlike rename, this cannot replace a concurrently created target.
+        try { linkSync(snapshot, target); }
+        catch (error) { if (error.code === 'EEXIST') throw new Error('Backup destination already exists'); throw error; }
+        return target;
+      } finally { rmSync(staging, { recursive: true, force: true }); }
     },
     close: () => sql.close(),
   };
