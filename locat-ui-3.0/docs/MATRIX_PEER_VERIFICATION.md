@@ -1,4 +1,8 @@
-# Contact identity and verification groundwork
+# Contact identity and verification
+
+Current implementation includes the explicit UI3 verification workflow and restricted gateway transport described below. Earlier groundwork sections are historical. Request-generation checks isolate late asynchronous results after cancellation; accepted contacts are paged in groups of 20 with no first-100 truncation. Full browser/native/recovery acceptance remains pending.
+
+## Historical groundwork
 
 Live peer-verification UI and protocol transport through the Locat gateway are not enabled yet. This checkpoint prepares identity authorization without adding Send, automatic trust, conversation mutation, federation or a second frontend.
 
@@ -24,7 +28,7 @@ After binding the current device, setup now offers an explicit Enable device ver
 
 The gateway now supports the SDK's own-user filter creation/retrieval, read-only push rules and capabilities. Filter creation is constrained to Locat's fixed verification profile; sync always substitutes that profile and offline presence regardless of client parameters. Room selection is empty, and the returned room, presence and account-data sections are cleared. Only standard verification to-device event types from the bound account or accepted local peers are returned. It does not expose a room timeline or general encrypted to-device transport. This verification-only profile intentionally is not a general Matrix frontend.
 
-Peer discovery adds active bound device IDs without names/platform/pins, plus reverse resolution for one exact Matrix user ID; it retains current binding/proof and accepted/unblocked guards. Device IDs indicate current Locat authorization, not physical presence or current browser activity. Selection reads real authorized mappings; empty devices is a truthful unavailable state. The panel currently loads at most 100 accepted contacts per enable action; large contact-directory pagination is unfinished.
+Peer discovery adds active bound device IDs without names/platform/pins, plus reverse resolution for one exact Matrix user ID; it retains current binding/proof and accepted/unblocked guards. Device IDs indicate current Locat authorization, not physical presence or current browser activity. Selection reads real authorized mappings; empty devices is a truthful unavailable state. The panel loads the accepted directory and renders 20 contacts per page with previous/next controls, including entries beyond the former first-100 cutoff. Server-side directory pagination and refresh remain separate work.
 
 Compatibility dependency: matrixTrackedPeer.mjs isolates two internal hooks of the exactly pinned matrix-js-sdk 44.0.0 backend: its existing Rust tracked-user update and its outgoing-request processor. The public uncached device-info API downloads metadata without retaining it for SAS; room-free verification otherwise cannot find a previously unshared peer. The adapter uses WASM 18.9.0 UserId and changes neither cryptographic primitives nor trust. Missing runtime capabilities fail closed. Both library upgrades require rerunning actual gateway/SDK acceptance and reviewing the internal contract; this is not a universal SDK compatibility guarantee.
 

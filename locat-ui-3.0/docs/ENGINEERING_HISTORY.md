@@ -1,3 +1,7 @@
+## Latest — verification cancellation isolation and contact pagination
+
+Verification actions now capture their request generation and signing-key snapshot. Late accept, SAS startup, authorization, fingerprint, trust and cancellation results cannot overwrite a cancelled/replacement request; an outgoing request created after cancellation is cancelled without attaching. Regression tests cover delayed authorization, accept completion, outgoing request creation and incoming peer lookup. UI3 contact selection now pages every accepted contact in groups of 20 instead of dropping entries after 100; shared Button controls and existing theme remain in use. Validation: 150 frontend tests across 46 files, 43 backend tests, type checking, lint and production build pass. Actual Synapse/SDK controller acceptance passes with synthetic Locat guards and in-memory IndexedDB. Browser/native persistence, full identity recovery, federation and the broader master roadmap remain unfinished; conversations remain gated.
+
 # Engineering history
 
 ## 2026-10-14 — Build stabilization and durable account foundation
