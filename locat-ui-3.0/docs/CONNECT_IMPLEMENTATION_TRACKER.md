@@ -7,7 +7,7 @@
 | P2 global identity | Local IDs preserved; qualified local addresses/search and browser device proof | Existing isolation/revocation tests | Authenticated global authority/key lifecycle pending |
 | P3 E2EE/offline | Preferred Matrix feasibility direction documented | No messaging crypto acceptance | Gate closed; no real private Send |
 | P4 federation | Standards-based direction/dependencies documented | None | Not implemented |
-| P5 relay | Existing encrypted paired Remote signaling | Existing API/crypto tests | STUN/TURN configuration and real frames pending |
+| P5 relay | Encrypted paired Remote signaling plus opt-in shared STUN/TURN configuration and temporary credential issuance | Existing API/crypto tests | Real TURN allocation/relay frames, quality diagnostics and native acceptance pending |
 | P6 native | Original source references only | Three-OS source CI does not certify native clients | Windows/Android/Pi physical testing pending |
 | P7 beta | Threat boundaries and acceptance procedures documented | Local foundation checks only | Not internet/public-beta ready |
 

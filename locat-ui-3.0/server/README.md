@@ -102,3 +102,5 @@ Schema v7/v8 connects /api/link/register, challenge, prove, devices, heartbeat, 
 ### Browser Remote signaling
 
 Schema v9 extends protected /api/link/remote routes with source-decided sessions and encrypted signaling. Account/session/device proof and verified pairs remain mandatory. Roles gate offers/answers, expiry/close/revocation purge signals, and no server capture/control endpoint exists. See docs/REMOTE_INTEGRATION.md for browser consent, direct connectivity and native limitations.
+
+Optional connection infrastructure: see ../docs/CONNECT_ARCHITECTURE.md and ../docs/CONNECT_NETWORK_TRAVERSAL.md for fixed-peer TLS proxying, health WebSockets and protected temporary TURN credentials. No discovery/relay service is enabled by default. Legacy /api/messages now returns an authenticated 501 security gate until reviewed messaging integration is accepted; existing database rows remain preserved.

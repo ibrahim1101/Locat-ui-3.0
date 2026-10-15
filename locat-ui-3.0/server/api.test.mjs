@@ -173,6 +173,10 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/link/devices')).status,401);
     assert.equal((await request('/api/link/devices','GET',undefined,aliceCookie)).status,403);
     const firstDevice=await registerDevice('First',aliceCookie),secondDevice=await registerDevice('Second',aliceCookie),foreignDevice=await registerDevice('Foreign',bobCookie);
+    assert.equal((await request('/api/link/connectivity')).status,401);
+    assert.equal((await request('/api/link/connectivity','GET',undefined,aliceCookie)).status,403);
+    assert.deepEqual(await (await request('/api/link/connectivity','GET',undefined,aliceCookie,firstDevice.headers)).json(),{iceServers:[],hasRelay:false,expiresAt:null});
+    assert.equal((await request('/api/link/connectivity','GET',undefined,bobCookie,firstDevice.headers)).status,403);
     assert.equal((await request('/api/link/devices','GET',undefined,bobCookie,firstDevice.headers)).status,403);
     assert.equal((await request('/api/link/pair','POST',{peer:foreignDevice.id},aliceCookie,firstDevice.headers)).status,404);
     assert.equal((await request('/api/link/rename','POST',{name:'Forged',id:secondDevice.id},aliceCookie,firstDevice.headers)).status,400);
@@ -216,6 +220,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/link/remote/close','POST',{id:remoteId},aliceCookie,firstDevice.headers)).status,200);
     assert.equal((await request('/api/link/remote/signal','POST',{...remoteCommand,signalId:crypto.randomUUID()},aliceCookie,secondDevice.headers)).status,409);
     assert.equal((await request('/api/link/revoke','POST',{id:secondDevice.id},aliceCookie,firstDevice.headers)).status,200);
+    assert.equal((await request('/api/link/connectivity','GET',undefined,aliceCookie,secondDevice.headers)).status,403);
     assert.equal((await request('/api/link/devices','GET',undefined,aliceCookie,secondDevice.headers)).status,403);
     assert.equal((await request('/api/link/register','POST',{name:'Reuse',platform:'web',publicKey:secondDevice.publicKey},aliceCookie)).status,403);
     const payload = { recipientId: bob.id, ciphertext: "A".repeat(48), nonce: "B".repeat(24), algorithm: "client-e2ee-v1" };

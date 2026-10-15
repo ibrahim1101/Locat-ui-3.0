@@ -18,8 +18,8 @@ export function linkStore(sql){
  };
  store.payloads=linkPayloadStore(sql,store);store.remote=remoteStore(sql,store);return store;
 }
-export function createLinkHandler({store,sessionUser,sessionToken,body,json,audit}){
- const limit=createRateLimiter(60),chunkLimit=createRateLimiter(4000);return async(req,res,url,origin)=>{
+export function createLinkHandler({store,sessionUser,sessionToken,body,json,audit,connectivity}){
+ const limit=createRateLimiter(60),chunkLimit=createRateLimiter(4000),iceLimit=createRateLimiter(30);return async(req,res,url,origin)=>{
  if(!url.pathname.startsWith('/api/link/'))return false;
  const user=sessionUser(req);if(!user)fail(401,'Not authenticated');
  const session=sessionToken(req);if(!session)fail(401,'Not authenticated');
@@ -34,6 +34,7 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  return true;
  }
  const actor=verifyLinkProof(user.id,session,req.headers['x-locat-device-proof']);store.owned(user.id,actor);
+ if(action==='connectivity'&&req.method==='GET'){const retryAfter=iceLimit(user.id);if(retryAfter)throw Object.assign(new Error('Connectivity request rate limit exceeded'),{status:429,retryAfter});json(res,200,connectivity?.issue()??{iceServers:[],expiresAt:null,hasRelay:false});return true;}
  if(action.startsWith('remote/'))return handleRemote({req,res,url,store:store.remote,userId:user.id,actor,body,json});
  if(action.startsWith('payload'))return handleLinkPayload({req,res,url,store:store.payloads,userId:user.id,actor,body,json});
  if(req.method==='GET'&&action==='devices'){json(res,200,{...store.list(user.id,actor),currentDeviceId:actor});return true;}

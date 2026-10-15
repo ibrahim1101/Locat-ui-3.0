@@ -17,3 +17,6 @@ it('local mode cannot request screen capture or remote authorization',()=>{
  const original=session.user;session.user=null as unknown as typeof original;const picker=vi.fn();vi.stubGlobal('navigator',{mediaDevices:{getDisplayMedia:picker}});
  try{render(<MemoryRouter><LiveRemote/></MemoryRouter>);expect(screen.getByText('Sign in and pair devices first')).toBeVisible();expect(calls).toEqual([]);expect(picker).not.toHaveBeenCalled();}finally{session.user=original;}
 });
+it('keeps external traversal off until explicit consent and disables relay-only otherwise',async()=>{
+ render(<MemoryRouter><LiveRemote/></MemoryRouter>);const traversal=await screen.findByRole('switch',{name:'Allow server-configured STUN/TURN'});const relay=screen.getByRole('switch',{name:'Use TURN relay only'});expect(traversal).toHaveAttribute('aria-checked','false');expect(relay).toBeDisabled();expect(calls).not.toContain('connectivity');fireEvent.click(traversal);expect(relay).toBeEnabled();fireEvent.click(relay);expect(relay).toHaveAttribute('aria-checked','true');fireEvent.click(traversal);expect(relay).toHaveAttribute('aria-checked','false');expect(relay).toBeDisabled();
+});

@@ -1,0 +1,19 @@
+# Configurable STUN/TURN foundation
+
+This implements configuration/credential issuance and browser wiring, not verified internet media connectivity. No external ICE destination is built in, no relay is activated, and no TURN allocation test has run. Cloudflare Tunnel is not a TURN server.
+
+Operator settings (optional, process startup):
+
+- LOCAT_STUN_URLS: comma-delimited stun:host:port destinations, maximum eight.
+- LOCAT_TURN_URLS: comma-delimited turn:host:port?transport=udp or turns:host:port?transport=tcp destinations, maximum eight. No userinfo, paths, fragments or arbitrary schemes. URLs over 256 characters and invalid ports fail startup.
+- LOCAT_TURN_SECRET_FILE: private operator-owned file shared with the chosen coturn service, 32–256 printable non-space characters (prefer a randomly generated high-entropy value). It is read at startup, never returned to clients, committed, logged or put into frontend configuration. A secret without TURN URLs or TURN URLs without a valid secret fail closed. Secret changes require coordinating both services and restarting Locat; overlapping rotation is not implemented.
+
+GET /api/link/connectivity is a shared authenticated/proved-device endpoint with account-scoped 30/minute issuance limit. Session-only, cross-account proof and revoked-device access are denied. With no configuration it returns no servers. TURN uses the standard coturn REST expiry-prefixed random username and base64 HMAC-SHA1 password, valid 30 minutes. The random label contains no account/device identifier. This is a temporary bearer credential, not a proof bound to a TURN client device: authorized recipients can copy it during validity. Revocation stops future issuance; already issued credentials/allocations require TURN-side lifetime/quota enforcement and are not instantly recalled. No shared secret is sent to the browser.
+
+Remote's UI3 switches default off for network traversal. Each client independently opts into server-configured STUN/TURN before its next session. Relay-only uses iceTransportPolicy=relay and fails explicitly without configured TURN. Existing pin verification/source capture consent still apply. Changing switches does not reconfigure a running session. Direct mode makes no connectivity request and uses no external ICE service. A configured STUN/relay operator can see network IPs, timing and traffic sizes; browser IP disclosure and relay trust need operator review. This does not establish media E2EE or messaging security.
+
+Before any relay deployment: authorize exact host/network changes, use appropriate TLS/certificates, protect shared-secret files, synchronize clocks, configure relay port/firewall/NAT mappings, prohibit unauthorized/private peer relay destinations as appropriate, enforce allocation/bandwidth quotas and expiry, redact logs and monitor abuse/costs. A Raspberry Pi behind CGNAT may not itself provide a reachable general-purpose TURN relay; choose a separately reachable authorized service. No paid service is assumed or provisioned.
+
+Acceptance: execute CONNECT_TEST_PLAN test G with both actual clients in relay-only mode; confirm a selected relay candidate in browser statistics, real frames, consent/stop/revocation behavior and failed/expired credentials. Unit and API tests validate parsing, credentials, access checks, consent default, relay-only configuration and missing-relay failure; they do not contact an ICE service. Candidate-pair statistics, bandwidth controls, credential renewal, NAT recovery and native acceptance remain pending.
+
+Primary implementation reference checked 2026-10-15: https://github.com/coturn/coturn/blob/master/README.turnserver (TURN REST credential construction, use-auth-secret and deployment controls). This uses that established credential mechanism; it is not a custom messaging cryptographic protocol.

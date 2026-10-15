@@ -1,3 +1,4 @@
+import { iceConfiguration } from './ice.mjs';
 import { accountIdentity, localDiscoveryQuery } from './globalIdentity.mjs';
 import { attachRealtime } from './realtime.mjs';
 /**
@@ -23,6 +24,7 @@ import { openDatabase } from "./database.mjs";
 const scrypt = promisify(scryptCallback);
 if (process.env.LOCAT_DATA_FILE) throw new Error("LOCAT_DATA_FILE is retired; set LOCAT_DATABASE_FILE to a new SQLite path. Legacy JSON is never overwritten.");
 const config = serverConfig();
+const connectivity = iceConfiguration();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();
@@ -64,7 +66,7 @@ function sessionUser(req) {
 function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
-const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit});
+const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,body,json,audit:db.audit});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,body,json});
 async function handle(req, res) {
