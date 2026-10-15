@@ -1,7 +1,8 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Badge,Button,Sheet,StateView,TextField} from '../ui';
 import {sentinelRequest as request} from './sentinelRequest';
-type Incident={id:string;title:string;description:string;source:string;severity:string;status:string;occurrences:number;updatedAt:number};
+import {prepareIncidentExport,type IncidentExportRow} from './incidentExport';
+type Incident=IncidentExportRow;
 type History={id:number;action:string;note:string;createdAt:number};
 type Filters={q:string;status:string;severity:string;source:string};
 const emptyFilters:Filters={q:'',status:'',severity:'',source:''};
@@ -9,14 +10,16 @@ export function SentinelIncidentsPanel({refreshToken=0}:{refreshToken?:number}){
  const [incidents,setIncidents]=useState<Incident[]>([]),[cursor,setCursor]=useState<string|null>(null),[draft,setDraft]=useState<Filters>(emptyFilters),[filters,setFilters]=useState<Filters>(emptyFilters),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [selected,setSelected]=useState<Incident|null>(null),[history,setHistory]=useState<History[]>([]),[historyCursor,setHistoryCursor]=useState<string|null>(null),[note,setNote]=useState(''),[acting,setActing]=useState(false);
  const listRequest=useRef<AbortController|null>(null),listGeneration=useRef(0),detailRequest=useRef<AbortController|null>(null),detailGeneration=useRef(0),operation=useRef(false);
+ const loadedFilters=useRef<Filters>(emptyFilters);const [notice,setNotice]=useState('');
  const load=useCallback(async(filter:Filters,before:string|null,append:boolean)=>{
   if(append&&listRequest.current)return;
-  listRequest.current?.abort();const control=new AbortController(),version=++listGeneration.current;listRequest.current=control;setLoading(true);setError('');
+  listRequest.current?.abort();const control=new AbortController(),version=++listGeneration.current;listRequest.current=control;setLoading(true);setError('');setNotice('');
   if(!append){setIncidents([]);setCursor(null);}
   try{
    const params=new URLSearchParams({limit:'25',...Object.fromEntries(Object.entries(filter).filter(([,value])=>value)),...(before?{before}:{})});
    const data=await request('/api/sentinel/incidents?'+params,undefined,control.signal);
    if(version!==listGeneration.current)return;
+   loadedFilters.current={...filter};
    setIncidents(old=>append?[...old,...(data.incidents as Incident[]).filter(row=>!old.some(existing=>existing.id===row.id))]:data.incidents);setCursor(data.nextCursor??null);
   }catch(reason){if(version===listGeneration.current)setError(reason instanceof Error?reason.message:'Incidents could not be loaded');}
   finally{if(version===listGeneration.current){listRequest.current=null;setLoading(false);}}
@@ -51,6 +54,7 @@ export function SentinelIncidentsPanel({refreshToken=0}:{refreshToken?:number}){
   }catch(reason){if(version===detailGeneration.current)setError(reason instanceof Error?reason.message:'Incident action failed');}
   finally{if(version===detailGeneration.current){detailRequest.current=null;operation.current=false;setActing(false);}}
  }
+ function exportLoaded(){setError('');setNotice('');try{const prepared=prepareIncidentExport(incidents,loadedFilters.current,!!cursor),url=URL.createObjectURL(new Blob([prepared.text],{type:'application/json;charset=utf-8'}));try{const anchor=document.createElement('a');anchor.href=url;anchor.download=prepared.filename;document.body.append(anchor);try{anchor.click();}finally{anchor.remove();}setNotice(`JSON download prepared for ${incidents.length} loaded incident${incidents.length===1?'':'s'}.`);}finally{const revoke=URL.revokeObjectURL.bind(URL);setTimeout(()=>revoke(url),1000);}}catch(reason){setError(reason instanceof Error?reason.message:'Incident export failed.');}}
  return <section className="space-y-4" aria-label="Sentinel incident history">
   <form className="space-y-3 rounded-xl bg-s1 p-4 hairline" onSubmit={event=>{event.preventDefault();setFilters({...draft,q:draft.q.trim(),source:draft.source.trim()});}}>
    <TextField label="Search incidents" value={draft.q} maxLength={160} onChange={event=>setDraft(old=>({...old,q:event.target.value}))} hint="Search titles, descriptions and source names."/>
@@ -60,6 +64,8 @@ export function SentinelIncidentsPanel({refreshToken=0}:{refreshToken?:number}){
    <Button type="submit" disabled={loading}>Apply incident filters</Button>
   </form>
   <p className="text-xs text-ink-3">Account-owned incidents, most recently updated first. Repeated source and fingerprint pairs update the existing alert. Refresh to include incidents that changed while paging.</p>
+  <div className="space-y-2"><Button variant="ghost" disabled={loading||!incidents.length} onClick={exportLoaded}>Export loaded incidents</Button><p className="text-xs text-ink-3">Downloads readable JSON including loaded incident descriptions and applied filters. Load older incidents first to include them. Incident notes, history and integration tokens are excluded.</p></div>
+  {notice&&<p role="status" className="text-ember">{notice}</p>}
   {error&&<p role="alert" className="text-danger">{error}</p>}
   {incidents.map(item=><article key={item.id} className="rounded-xl bg-s1 p-4 hairline"><div className="flex flex-wrap items-center gap-3"><Badge tone={['high','critical'].includes(item.severity)?'warn':'neutral'}>{item.severity}</Badge><h2 className="flex-1 font-semibold">{item.title}</h2><Button disabled={acting} onClick={()=>void open(item.id)}>View incident</Button></div><p className="mt-2 text-sm text-ink-3">{item.source} · {item.status} · {item.occurrences} occurrences · {new Date(item.updatedAt).toLocaleString()}</p></article>)}
   {loading&&<p role="status">Loading incidents…</p>}{!loading&&!incidents.length&&!error&&<StateView kind="empty" title="No incidents in this view"/>}

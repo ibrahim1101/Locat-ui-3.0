@@ -54,3 +54,5 @@ Sentinel now pages incident lists, token inventory and per-incident event histor
 Actual Chromium foundation and two-context Link acceptance are recorded in BROWSER_FOUNDATION_ACCEPTANCE.md. Account-scoped Devices lifetime cancellation/duplicate guards and post-body session/proof/device rechecks are described in LINK_INTEGRATION.md. These do not certify Matrix browsers, native hardware or the complete ecosystem.
 
 Real Chromium managed-device setup, native IndexedDB signing-key continuity, exclusive writer rejection, verification sync and confirmed logout/cleanup passed at 056b778 (workflow 38748818924). See BROWSER_FOUNDATION_ACCEPTANCE.md for exact evidence, certificate/network restrictions and later peer-SAS test status. Settings and transports now isolate account lifetimes and cancel on close; this does not enable conversations or certify full recovery/native clients.
+
+Sentinel can explicitly download bounded readable JSON for loaded incidents and applied filters. SENTINEL_INCIDENTS.md distinguishes this from full archive/history/retention or private backup. The current UI3 theme and account scope are preserved.
