@@ -1,0 +1,41 @@
+# Preparation only: no public listener, DNS or tunnel. Requires private operator configuration.
+services:
+  matrix:
+    image: ${LOCAT_MATRIX_IMAGE:?Set a verified ARM64-capable pinned Synapse image or digest}
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.json
+    ports:
+      - "127.0.0.1:8008:8008"
+    volumes:
+      - ${LOCAT_MATRIX_CONFIG_DIR:?Private prepared config directory}:/config:ro
+      - matrix_data:/data
+    depends_on:
+      matrix-db:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+  matrix-db:
+    image: ${LOCAT_MATRIX_POSTGRES_IMAGE:?Set a verified pinned PostgreSQL 18 image or digest}
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/matrix_db_password
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    secrets: [matrix_db_password]
+    volumes:
+      - matrix_postgres:/var/lib/postgresql
+      - ${LOCAT_MATRIX_CONFIG_DIR:?Private prepared config directory}/init.sql:/docker-entrypoint-initdb.d/10-locat.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+volumes:
+  matrix_data:
+  matrix_postgres:
+secrets:
+  matrix_db_password:
+    file: ${LOCAT_MATRIX_CONFIG_DIR:?Private prepared config directory}/postgres-password
