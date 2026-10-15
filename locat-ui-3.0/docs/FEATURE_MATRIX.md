@@ -56,3 +56,5 @@ Actual Chromium foundation and two-context Link acceptance are recorded in BROWS
 Real Chromium managed-device setup, native IndexedDB signing-key continuity, exclusive writer rejection, verification sync and confirmed logout/cleanup passed at 056b778 (workflow 38748818924). See BROWSER_FOUNDATION_ACCEPTANCE.md for exact evidence, certificate/network restrictions and later peer-SAS test status. Settings and transports now isolate account lifetimes and cancel on close; this does not enable conversations or certify full recovery/native clients.
 
 Sentinel can explicitly download bounded readable JSON for loaded incidents and applied filters. SENTINEL_INCIDENTS.md distinguishes this from full archive/history/retention or private backup. The current UI3 theme and account scope are preserved.
+
+Photos now has bounded per-open-photo undo/redo covering existing crop/color/text/reset parameters. PHOTO_EDITING.md defines its nonpersistent history, source preservation and pending real-canvas browser target. Freehand UI, synchronization and native codec/hardware acceptance remain open.

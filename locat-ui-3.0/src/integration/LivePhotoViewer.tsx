@@ -1,9 +1,11 @@
 import { safeMediaUrl } from "./mediaSource";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, type SetStateAction } from "react";
 import { defaultPhotoEdit, renderPhotoEdit } from "../lib/photoEditing";
 import { editedImageFile } from "../lib/imageEditing";
 import { Button, Slider, TextField } from "../ui";
 import type { LocalMediaItem } from "./localMediaStore";
+import {createPhotoEditHistory,photoEditHistory,PHOTO_UNDO_LIMIT} from '../lib/photoEditHistory';
+import type {PhotoEdit} from '../lib/photoEditing';
 export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClose(): void }) {
   const image = useRef<HTMLImageElement>(null);
   const preview = useRef<HTMLCanvasElement>(null);
@@ -12,7 +14,9 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
   const [captionColor, setCaptionColor] = useState("#ffffff");
   const [tool, setTool] = useState("crop");
   const [url, setUrl] = useState("");
-  const [edit, setEdit] = useState(defaultPhotoEdit);
+  const [history,dispatch]=useReducer(photoEditHistory,undefined,createPhotoEditHistory);
+  const edit=history.present;
+  const setEdit=(update:SetStateAction<PhotoEdit>)=>dispatch({type:'edit',update});
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState(1);
   const direct = safeMediaUrl(item);
@@ -44,6 +48,7 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
     <div className="flex h-96 items-center justify-center overflow-auto rounded-xl bg-black">{!decoded && <p role="status" className="text-white/70">Loading photo…</p>}<canvas ref={preview} role="img" aria-label={`Edited preview of ${item.name}`} className="max-h-full max-w-full object-contain" style={{ display: decoded ? undefined : "none", transform: `scale(${zoom})` }} /></div>
     <div className="flex flex-wrap gap-2"><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, geometry: { ...old.geometry, turns: (old.geometry.turns + 1) % 4 } }))}>Rotate</Button><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, flipX: !old.flipX }))}>Flip horizontal</Button><Button variant="ghost" onClick={() => setEdit(old => ({ ...old, flipY: !old.flipY }))}>Flip vertical</Button><Button variant="ghost" onClick={() => { setEdit(defaultPhotoEdit()); setCaption(""); setError(""); }}>Reset edits</Button><Button onClick={() => void exportCopy()}>Download edited copy</Button></div>
     <Slider label="Viewer zoom" min={1} max={3} step={0.1} value={zoom} onChange={setZoom} />
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Photo edit history"><Button variant="ghost" disabled={!history.past.length} onClick={()=>{dispatch({type:'undo'});setError('');}}>Undo edit</Button><Button variant="ghost" disabled={!history.future.length} onClick={()=>{dispatch({type:'redo'});setError('');}}>Redo edit</Button></div>
     {(["brightness", "contrast", "saturation"] as const).map(key => <Slider key={key} label={key} min={0} max={200} value={edit[key]} onChange={value => setEdit(old => ({ ...old, [key]: value }))} />)}
     <div className="flex flex-wrap gap-2" role="group" aria-label="Photo tools">{["crop", "text"].map(value => <Button key={value} variant="ghost" aria-pressed={tool === value} onClick={() => setTool(value)}>{value === "crop" ? "Crop" : "Text annotations"}</Button>)}</div>
     {tool === "crop" ? <div className="space-y-4 rounded-xl bg-s1 p-4 hairline">
@@ -55,7 +60,7 @@ export function LivePhotoViewer({ item, onClose }: { item: LocalMediaItem; onClo
       <form className="space-y-3" onSubmit={event => { event.preventDefault(); if (caption.trim() && edit.texts.length < 30) { setEdit(old => ({ ...old, texts: [...old.texts, { text: caption.trim(), color: captionColor, size: 5, x: 0.05, y: 0.15 }] })); setCaption(""); } }}><TextField label="Annotation text" value={caption} required maxLength={200} onChange={event => setCaption(event.target.value)} /><TextField label="Annotation color" type="color" value={captionColor} onChange={event => setCaptionColor(event.target.value)} /><Button type="submit" disabled={!caption.trim() || edit.texts.length >= 30}>Add text</Button></form>
       {edit.texts.map((text, index) => <div key={index} className="space-y-3 rounded-xl bg-s2 p-3"><p className="break-words text-sm font-semibold">{text.text}</p>{(["x", "y", "size"] as const).map(key => <Slider key={key} label={`Text ${index + 1} ${key === "x" ? "horizontal position" : key === "y" ? "vertical position" : "size"}`} min={key === "size" ? 1 : 0} max={key === "size" ? 20 : 1} step={key === "size" ? 1 : 0.01} value={text[key]} onChange={value => setEdit(old => ({ ...old, texts: old.texts.map((row, i) => i === index ? { ...row, [key]: value } : row) }))} />)}<Button variant="ghost" aria-label={`Remove text ${index + 1}`} onClick={() => setEdit(old => ({ ...old, texts: old.texts.filter((_, i) => i !== index) }))}>Remove text</Button></div>)}
     </div>}
-    <p className="text-xs text-ink-3">Your original stays unchanged. JPEG copies use a maximum 1600px edge; crop and text appear in the edited preview and export. Viewer zoom changes only the view.</p>
+    <p className="text-xs text-ink-3">Your original stays unchanged. JPEG copies use a maximum 1600px edge; crop and text appear in the edited preview and export. Viewer zoom changes only the view. Undo keeps up to {PHOTO_UNDO_LIMIT} recent edit steps while this photo is open; closing it discards that history.</p>
     {error && <p role="alert" className="text-danger">{error}</p>}
   </section>;
 }
