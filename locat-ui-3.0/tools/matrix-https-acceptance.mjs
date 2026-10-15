@@ -63,6 +63,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
    return {user,password,username,auth,issued,client,controller,state:()=>state};
   }
   const unbound=await account('https_unbound',false),unboundStatus=await json('/api/link/matrix/status',unbound.auth);
+  const unboundDevices=await json('/api/link/devices',unbound.auth);assert.equal(unboundDevices.devices.find(device=>device.id===unbound.linkDeviceId).matrix.binding,'unbound');
   assert.equal(unboundStatus.device,null);assert.equal(unboundStatus.authorizedHere,false);assert.equal(unboundStatus.managedDevice.deviceId,unbound.issued.deviceId);assert.equal(unboundStatus.managedDevice.operationActive,false);
   assert.equal((await api('/_matrix/client/v3/account/whoami',{...unbound.auth,headers:{Authorization:'Bearer '+unbound.issued.accessToken}})).status,403,'Recorded setup does not authorize the Matrix gateway');
   await json('/api/link/matrix/revoke-managed-device',{...unbound.auth,method:'POST',data:{}});
@@ -70,6 +71,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   const abandoned=await account('https_abandoned',false);await json('/api/link/revoke',{...abandoned.auth,method:'POST',data:{id:abandoned.linkDeviceId}});
   await until(async()=>(await fetch(upstream+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer '+abandoned.issued.accessToken}})).status===401,'queued revocation of unbound managed device');
   const alice=await account('https_alice'),bob=await account('https_bob');
+  const aliceDevices=await json('/api/link/devices',alice.auth),aliceMessaging=aliceDevices.devices.find(device=>device.matrix?.deviceId===alice.issued.deviceId)?.matrix;assert.equal(aliceMessaging?.binding,'authorized');assert.equal(aliceMessaging.managed,true);
   await json('/api/contacts/request',{...alice.auth,method:'POST',data:{userId:bob.user.id}});
   await json('/api/contacts/respond',{...bob.auth,method:'POST',data:{userId:alice.user.id,accept:true}});
   const protectedPath='/_matrix/client/v3/account/whoami',bearer={Authorization:'Bearer '+alice.issued.accessToken};

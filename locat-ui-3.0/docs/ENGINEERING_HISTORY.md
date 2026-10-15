@@ -1,3 +1,7 @@
+## Latest — known-device messaging state in UI3
+
+The proof-authorized Devices snapshot now joins only the owner's known Matrix bindings/setup records and reports recorded setup, local grant authorization or blocked/expired grant, plus managed-operation activity. Local authorization display requires both an unexpired grant and an existing unexpired Locat session; logout is reflected without inventing Matrix-token presence. Internal lease tokens, session hashes and bearer tokens are excluded. UI3 cards use existing theme tokens; cleanup confirmation remains distinct from local grant state. Tests pass: 160 frontend/46 files, 56 backend, check/lint/build and actual HTTPS/Synapse acceptance, including unbound and bound inventory responses. Account-wide upstream token enumeration, browser/native acceptance and full recovery remain pending; conversations stay gated and the full master remains active.
+
 ## Latest — managed setup intent before binding
 
 The initial targeted test run failed one authorization-loss assertion that depended on the ordinal count of recheck calls; the new pre-network check shifted the count. The test now causes actual authorization loss from the provider-inspection stage and still requires cleanup of the issued token. The corrected targeted tests pass.

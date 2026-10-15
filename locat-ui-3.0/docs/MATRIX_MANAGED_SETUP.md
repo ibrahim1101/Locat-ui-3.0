@@ -13,3 +13,10 @@ An authorized owner can use the existing Revoke this managed Matrix device actio
 Tests cover cross-connection exclusion, lease expiry/replacement, stale settlement, immutable identity, missing tracking, v13 migration with preserved bindings, unbound Link cleanup, failure after token issuance, failed immediate logout and late deletion re-arming. Actual HTTPS/Synapse acceptance issues normal managed tokens without binding, confirms no gateway grant, then proves explicit device deletion and queued Link deletion invalidate the corresponding tokens upstream. Database/WAL raw-secret checks include those accounts. Browser UI tests use mocked transport; actual browser/native persistence and UI acceptance remain separate.
 
 Schema 14 cannot discover unrecorded sessions issued before this migration. Account-wide token enumeration/revocation, independent review, full identity/cross-signing recovery, browser/native acceptance and public federation remain pending. The original requirement register and full master roadmap are retained. No public service/operator configuration was changed and conversations remain gated.
+
+
+## Known-device state in Devices
+
+The existing proof-authorized Link snapshot now includes the owner's known Matrix device identifier, whether managed setup is recorded, whether an operation is active, and local binding state. Grant authorization requires both an unexpired stored binding and an existing unexpired Locat session. A missing/revoked session or expired grant is reported as blocked; a setup without binding is unbound. A revoked Link identity cannot be authorized. Only public status metadata is returned; operation tokens, session hashes and Matrix bearer tokens are omitted. UI3 displays this in the existing device cards beside the separate cleanup status.
+
+This is the local device/grant inventory, not upstream token enumeration or an online/physical-device guarantee. A Matrix token can independently expire or be revoked upstream. Tests exercise setup, binding, Locat logout and account isolation, and the actual HTTPS harness checks both unbound and authorized snapshots.
