@@ -1,3 +1,4 @@
+import {createMatrixConversationSession} from '../src/integration/matrixConversationSession.ts';
 import WebSocket from 'ws';
 /** Synthetic loopback acceptance of the production HTTPS/auth/proof boundary.
  * This is a Node client, not browser persistence or UI acceptance. */
@@ -19,7 +20,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
  const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
  const origin='https://127.0.0.1:'+port,key=join(dir,'locat-test.key'),cert=join(dir,'locat-test.crt');
  await exec('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1']);
- const ca=await readFile(cert),clients=[],controllers=[];
+ const ca=await readFile(cert),clients=[],controllers=[],conversations=[];
  // Trust only this fixture certificate and only this exact loopback origin.
  function transport(input,init={}){
   const url=new URL(String(input));assert.equal(url.origin,origin);
@@ -56,7 +57,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
    assert.equal((await api('/api/link/prove',{method:'POST',cookie,data:{id:challenge.id,answer}})).status,403,'Device challenge replay must fail');
    const auth={cookie,proof},issued=await json('/api/link/matrix/provision',{...auth,method:'POST',data:{}});
    if(!bind)return {user,password,username,auth,issued,linkDeviceId:device.id};
-   const network={conversations:false,roomSyncStarted:false,pending:new Set(),encryptedWrites:[]};const fetchFn=async(input,init={})=>{const target=new URL(String(input));if(network.conversations&&target.pathname==='/_matrix/client/v3/sync'){target.searchParams.set('locat_conversations','1');if(!network.roomSyncStarted){target.searchParams.delete('since');target.searchParams.set('full_state','true');}}if(target.pathname.includes('/send/m.room.encrypted/')||target.pathname.includes('/sendToDevice/m.room.encrypted/'))network.encryptedWrites.push(init.body);const headers=new Headers(init.headers);headers.set('Cookie',cookie);headers.set('Origin',origin);headers.set('X-Locat-Device-Proof',proof);headers.set('Authorization','Bearer '+issued.accessToken);const control=new AbortController();network.pending.add(control);try{const response=await transport(target,{...init,headers,signal:init.signal?AbortSignal.any([init.signal,control.signal]):control.signal});if(response.ok&&network.conversations&&target.pathname==='/_matrix/client/v3/sync')network.roomSyncStarted=true;return response;}finally{network.pending.delete(control);}};
+   const network={conversations:false,roomSyncStarted:false,pending:new Set(),encryptedWrites:[],roomWrites:[],dropRoomAckOnce:false};const fetchFn=async(input,init={})=>{const target=new URL(String(input));if(network.conversations&&target.pathname==='/_matrix/client/v3/sync'){target.searchParams.set('locat_conversations','1');if(!network.roomSyncStarted){target.searchParams.delete('since');target.searchParams.set('full_state','true');}}if(target.pathname.includes('/send/m.room.encrypted/')||target.pathname.includes('/sendToDevice/m.room.encrypted/'))network.encryptedWrites.push(init.body);if(target.pathname.includes('/send/m.room.encrypted/'))network.roomWrites.push({path:target.pathname,body:init.body});const headers=new Headers(init.headers);headers.set('Cookie',cookie);headers.set('Origin',origin);headers.set('X-Locat-Device-Proof',proof);headers.set('Authorization','Bearer '+issued.accessToken);const control=new AbortController();network.pending.add(control);try{const response=await transport(target,{...init,headers,signal:init.signal?AbortSignal.any([init.signal,control.signal]):control.signal});if(response.ok&&network.conversations&&target.pathname==='/_matrix/client/v3/sync')network.roomSyncStarted=true;if(response.ok&&network.dropRoomAckOnce&&target.pathname.includes('/send/m.room.encrypted/')){network.dropRoomAckOnce=false;throw new Error('Synthetic lost encrypted-send acknowledgement');}return response;}finally{network.pending.delete(control);}};
    const client=createClient({baseUrl:origin,fetchFn,userId:issued.userId,deviceId:issued.deviceId,accessToken:issued.accessToken,verificationMethods:['m.sas.v1'],logger:quiet});clients.push(client);
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'synthetic-https-'+user.id});const publicKeys=await client.getCrypto().getOwnDeviceKeys();
    await json('/api/link/matrix/bind',{...auth,method:'POST',data:{...issued,publicKeys}});
@@ -103,10 +104,12 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await Promise.all(controllers.map(controller=>controller.close()));
   for(const peer of [alice,bob]){peer.client.getCrypto().globalBlacklistUnverifiedDevices=true;peer.network.conversations=true;for(const control of peer.network.pending)control.abort();}
   await until(()=>alice.client.getRoom(conversation.roomId)?.getMyMembership()==='join'&&bob.client.getRoom(conversation.roomId)?.getMyMembership()==='join','production HTTPS conversation sync',60000);
-  const messageMarker='LOCAT_SYNTHETIC_HTTPS_'+randomBytes(16).toString('hex');const encryptedMessage=await alice.client.sendTextMessage(conversation.roomId,messageMarker);
+  const messageMarker='LOCAT_SYNTHETIC_HTTPS_'+randomBytes(16).toString('hex');
+  const conversationController=createMatrixConversationSession(alice.client,accountId=>json('/api/link/matrix/peer?'+new URLSearchParams({accountId}),alice.auth),accountId=>json('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId,accessToken:alice.issued.accessToken}}),async()=>{});conversations.push(conversationController);await conversationController.open(bob.user.id);
+  alice.network.dropRoomAckOnce=true;let sent;try{sent=await conversationController.send(messageMarker);}catch{sent=await conversationController.send(messageMarker);}const encryptedMessage={event_id:sent.eventId};
   await until(async()=>{const event=bob.client.getRoom(conversation.roomId)?.findEventById(encryptedMessage.event_id);if(!event)return false;await bob.client.decryptEventIfNeeded(event);return event.getContent().body===messageMarker;},'production HTTPS SDK message encryption and recipient decryption',60000);
-  assert.ok(alice.network.encryptedWrites.length>0);assert.ok(!JSON.stringify(alice.network.encryptedWrites).includes(messageMarker));
-  for(const client of clients)client.stopClient();
+  assert.equal(alice.network.dropRoomAckOnce,false);assert.equal(new Set(alice.network.roomWrites.map(write=>write.path)).size,1,'Retry must reuse the same transaction');assert.equal(new Set(alice.network.roomWrites.map(write=>write.body)).size,1,'Retry must reuse the same ciphertext');assert.equal(bob.client.getRoom(conversation.roomId).getLiveTimeline().getEvents().filter(event=>event.getContent().body===messageMarker).length,1,'Lost acknowledgement retry must yield one message');assert.ok(alice.network.encryptedWrites.length>0);assert.ok(!JSON.stringify(alice.network.encryptedWrites).includes(messageMarker));
+  await Promise.all(conversations.map(controller=>controller.close()));for(const client of clients)client.stopClient();
 
   await json('/api/contacts/block',{...alice.auth,method:'POST',data:{userId:bob.user.id,blocked:true}});
   assert.equal((await api(conversationPath+'/messages?dir=b',{...alice.auth,headers:bearer})).status,403,'Blocking removes conversation history access');
@@ -123,9 +126,9 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,...[alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, encrypted key distribution/room sync/send/recipient decryption, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, controller-guarded encrypted key distribution/room sync/send/decryption and lost-ack original-event idempotency, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
-  await Promise.allSettled(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
+  await Promise.allSettled([...controllers,...conversations].map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}
  }
 }

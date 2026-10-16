@@ -61,3 +61,9 @@ it('closes the initialized device and discards the old account setup when identi
  const view=render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText(/Device bound and local crypto initialized/);const original=session.user;
  try{session.user={id:'b'.repeat(32)};view.rerender(<LiveMatrixSettings/>);expect(screen.queryByRole('dialog')).toBeNull();await waitFor(()=>expect(closeCrypto).toHaveBeenCalledOnce());expect(close).toHaveBeenCalled();expect(screen.getByRole('button',{name:'Set up messaging device'})).toBeEnabled();}finally{session.user=original;}
 });
+it('transfers a bound session to the account owner without aborting it when setup closes',async()=>{
+ const {MatrixOwnerProvider}=await import('./matrixOwner');const managed={...configured,managedProvisioning:true};
+ request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:managed);
+ openCrypto.mockResolvedValue({accountId:'a'.repeat(32),closed:false,bind,revoke,close:closeCrypto});
+ const view=render(<MatrixOwnerProvider accountId={'a'.repeat(32)}><LiveMatrixSettings/></MatrixOwnerProvider>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText(/Device bound and local crypto initialized/);fireEvent.click(screen.getByRole('button',{name:'Keep messaging active'}));await screen.findByText('Messaging crypto is active for this account.');expect(screen.queryByRole('dialog')).toBeNull();expect(openCrypto.mock.calls[0][1].aborted).toBe(false);expect(closeCrypto).not.toHaveBeenCalled();view.unmount();await waitFor(()=>expect(closeCrypto).toHaveBeenCalledOnce());
+});

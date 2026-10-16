@@ -1,3 +1,11 @@
+## Account-owned crypto and gated browser conversations
+
+Start 16fe2040a018bb1d4e12aa27f6f063a584c203a9; local source 0fbf626d11fd1e3ca136a87ed64fb9c70cc3c86e. Implemented account-keyed Matrix owner, explicit Settings adoption/stop, real Contacts conversation route, UI3 Composer/MessageBubble projections and production controller with current trust/contact/device/membership checks, outbound-session rotation, bounded original SDK event retry and shutdown tracking. Send is deliberately false pending browser acceptance. No preview conversations/data are projected into live mode.
+
+Ran check/lint/test:all/build, focused owner/controller/Settings tests and actual Synapse/HTTPS acceptance with the production controller. Source results 261 frontend/65 files, 111 backend; type/lint pass. Initial TypeScript failures were an unused type, optional membership handling and an overly broad mock signature; fixed. Lint caught a test probe assigning a global during render; moved capture into an effect. No production safeguard was weakened. Latest original-event retry passed real HTTPS lost-ack acceptance: identical transaction/ciphertext and exactly one received message. New browser step requires real account crypto retention across sidebar navigation, two registered rooms and synchronized encryption while Send remains disabled; new CI must be observed.
+
+Next execute built-browser gated ownership/room acceptance, then real Send/Receive and full offline/reload/revocation/tamper/isolation/no-plaintext coverage before opening the UI gate. Full roadmap preserved; no deployment/DNS/main/release/cost actions.
+
 ## Observed protected-transport source CI
 
 Published protected transport as 76908f6f4872a498d6b734e0d04383e7bdb685fc (tree matches local source/docs exactly). Workflow 38850540733 browser job 116810544497 passed seven main scenarios in 39.0 seconds and three foreground foundation repetitions in 12.4 seconds. Ubuntu job 116810544619 passed 252 frontend/63 files, 111 backend tests and the expanded full-gateway + production HTTPS encrypted messaging/Synapse fixture. macOS verification succeeded. Windows job 116810544655 subsequently completed successfully; all four jobs passed. No browser conversation UI has been added or certified.

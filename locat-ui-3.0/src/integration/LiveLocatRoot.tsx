@@ -1,3 +1,4 @@
+import {MatrixOwnerProvider} from './matrixOwner';
 import { connectRealtime } from './realtimeConnection';
 import { monitorConnection } from './connectionMonitor';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -111,6 +112,6 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   }), [nav, refresh]);
 
   return <SessionProvider key={session.authStatus === "local" ? "local-device" : session.user?.id ?? "signed-out"} adapter={adapter} initialUser={null} initialConnection={disconnected} platform={platform} liveSession={session}>
-    <LiveMediaProvider key={session.user?.id ?? (session.authStatus === "local" ? "local-device" : "signed-out")}><PlayerProvider><App /></PlayerProvider></LiveMediaProvider>
+    <MatrixOwnerProvider accountId={session.user?.id??''}><LiveMediaProvider key={session.user?.id ?? (session.authStatus === "local" ? "local-device" : "signed-out")}><PlayerProvider><App /></PlayerProvider></LiveMediaProvider></MatrixOwnerProvider>
   </SessionProvider>;
 }
