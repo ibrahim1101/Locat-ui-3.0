@@ -1,9 +1,16 @@
+import {matrixTokenHash} from './matrixBinding.mjs';
 import {managedMatrixIdentity} from '../shared/matrixIdentity.mjs';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
 /** Server only. The service token never becomes a device token or response field. */
 export function createManagedMatrixProvisioner({provider,serviceToken,serverId,store,managedDevices}){
  if(!provider||typeof serviceToken!=='string'||!/^[A-Za-z0-9_-]{64,256}$/.test(serviceToken))throw new Error('Invalid managed Matrix configuration');
  const active=new Set();
+ function blockUnconfirmedGrant(userId,actor,token){
+  if(typeof store.current!=='function'){if(store.status(userId,actor).device)fail(503,'Existing grant inspection is required for safe cleanup');return;}
+  const current=store.current(userId,actor);if(current?.tokenHash===matrixTokenHash(token))store.disconnect(userId,actor);
+  const after=store.current(userId,actor);if(after?.tokenHash===matrixTokenHash(token)&&(!Number.isSafeInteger(after.expiresAt)||after.expiresAt>Date.now()))fail(502,'Unconfirmed Locat grant could not be blocked');
+ }
+
  async function request(path,payload,signal,method='POST'){
   let response;try{response=await fetch(provider.origin+path,{method,headers:{Authorization:'Bearer '+serviceToken,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload),redirect:'error',signal});}catch{fail(502,'Managed messaging service is unavailable');}
   const reader=response.body?.getReader();if(!reader)fail(502,'Invalid managed messaging response');const chunks=[];let size=0;
@@ -27,14 +34,17 @@ export function createManagedMatrixProvisioner({provider,serviceToken,serverId,s
   try{store.disconnect(userId,actor);recheck();if(operation)managedDevices.check(operation);await deleteIdentity(identity);recheck();}finally{if(operation)managedDevices.finish(operation);}
  },async cancel(userId,actor,token,recheck){
   if(typeof token!=='string'||!/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(token)||token===serviceToken)fail(400,'Invalid managed device token');
-  const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const remote=await provider.inspect(token);recheck();if(remote.userId!==identity.userId||remote.deviceId!==identity.deviceId)fail(403,'Managed device token belongs to another identity');await provider.logout(token);recheck();
+  const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName);recheck();const remote=await provider.inspect(token);recheck();if(remote.userId!==identity.userId||remote.deviceId!==identity.deviceId)fail(403,'Managed device token belongs to another identity');
+  // Matrix logout deletes the device and its published keys, not just this token.
+  if(store.status(userId,actor).device||remote.keys){blockUnconfirmedGrant(userId,actor,token);recheck();return {upstreamLogoutConfirmed:false,locatGrantBlocked:true,existingDeviceRetained:true};}
+  await provider.logout(token);recheck();return {upstreamLogoutConfirmed:true};
  },async provision(userId,actor,recheck){
   if(!managedDevices||!['begin','check','finish'].every(name=>typeof managedDevices[name]==='function'))fail(503,'Durable managed-device tracking is required for provisioning');
   const identity=managedMatrixIdentity(serverId,userId,actor,provider.serverName),key=JSON.stringify([userId,actor]);
   recheck();const local=store.status(userId,actor);
   if(local.matrixUserId&&local.matrixUserId!==identity.userId||local.device&&local.device.deviceId!==identity.deviceId)fail(409,'Existing messaging identity requires an explicit migration; managed setup cannot replace it');
   if(active.has(key))fail(409,'Messaging setup is already running for this device');if(active.size>=8)fail(503,'Messaging setup is busy');active.add(key);
-  let token,operation;
+  let token,operation,preserveDevice=!!local.device||!!managedDevices.current?.(userId,actor);
   const check=()=>{recheck();if(operation)managedDevices.check(operation);};
   try{
    operation=managedDevices?.begin(userId,actor,identity);check();
@@ -47,12 +57,12 @@ export function createManagedMatrixProvisioner({provider,serviceToken,serverId,s
    if(!login.ok)fail(502,'Managed messaging device login was rejected');
    if(typeof login.value.access_token==='string'&&/^[A-Za-z0-9._~+/=-]{16,8192}$/.test(login.value.access_token)&&login.value.access_token!==serviceToken)token=login.value.access_token;
    if(!token||login.value.user_id!==identity.userId||login.value.device_id!==identity.deviceId)fail(502,'Unexpected managed messaging device identity');
-   check();const remote=await provider.inspect(token,signal);check();
+   check();const remote=await provider.inspect(token,signal);if(remote.keys)preserveDevice=true;check();
    if(remote.userId!==identity.userId||remote.deviceId!==identity.deviceId)fail(502,'Managed messaging session identity changed');
    if(remote.keys){const pins=local.device?.publicKeys;if(!pins||remote.keys['ed25519:'+identity.deviceId]!==pins.ed25519||remote.keys['curve25519:'+identity.deviceId]!==pins.curve25519)fail(409,'Existing messaging keys require recovery; setup cannot replace them');}
    // No authorization grant is issued here. Browser Rust keys must still pass the binding endpoint.
    return {userId:identity.userId,deviceId:identity.deviceId,accessToken:token};
-  }catch(error){if(token)try{await provider.logout(token);}catch{fail(502,'Messaging setup failed; cleanup of the new upstream session was not confirmed');}throw error;}
+  }catch(error){if(token){if(preserveDevice){try{blockUnconfirmedGrant(userId,actor,token);}catch{fail(502,'Messaging setup failed; existing device retained but local grant cleanup was not confirmed');}throw Object.assign(new Error((error.status?error.message:'Messaging setup failed')+'; existing device retained, upstream token cleanup requires explicit device revocation'),{status:error.status??502});}try{await provider.logout(token);}catch{fail(502,'Messaging setup failed; cleanup of the new upstream session was not confirmed');}}throw error;}
   finally{try{if(operation)managedDevices.finish(operation);}finally{active.delete(key);}}
  }};
 }

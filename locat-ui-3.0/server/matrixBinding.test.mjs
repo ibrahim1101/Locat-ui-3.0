@@ -50,7 +50,7 @@ test('managed setup endpoint requires empty derived-identity input and existing 
 
 test('exhausted Matrix setup allowance preserves separately bounded cleanup and revocation',async()=>{
  let input={},provisioned=0,cancelled=0,revoked=0,loggedOut=0,disconnected=0,allowed=true;
- const handler=createMatrixBindingHandler({store:{authorize(){},disconnect(){disconnected++;}},provider:{async logout(){loggedOut++;}},provisioner:{async provision(){provisioned++;return {};},async cancel(_user,_actor,_token,recheck){recheck();cancelled++;},async revokeDevice(_user,_actor,recheck){recheck();revoked++;}},body:async()=>input,json(){},audit(){}});
+ const handler=createMatrixBindingHandler({store:{authorize(){},disconnect(){disconnected++;}},provider:{async logout(){loggedOut++;}},provisioner:{async provision(){provisioned++;return {};},async cancel(_user,_actor,_token,recheck){recheck();cancelled++;return {upstreamLogoutConfirmed:true};},async revokeDevice(_user,_actor,recheck){recheck();revoked++;}},body:async()=>input,json(){},audit(){}});
  const command=action=>handler({req:{method:'POST'},res:{},url:new URL('https://locat.test/api/link/matrix/'+action),userId:'owner',actor:1,session:'session',recheck(){if(!allowed)throw Object.assign(new Error('Session revoked'),{status:401});}});
  for(let i=0;i<10;i++)await command('provision');assert.equal(provisioned,10);await assert.rejects(command('provision'),{status:429});await assert.rejects(command('bind'),{status:429});
  input={accessToken:'synthetic-matrix-token-0001'};allowed=false;await assert.rejects(command('cancel-provision'),{status:401});assert.equal(cancelled,0);allowed=true;

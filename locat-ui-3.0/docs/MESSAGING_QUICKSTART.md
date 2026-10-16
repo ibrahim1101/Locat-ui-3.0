@@ -35,3 +35,6 @@ Gateway restart recovery: an open browser can renew its private-key device proof
 
 
 If a send has no confirmed acknowledgement, reopen its original contact after restarting messaging on the same browser/device. **Retry pending encrypted message** sends the original ciphertext/transaction only after current authorization and verification checks. It allows at most three transmissions within five minutes. A changed contact device set, missing trust, expiry, storage failure or backward clock blocks replay. **Forget pending retry** requires confirmation and only removes local retry metadata; a server-accepted message may still arrive. Unresolved retry records block new compositions. Browser storage loss, a different device or lost messaging keys cannot recover this journal. No automatic replay or long-term offline sender queue is implemented.
+
+
+Cancelling a failed managed renewal preserves an established Matrix device and its published keys. Locat blocks the unconfirmed grant and reports partial cleanup; its upstream token can remain valid on the private homeserver until explicit managed-device revocation. Matrix logout removes the whole associated device and all its tokens. It is not a non-destructive single-token cleanup; restoring deleted server device state requires recovery.

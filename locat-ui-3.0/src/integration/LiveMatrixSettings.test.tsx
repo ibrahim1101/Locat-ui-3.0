@@ -21,15 +21,15 @@ it('reports upstream logout failure honestly, keeps retry available and confirms
 });
 
 it('uses managed provisioning with shared submit controls and no separate credential fields',async()=>{
- const managed={...configured,managedProvisioning:true};request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:managed);
+ const managed={...configured,managedProvisioning:true};request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);
  render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));const submit=await screen.findByRole('button',{name:'Create and bind managed session'});expect(screen.queryByLabelText('Separate Matrix access token')).toBeNull();expect(request).not.toHaveBeenCalledWith('matrix/provision',{});fireEvent.click(submit);await screen.findByText(/Device bound and local crypto initialized/);expect(request).toHaveBeenCalledWith('matrix/provision',{});expect(openCrypto.mock.calls[0][0]).toEqual({accountId:'a'.repeat(32),userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'});expect(request).not.toHaveBeenCalledWith('matrix/cancel-provision',expect.anything());
 });
 it('revokes an issued managed session if local crypto initialization fails',async()=>{
- const managed={...configured,managedProvisioning:true};request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:managed);openCrypto.mockRejectedValue(new Error('Browser crypto unavailable'));
+ const managed={...configured,managedProvisioning:true};request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);openCrypto.mockRejectedValue(new Error('Browser crypto unavailable'));
  render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText('Browser crypto unavailable');await waitFor(()=>expect(request).toHaveBeenCalledWith('matrix/cancel-provision',{accessToken:'synthetic-managed-token'}));expect(screen.queryByText(/Device bound and local crypto initialized/)).toBeNull();
 });
 it('cleans up a late managed token after the setup sheet is closed',async()=>{
- const managed={...configured,managedProvisioning:true};let finish:(value:unknown)=>void=()=>{};request.mockImplementation(async(path:string)=>path==='matrix/provision'?new Promise(resolve=>{finish=resolve;}):managed);
+ const managed={...configured,managedProvisioning:true};let finish:(value:unknown)=>void=()=>{};request.mockImplementation(async(path:string)=>path==='matrix/provision'?new Promise(resolve=>{finish=resolve;}):path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);
  render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await waitFor(()=>expect(request).toHaveBeenCalledWith('matrix/provision',{}));fireEvent.click(screen.getByRole('button',{name:'Close'}));finish({userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'});await waitFor(()=>expect(request).toHaveBeenCalledWith('matrix/cancel-provision',{accessToken:'synthetic-managed-token'}));expect(openCrypto).not.toHaveBeenCalled();
 });
 
@@ -40,7 +40,7 @@ it('can revoke all managed device sessions without a locally initialized token a
 
 it('supplies existing public-key pins when reopening a managed messaging device',async()=>{
  const pins={ed25519:'existing-signing-key',curve25519:'existing-identity-key'},managed={...configured,managedProvisioning:true,matrixUserId:'@managed:matrix.test',device:{deviceId:'LOCAT_1',publicKeys:pins,expiresAt:0}};
- request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:managed);render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText(/Device bound and local crypto initialized/);expect(openCrypto.mock.calls[0][0].expectedPublicKeys).toEqual(pins);
+ request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText(/Device bound and local crypto initialized/);expect(openCrypto.mock.calls[0][0].expectedPublicKeys).toEqual(pins);
 });
 
 it('offers managed device cleanup when a recorded setup never reached binding',async()=>{
@@ -52,7 +52,7 @@ it('refreshes recorded managed setup after failure so cleanup remains available 
 
 it('excludes duplicate managed submissions before the first provision response',async()=>{
  const managed={...configured,managedProvisioning:true};let finish!:(value:unknown)=>void;
- request.mockImplementation(async(path:string)=>path==='matrix/provision'?new Promise(resolve=>{finish=resolve;}):managed);
+ request.mockImplementation(async(path:string)=>path==='matrix/provision'?new Promise(resolve=>{finish=resolve;}):path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);
  render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));const button=await screen.findByRole('button',{name:'Create and bind managed session'}),form=button.closest('form')!;fireEvent.submit(form);fireEvent.submit(form);await waitFor(()=>expect(request.mock.calls.filter(([path])=>path==='matrix/provision')).toHaveLength(1));finish({userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'});await screen.findByText(/Device bound and local crypto initialized/);expect(bind).toHaveBeenCalledOnce();
 });
 
@@ -63,7 +63,11 @@ it('closes the initialized device and discards the old account setup when identi
 });
 it('transfers a bound session to the account owner without aborting it when setup closes',async()=>{
  const {MatrixOwnerProvider}=await import('./matrixOwner');const managed={...configured,managedProvisioning:true};
- request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:managed);
+ request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:true}:managed);
  openCrypto.mockResolvedValue({accountId:'a'.repeat(32),closed:false,bind,revoke,close:closeCrypto});
  const view=render(<MatrixOwnerProvider accountId={'a'.repeat(32)}><LiveMatrixSettings/></MatrixOwnerProvider>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText(/Device bound and local crypto initialized/);fireEvent.click(screen.getByRole('button',{name:'Keep messaging active'}));await screen.findByText('Messaging crypto is active for this account.');expect(screen.queryByRole('dialog')).toBeNull();expect(openCrypto.mock.calls[0][1].aborted).toBe(false);expect(closeCrypto).not.toHaveBeenCalled();view.unmount();await waitFor(()=>expect(closeCrypto).toHaveBeenCalledOnce());
+});
+
+it('reports preserved-device local cancellation without claiming upstream token revocation',async()=>{
+ const managed={...configured,managedProvisioning:true};request.mockImplementation(async(path:string)=>path==='matrix/provision'?{userId:'@managed:matrix.test',deviceId:'LOCAT_1',accessToken:'synthetic-managed-token'}:path==='matrix/cancel-provision'?{upstreamLogoutConfirmed:false,locatGrantBlocked:true,existingDeviceRetained:true}:managed);openCrypto.mockRejectedValue(new Error('Local setup interrupted'));render(<LiveMatrixSettings/>);fireEvent.click(screen.getByRole('button',{name:'Set up messaging device'}));fireEvent.click(await screen.findByRole('button',{name:'Create and bind managed session'}));await screen.findByText('Existing messaging device retained. The unconfirmed token is blocked by Locat; upstream token revocation requires explicit managed-device revocation.');expect(screen.getByRole('alert')).toHaveTextContent('Local setup interrupted');expect(screen.queryByText(/Device bound and local crypto initialized/)).toBeNull();
 });
