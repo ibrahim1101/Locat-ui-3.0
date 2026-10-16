@@ -9,6 +9,8 @@ test('Cinema: real storage guards, clickable controls, server metadata and compa
  const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'}),page=await context.newPage();
  const external=[],streams=[],errors=[];
  await context.route('**/*',route=>{if(new URL(route.request().url()).origin===fixture.origin)return route.continue();external.push(true);return route.abort();});
+ page.on('response',response=>{if(new URL(response.url()).pathname.startsWith('/api/media/stream/'))console.log('Cinema stream response',new URL(response.url()).search,response.status(),response.headers()['content-type']);});
+ page.on('requestfailed',request=>{if(new URL(request.url()).pathname.startsWith('/api/media/stream/'))console.log('Cinema stream failure',new URL(request.url()).search,request.failure());});
  page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/media/stream/'))streams.push(request.url());});
  try{
   const username='cinema_'+randomBytes(6).toString('hex'),password=randomBytes(24).toString('base64url');await page.goto(fixture.origin);
@@ -29,5 +31,5 @@ test('Cinema: real storage guards, clickable controls, server metadata and compa
   await expect(page.getByLabel('Seek',{exact:true})).toBeDisabled();await expect(page.getByTestId('player-error')).toHaveCount(0);expect(errors).toEqual([]);expect(external).toEqual([]);
   await page.route('**/api/media/stream/*?mode=transcode',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'FFmpeg is unavailable'})}));
   await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();await page.getByRole('dialog',{name:'Playback compatibility'}).getByRole('button',{name:'Convert to H.264/AAC · up to 1080p'}).click();await expect(page.getByTestId('player-error')).toContainText('Server conversion could not be played');
- }finally{await context.close();}
+ }catch(error){console.log('Cinema native failure',await page.locator('video').evaluate(v=>({src:v.getAttribute('src'),ready:v.readyState,network:v.networkState,paused:v.paused,ended:v.ended,time:v.currentTime,duration:v.duration,preload:v.preload,buffered:v.buffered.length,error:v.error?{code:v.error.code,message:v.error.message}:null})).catch(()=>null));console.log('Cinema player error text',await page.getByTestId('player-error').allTextContents());throw error;}finally{await context.close();}
 });

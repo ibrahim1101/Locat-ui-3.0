@@ -1,5 +1,21 @@
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
+
+// The caller owns the authorized handle. Destroying a FileHandle ReadStream
+// closes that handle even with autoClose:false; probing must leave it usable.
+function mediaInput(fd) {
+  return Readable.from((async function* () {
+    let position = 0;
+    while (true) {
+      const buffer = Buffer.allocUnsafe(64 * 1024);
+      const { bytesRead } = await fd.read(buffer, 0, buffer.length, position);
+      if (!bytesRead) return;
+      position += bytesRead;
+      yield buffer.subarray(0, bytesRead);
+    }
+  })());
+}
 
 /** Original Locat mediaProbe policy. A recommendation never guarantees client decoder support. */
 export function playbackStrategy(container, videoCodec, audioCodec) {
@@ -18,7 +34,7 @@ export async function probeMedia(fd, { executable = process.env.LOCAT_FFPROBE_PA
   activeProbes++;
   try { return await new Promise((resolve, reject) => {
     const child = spawn(executable, ['-v', 'error', '-show_entries', 'format=format_name,duration:stream=index,codec_type,codec_name,width,height:stream_tags=language,title', '-of', 'json', '-i', 'pipe:0'], { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-    const input = fd.createReadStream({ start: 0, autoClose: false });
+    const input = mediaInput(fd);
     let output = '', stderrBytes = 0, settled = false;
     function finish(error, value) { if (settled) return; settled = true; clearTimeout(timer); input.destroy(); if (error) { child.kill(); reject(error); } else resolve(value); }
     const timer = setTimeout(() => finish(unavailable('Media inspection timed out')), timeoutMs);
@@ -58,7 +74,7 @@ export function createMediaProcessor({ maximum = 2, timeoutMs = 4 * 60 * 60 * 10
         res.once('close', cancel);
         try {
           await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(unavailable('FFmpeg is unavailable'))); });
-          input = fd.createReadStream({ start: 0, autoClose: false });
+          input = mediaInput(fd);
           input.on('error', cancel); child.stdin.on('error', () => {}); input.pipe(child.stdin);
           child.stderr.resume();
           // Do not commit HTTP 200 for a worker that exits before producing any MP4 bytes.

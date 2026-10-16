@@ -30,7 +30,7 @@ test('real FFprobe/FFmpeg process authorized open files, preserve selected audio
     const processor = createMediaProcessor();
     server = createServer(async (req, res) => {
       const fd = await open(source, 'r');
-      try { await processor.stream(fd, res, { transcode: req.url === '/transcode', audioIndex: probe.audioTracks[1].index }); }
+      try { const inspected = await probeMedia(fd); assert.equal(inspected.width,160); assert.ok((await fd.stat()).isFile()); await processor.stream(fd, res, { transcode: req.url === '/transcode', audioIndex: probe.audioTracks[1].index }); }
       catch (error) { if (!res.headersSent) { res.writeHead(error.status ?? 500); res.end(); } else res.destroy(); }
       finally { await fd.close(); }
     });
