@@ -2,11 +2,11 @@ import type {MatrixClient,MatrixEvent} from 'matrix-js-sdk';
 import type {VerificationPeer} from './matrixVerificationSession';
 import {trackAuthorizedMatrixPeer} from './matrixTrackedPeer.mjs';
 export type ConversationMessage={id:string;text?:string;mine:boolean;createdAt:number;failed:boolean};
-export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transport:string;busy:boolean;roomReady?:boolean;error?:string;messages:ConversationMessage[]};
+export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transport:string;busy:boolean;roomReady?:boolean;historyAvailable?:boolean;error?:string;messages:ConversationMessage[]};
 /** Account-owned controller. Plaintext is projected only from successfully decrypted SDK events. */
 export function createMatrixConversationSession(client:MatrixClient,resolvePeer:(accountId:string)=>Promise<VerificationPeer>,bootstrap:(accountId:string)=>Promise<{roomId:string}>,enableSync:()=>Promise<void>){
  let retry:{roomId:string;text:string;transaction:string;attempts:number;devices:string;event?:MatrixEvent}|null=null;
- let closed=false,busy=false,version=0,state:ConversationSnapshot={transport:'connecting',busy:false,messages:[]};
+ let closed=false,busy=false,version=0,historyPages=0,state:ConversationSnapshot={transport:'connecting',busy:false,messages:[]};
  const listeners=new Set<(state:ConversationSnapshot)=>void>(),pending=new Set<Promise<unknown>>();
  const publish=(patch:Partial<ConversationSnapshot>)=>{if(closed)return;state={...state,...patch};for(const listener of listeners)listener(state);};
  const requireCurrent=(epoch:number)=>{if(closed||version!==epoch)throw new Error('Conversation changed or messaging closed.');};
@@ -22,7 +22,8 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
    messages.push({id:event.getId()!,text:content.body,mine:event.getSender()===client.getUserId(),createdAt:event.getTs(),failed:false});
   }
   const unique=[...new Map(messages.map(message=>[message.id,message])).values()];
-  const transport=client.getSyncState()??'connecting',roomReady=room?.getMyMembership()==='join'&&room?.getMember(state.peer?.matrixUserId??'')?.membership==='join'&&room?.currentState.getStateEvents('m.room.encryption','')?.getContent().algorithm==='m.megolm.v1.aes-sha2';if(JSON.stringify(unique)!==JSON.stringify(state.messages)||transport!==state.transport||roomReady!==state.roomReady)publish({messages:unique,transport,roomReady});
+  const historyAvailable=!!room?.oldState.paginationToken&&historyPages<3&&(room?.getLiveTimeline().getEvents().length??200)<200;
+  const transport=client.getSyncState()??'connecting',roomReady=room?.getMyMembership()==='join'&&room?.getMember(state.peer?.matrixUserId??'')?.membership==='join'&&room?.currentState.getStateEvents('m.room.encryption','')?.getContent().algorithm==='m.megolm.v1.aes-sha2';if(JSON.stringify(unique)!==JSON.stringify(state.messages)||transport!==state.transport||roomReady!==state.roomReady||historyAvailable!==state.historyAvailable)publish({messages:unique,transport,roomReady,historyAvailable});
  }
  const timer=setInterval(project,300);
  async function guard(epoch:number){
@@ -43,7 +44,14 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
  }
  return {
   subscribe(listener:(state:ConversationSnapshot)=>void){listeners.add(listener);listener(state);return()=>{listeners.delete(listener);};},
-  open(accountId:string){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=++version;publish({busy:true,error:undefined,messages:[],roomId:undefined,peer:undefined});try{const peer=await resolvePeer(accountId);requireCurrent(epoch);const {roomId}=await bootstrap(accountId);requireCurrent(epoch);await client.joinRoom(roomId);requireCurrent(epoch);publish({peer,roomId});await enableSync();requireCurrent(epoch);project();}catch(reason){if(!closed&&version===epoch)publish({error:reason instanceof Error?reason.message:'Conversation setup failed.'});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+  open(accountId:string){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;historyPages=0;const epoch=++version;publish({busy:true,error:undefined,messages:[],roomId:undefined,peer:undefined,historyAvailable:false});try{const peer=await resolvePeer(accountId);requireCurrent(epoch);const {roomId}=await bootstrap(accountId);requireCurrent(epoch);await client.joinRoom(roomId);requireCurrent(epoch);publish({peer,roomId});await enableSync();requireCurrent(epoch);project();}catch(reason){if(!closed&&version===epoch)publish({error:reason instanceof Error?reason.message:'Conversation setup failed.'});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+  loadOlder(){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{
+   if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Messaging is reconnecting. History was not requested.');
+   const {roomId}=await guard(epoch),room=client.getRoom(roomId)!;
+   const remaining=200-room.getLiveTimeline().getEvents().length;
+   if(historyPages>=3||remaining<=0||!room.oldState.paginationToken)return;
+   await client.scrollback(room,Math.min(50,remaining));requireCurrent(epoch);historyPages++;project();
+  }catch(reason){if(!closed&&version===epoch)publish({error:reason instanceof Error?reason.message:'Older encrypted history could not be loaded.'});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
   send(text:string){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');if(!text.trim()||new TextEncoder().encode(text).length>16384)throw new Error('Enter a message of at most 16 KiB.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Messaging is reconnecting. Your draft was not sent.');const {roomId,crypto,devices}=await guard(epoch);
    if(retry&&(retry.roomId!==roomId||retry.text!==text||retry.devices!==devices))throw new Error('An uncertain send is pending. Keep the same draft and devices, or stop messaging and inspect history before sending anything else.');
    if(retry&&retry.attempts>=3)throw new Error('The three-attempt retry limit was reached. Stop messaging and inspect history before another send.');

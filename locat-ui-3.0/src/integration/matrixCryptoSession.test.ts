@@ -50,7 +50,7 @@ it('holds the crypto store lock until an in-progress history import settles duri
 
 it('refreshes room state on each open without letting an old sync acknowledge a newer selection',async()=>{
  vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
- const room={getLiveTimeline:()=>({getEvents:()=>[]}),getMyMembership:()=> 'join',getMember:()=>({membership:'join'}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})}};
+ const room={oldState:{paginationToken:null},getLiveTimeline:()=>({getEvents:()=>[]}),getMyMembership:()=> 'join',getMember:()=>({membership:'join'}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})}};
  const start=vi.fn();create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop,getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=>binding.userId,joinRoom:vi.fn(async()=>{}),startClient:start});
  linkRequest.mockImplementation(async(path:string)=>path.startsWith('matrix/peer?')?{accountId:'b'.repeat(32),matrixUserId:'@bob:locat.test',devices:[{deviceId:'BOB'}]}:path==='matrix/conversation'?{roomId:'!room:locat.test'}:{});
  const fetch=vi.fn<(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>>().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch',fetch);

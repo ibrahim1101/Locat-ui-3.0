@@ -3,11 +3,11 @@ import type {MatrixClient} from 'matrix-js-sdk';
 import {createMatrixConversationSession,type MatrixConversationSession} from './matrixConversationSession';
 vi.mock('./matrixTrackedPeer.mjs',()=>({trackAuthorizedMatrixPeer:vi.fn(async()=>{})}));
 const peer={accountId:'b'.repeat(32),matrixUserId:'@bob:test',devices:[{deviceId:'BOB'}]};
-let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>;
-beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});
- const room={getPendingEvents:()=>pendingEvents,getLiveTimeline:()=>({getEvents:()=>events}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})},getMembers:()=>members.map(userId=>({userId,membership:'join'})),getMyMembership:()=> 'join',getMember:()=>({membership:'join'})};
+let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
+beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
+ const room={oldState:pagination,getPendingEvents:()=>pendingEvents,getLiveTimeline:()=>({getEvents:()=>events}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})},getMembers:()=>members.map(userId=>({userId,membership:'join'})),getMyMembership:()=> 'join',getMember:()=>({membership:'join'})};
  const crypto={getUserDeviceInfo:vi.fn(async()=>new Map([[peer.matrixUserId,new Map([['BOB',{}]])]])),getDeviceVerificationStatus:vi.fn(async()=>({isVerified:()=>verified})),isEncryptionEnabledInRoom:vi.fn(async()=>true),forceDiscardSession:discard};
- const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,resendEvent:resend,decryptEventIfNeeded:vi.fn(async()=>{})};
+ const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,resendEvent:resend,scrollback,decryptEventIfNeeded:vi.fn(async()=>{})};
  session=createMatrixConversationSession(client as unknown as MatrixClient,resolve,async()=>({roomId:'!room:test'}),async()=>{});
 });
 afterEach(async()=>{await session.close();});
@@ -19,3 +19,13 @@ it('projects no plaintext wire events and deduplicates decrypted event IDs',asyn
  const event=(wire:string)=>({getWireType:()=>wire,getId:()=>'$same',getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>false,shouldAttemptDecryption:()=>false,isDecryptionFailure:()=>false,getContent:()=>({msgtype:'m.text',body:'decrypted'}),getType:()=> 'm.room.message',getTs:()=>123});events=[event('m.room.message'),event('m.room.encrypted'),event('m.room.encrypted')];await session.open(peer.accountId);expect(snapshot).toMatchObject({messages:[{id:'$same',text:'decrypted',failed:false}]});});
 
 it('retries the original SDK event rather than encrypting a second message after an uncertain response',async()=>{await session.open(peer.accountId);let original:unknown;send.mockImplementation(async(_room:string,_text:string,transaction:string)=>{original={getTxnId:()=>transaction,getId:()=> '~pending'};pendingEvents=[original];throw new Error('Connection interrupted');});await expect(session.send('secret')).rejects.toThrow('interrupted');await expect(session.send('different')).rejects.toThrow('uncertain send');await expect(session.send('secret')).resolves.toEqual({eventId:'$retried'});expect(send).toHaveBeenCalledOnce();expect(resend.mock.calls[0][0]).toBe(original);expect(discard).toHaveBeenCalledOnce();});
+
+it('loads bounded older SDK pages, serializes against sends and stops at the per-open page budget',async()=>{
+ await session.open(peer.accountId);let finish:()=>void=()=>{};scrollback.mockImplementationOnce(()=>new Promise<void>(done=>{finish=done;}));const loading=session.loadOlder();await vi.waitFor(()=>expect(scrollback).toHaveBeenCalledOnce());await expect(session.send('secret')).rejects.toThrow('current messaging');expect(scrollback.mock.calls[0][1]).toBe(50);finish();await loading;
+ scrollback.mockImplementation(async()=>{});await session.loadOlder();await session.loadOlder();await session.loadOlder();expect(scrollback).toHaveBeenCalledTimes(3);expect(send).not.toHaveBeenCalled();expect(discard).not.toHaveBeenCalled();
+});
+it('denies history access for unverified devices and never fetches beyond the 200-event display window',async()=>{
+ await session.open(peer.accountId);verified=false;await expect(session.loadOlder()).rejects.toThrow('Verify every');expect(scrollback).not.toHaveBeenCalled();verified=true;
+ const event={getWireType:()=> 'm.room.message'};events=Array.from({length:180},()=>event);await session.loadOlder();expect(scrollback.mock.calls[0][1]).toBe(20);
+ pagination.paginationToken='more';events=Array.from({length:200},()=>event);await session.loadOlder();expect(scrollback).toHaveBeenCalledOnce();
+});
