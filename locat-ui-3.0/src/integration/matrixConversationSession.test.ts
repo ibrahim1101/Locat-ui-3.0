@@ -29,3 +29,9 @@ it('denies history access for unverified devices and never fetches beyond the 20
  const event={getWireType:()=> 'm.room.message'};events=Array.from({length:180},()=>event);await session.loadOlder();expect(scrollback.mock.calls[0][1]).toBe(20);
  pagination.paginationToken='more';events=Array.from({length:200},()=>event);await session.loadOlder();expect(scrollback).toHaveBeenCalledOnce();
 });
+
+it('never replays an uncertain event after the five-minute retry window or a backward clock change',async()=>{
+ await session.open(peer.accountId);send.mockImplementation(async(_room:string,_text:string,transaction:string)=>{pendingEvents=[{getTxnId:()=>transaction,getId:()=> '~pending'}];throw new Error('Uncertain acknowledgement');});
+ const started=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(started);
+ try{await expect(session.send('secret')).rejects.toThrow('Uncertain');clock.mockReturnValue(started+300001);await expect(session.send('secret')).rejects.toThrow('retry window expired');clock.mockReturnValue(started-1);await expect(session.send('secret')).rejects.toThrow('retry window expired');expect(send).toHaveBeenCalledOnce();expect(resend).not.toHaveBeenCalled();}finally{clock.mockRestore();}
+});

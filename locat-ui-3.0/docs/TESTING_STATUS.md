@@ -6,7 +6,7 @@ Evidence is for this application, not certification inherited from the original 
 | --- | --- |
 | Current production source | Local 01c1e85bc987ff9f0608997c202f6f065fcce003, accepted within 443963655f3084f8526f44504b6ea3e2ecb7641b |
 | Local type/lint/build | Passed |
-| Frontend | 262 passed / 65 files |
+| Frontend | 266 passed / 65 files |
 | Backend | 111 passed |
 | Real Synapse/production HTTPS | Guarded controller + refreshed pinned keys, complete encrypted transport, offline restart, tamper/revocation and lost-ack original-event idempotence pass |
 | Accepted full browser candidate | 2d0e2ad / workflow 38868622567 / job 116867181610: seven scenarios (1.3m), three repetitions (10.3s); all four jobs succeeded |
@@ -22,3 +22,5 @@ Existing browser coverage for Link/private stores/history workers/Photos/Sentine
 Historical media acceptance: f3a4183 / workflow 38784656103 passed all four jobs, seven scenarios (40.7s) and three repetitions (12.5s), including native thumbnails/local-readiness. Earlier history is retained in ENGINEERING_HISTORY.md, BROWSER_FOUNDATION_ACCEPTANCE.md and docs/archive/TESTING_STATUS_353ca2b.md.
 
 The working text/UI path now meets the same-homeserver two-user secure-conversation objective in isolated Chromium. Broader durable sender/history/multi-room reliability, real process restart, public/international deployment and native hardware remain separate unfinished work.
+
+Current reliability follow-ons: published 474663e (room refresh) and 4b39f39 (bounded history); latest local retry-expiry/token-reissue/setup-retry source is pending publication/CI. Local 266 frontend/111 backend, type/lint/build and actual HTTPS/Synapse paging/third-room/new-token duplicate replay pass. Browser runs 38878644477 and 38879316491 each failed six-pass/one-failure at second-room setup/refresh, not accepted replacements for 4439636. See SESSION_HANDOFF.md for pending follow-on diagnostics and exact next task.

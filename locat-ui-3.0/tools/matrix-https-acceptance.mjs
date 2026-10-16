@@ -110,11 +110,23 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await until(async()=>{const event=bob.client.getRoom(conversation.roomId)?.findEventById(encryptedMessage.event_id);if(!event)return false;await bob.client.decryptEventIfNeeded(event);return event.getContent().body===messageMarker;},'production HTTPS SDK message encryption and recipient decryption',60000);
   assert.equal(alice.network.dropRoomAckOnce,false);assert.equal(new Set(alice.network.roomWrites.map(write=>write.path)).size,1,'Retry must reuse the same transaction');assert.equal(new Set(alice.network.roomWrites.map(write=>write.body)).size,1,'Retry must reuse the same ciphertext');assert.equal(bob.client.getRoom(conversation.roomId).getLiveTimeline().getEvents().filter(event=>event.getContent().body===messageMarker).length,1,'Lost acknowledgement retry must yield one message');assert.ok(alice.network.encryptedWrites.length>0);assert.ok(!JSON.stringify(alice.network.encryptedWrites).includes(messageMarker));
   await conversationController.loadOlder();assert.ok(alice.network.historyReads.length>0,'History controller must use the actual protected messages endpoint');for(const request of alice.network.historyReads){const query=new URL(request).searchParams;assert.equal(query.get('dir'),'b');assert.ok(Number(query.get('limit'))>0&&Number(query.get('limit'))<=50);}
+  const charlie=await account('https_charlie');await charlie.controller.close();
+  await json('/api/contacts/request',{...alice.auth,method:'POST',data:{userId:charlie.user.id}});await json('/api/contacts/respond',{...charlie.auth,method:'POST',data:{userId:alice.user.id,accept:true}});
+  await json('/api/link/matrix/conversation',{...charlie.auth,method:'POST',data:{accountId:alice.user.id,accessToken:charlie.issued.accessToken}});
+  await conversationController.open(charlie.user.id);
+  alice.network.roomSyncStarted=false;for(const control of alice.network.pending)control.abort();
+  await until(()=>alice.client.getRooms().filter(room=>room.getMyMembership()==='join').length===2,'new private room on existing HTTPS SDK client',60000);
+  await conversationController.open(bob.user.id);
+  const retainedPins=await alice.client.getCrypto().getOwnDeviceKeys();
   await Promise.all(conversations.map(controller=>controller.close()));for(const client of clients)client.stopClient();
+
+  const reissued=await json('/api/link/matrix/provision',{...alice.auth,method:'POST',data:{}});assert.equal(reissued.deviceId,alice.issued.deviceId);assert.equal(reissued.userId,alice.issued.userId);assert.notEqual(reissued.accessToken,alice.issued.accessToken);
+  await json('/api/link/matrix/bind',{...alice.auth,method:'POST',data:{...reissued,publicKeys:retainedPins}});
+  const originalWrite=alice.network.roomWrites[0],replayed=await json(originalWrite.path,{...alice.auth,method:'PUT',data:JSON.parse(originalWrite.body),headers:{Authorization:'Bearer '+reissued.accessToken}});assert.equal(replayed.event_id,encryptedMessage.event_id,'Same device/transaction/ciphertext after token reissue must return the original event');
 
   await json('/api/contacts/block',{...alice.auth,method:'POST',data:{userId:bob.user.id,blocked:true}});
   assert.equal((await api(conversationPath+'/messages?dir=b',{...alice.auth,headers:bearer})).status,403,'Blocking removes conversation history access');
-  assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:alice.issued.accessToken}})).status,404,'Blocking prevents conversation discovery');
+  assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:reissued.accessToken}})).status,404,'Blocking prevents conversation discovery');
   assert.equal((await api('/api/link/matrix/peer?accountId='+bob.user.id,alice.auth)).status,404,'Blocking removes peer discovery');
   assert.equal((await api('/_matrix/client/v3/keys/query',{...alice.auth,method:'POST',data:{device_keys:{[bob.issued.userId]:[]}},headers:bearer})).status,403,'Blocking removes key discovery');
   await json('/api/link/matrix/revoke-managed-device',{...bob.auth,method:'POST',data:{}});
@@ -124,10 +136,10 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await json('/api/link/revoke',{...alice.auth,method:'POST',data:{id:ownLink.id}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,403,'Revoked Link identity blocks the Matrix gateway');
   await until(async()=>(await fetch(upstream+protectedPath,{headers:bearer})).status===401,'queued Link revocation invalidates actual Matrix session');
-  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,...[alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
+  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,reissued.accessToken,...[alice,bob,charlie,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, controller-guarded encrypted key distribution/room sync/send/decryption and lost-ack original-event idempotency, bounded SDK history paging, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, controller-guarded encrypted key distribution/room sync/send/decryption and lost-ack original-event idempotency, bounded SDK history paging and same-device transaction idempotency after token reissue, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled([...controllers,...conversations].map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}
