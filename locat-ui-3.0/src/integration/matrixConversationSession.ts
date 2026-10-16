@@ -28,7 +28,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
  async function guard(epoch:number){
   const selected=state.peer,roomId=state.roomId;if(!selected||!roomId)throw new Error('Open a contact conversation first.');
   const peer=await resolvePeer(selected.accountId);requireCurrent(epoch);if(peer.matrixUserId!==selected.matrixUserId||!peer.devices.length)throw new Error('Contact or device authorization changed.');
-  await trackAuthorizedMatrixPeer(client,peer.matrixUserId);requireCurrent(epoch);
+  await trackAuthorizedMatrixPeer(client,peer.matrixUserId,true);requireCurrent(epoch);
   const crypto=client.getCrypto();if(!crypto)throw new Error('Messaging encryption is unavailable.');
   const devices=await crypto.getUserDeviceInfo([peer.matrixUserId],true);requireCurrent(epoch);
   for(const {deviceId} of peer.devices){if(!devices.get(peer.matrixUserId)?.has(deviceId)||(await crypto.getDeviceVerificationStatus(peer.matrixUserId,deviceId))?.isVerified()!==true)throw new Error('Verify every active contact device before sending.');requireCurrent(epoch);}

@@ -7,8 +7,8 @@ import {cannot} from '../contracts/common';
 import type {ComposerDraft} from '../contracts/messaging';
 import {useMatrixOwner} from './matrixOwnerContext';
 import type {ConversationSnapshot} from './matrixConversationSession';
-// Only the isolated CI acceptance build exercises Send until its browser security flow passes.
-export const conversationSendAccepted=import.meta.env.VITE_LOCAT_MESSAGING_ACCEPTANCE==='true';
+// Full native Chromium conversation/security acceptance: workflow 38868622567.
+export const conversationSendAccepted=true;
 export function LiveConversation({peerId}:{peerId:string}){
  const owner=useMatrixOwner(),navigate=useNavigate();const handle=owner?.handle;
  const [state,setState]=useState<ConversationSnapshot>({transport:'connecting',busy:false,messages:[]}),[error,setError]=useState(''),[draft,setDraft]=useState<ComposerDraft>({text:''});

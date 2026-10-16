@@ -75,8 +75,6 @@ jobs:
           cache-dependency-path: locat-ui-3.0/package-lock.json
       - run: npm ci
       - run: npm run build
-        env:
-          VITE_LOCAT_MESSAGING_ACCEPTANCE: 'true'
       - name: Install isolated Chromium test runtime
         run: npx playwright install --with-deps chromium
       - name: Set up browser Matrix acceptance Python
