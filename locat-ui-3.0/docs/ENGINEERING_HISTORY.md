@@ -1,3 +1,9 @@
+## Observed protected-transport source CI
+
+Published protected transport as 76908f6f4872a498d6b734e0d04383e7bdb685fc (tree matches local source/docs exactly). Workflow 38850540733 browser job 116810544497 passed seven main scenarios in 39.0 seconds and three foreground foundation repetitions in 12.4 seconds. Ubuntu job 116810544619 passed 252 frontend/63 files, 111 backend tests and the expanded full-gateway + production HTTPS encrypted messaging/Synapse fixture. macOS verification succeeded. Windows job 116810544655 subsequently completed successfully; all four jobs passed. No browser conversation UI has been added or certified.
+
+Shared Sheet review also confirmed the old `target.focus() ?? panel.focus()` expression always fell through because focus returns undefined. The replacement focuses one selected target and preserves an existing focus inside the dialog; both behaviors have source regression coverage. The prior CI repeat's exact cause remains unproven, even though the current full repeat run passed.
+
 ## Protected key distribution and scoped room synchronization — 2026-10-16
 
 Starting published fb97863dc3a935d726edfe1f443615af42c76a8c; ending local source 28fe65b5171631e783a93af96d745f7c98c49708. Added standard bounded Olm encrypted key delivery, bounded withheld metadata, exact current recipient/sender pins, active-device-only public key results with pin-change rejection, opt-in registered-room sync and response filtering. Default verification remains room-free. Actual SDK clients now complete the entire key/sync/send/decrypt path behind the gateway; additional real production HTTPS clients use real cookies, device proofs, managed binding and mutual SAS before encrypted messaging. Protected offline delivery after actual homeserver restart, duplicate suppression, tampered ciphertext rejection, revoked sync denial and DB/WAL plaintext scans pass. Still no built browser conversation controller or enabled Send.
