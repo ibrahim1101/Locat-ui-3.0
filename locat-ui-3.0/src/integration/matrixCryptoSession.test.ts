@@ -1,3 +1,5 @@
+import {IDBFactory} from 'fake-indexeddb';
+import {createMatrixOutbox} from './matrixOutbox';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {openMatrixCryptoSession} from './matrixCryptoSession';
 const {create,init,stop,crypto,linkRequest,linkClose,decryptHistory}=vi.hoisted(()=>({decryptHistory:vi.fn(),create:vi.fn(),init:vi.fn(),stop:vi.fn(),linkRequest:vi.fn().mockResolvedValue({}),linkClose:vi.fn(),crypto:{importRoomKeysAsJson:vi.fn(),globalBlacklistUnverifiedDevices:false,getOwnDeviceKeys:vi.fn(async()=>({ed25519:'synthetic-public-signing',curve25519:'synthetic-public-identity'}))}}));
@@ -5,7 +7,7 @@ vi.mock('./linkClient',()=>({BrowserLinkClient:class{connect=async()=>({token:'s
 vi.mock('./matrixHistory',()=>({decryptHistoryFile:decryptHistory,encryptHistoryExport:vi.fn()}));
 vi.mock('matrix-js-sdk',()=>({createClient:create,ClientEvent:{Sync:'sync'}}));
 const binding={accountId:'a'.repeat(32),userId:'@alice:locat.test',deviceId:'DEVICE',accessToken:'synthetic-test-token'};
-beforeEach(()=>{vi.clearAllMocks();linkRequest.mockReset().mockResolvedValue({});init.mockResolvedValue(undefined);create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop});vi.stubGlobal('isSecureContext',true);vi.stubGlobal('indexedDB',{});});
+beforeEach(()=>{vi.clearAllMocks();linkRequest.mockReset().mockResolvedValue({});init.mockResolvedValue(undefined);create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop});vi.stubGlobal('isSecureContext',true);vi.stubGlobal('indexedDB',new IDBFactory());});
 afterEach(()=>vi.unstubAllGlobals());
 it('holds an exclusive lock for a persistent account/device crypto store and releases on close',async()=>{
  let locked=false;const request=vi.fn(async(_name:string,_options:unknown,callback:(lock:object|null)=>Promise<void>)=>{if(locked)return callback(null);locked=true;try{return await callback({});}finally{locked=false;}});vi.stubGlobal('navigator',{locks:{request}});
@@ -74,5 +76,12 @@ it('waits for processed fresh room state, rejects stale refreshes and cancels se
 
 it('renews proof once for denied gateway reads but never replays SDK mutations',async()=>{
  vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
- const fetch=vi.fn().mockResolvedValue(new Response('{}',{status:403}));vi.stubGlobal('fetch',fetch);const value=await openMatrixCryptoSession(binding),transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch;try{const url=window.location.origin+'/_matrix/client/v3/sync';expect((await transport(url)).status).toBe(403);expect(fetch).toHaveBeenCalledTimes(2);expect(fetch.mock.calls[1][1].headers.get('X-Locat-Device-Proof')).toBe('renewed-proof');await transport(window.location.origin+'/_matrix/client/v3/keys/upload',{method:'POST',body:'{}'});expect(fetch).toHaveBeenCalledTimes(3);await transport(window.location.origin+'/_matrix/client/v3/rooms/room/send/m.room.encrypted/transaction',{method:'PUT',body:'{}'});expect(fetch).toHaveBeenCalledTimes(4);}finally{await value.close();}
+ const fetch=vi.fn().mockResolvedValue(new Response('{}',{status:403}));vi.stubGlobal('fetch',fetch);const value=await openMatrixCryptoSession(binding),transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch;try{const url=window.location.origin+'/_matrix/client/v3/sync';expect((await transport(url)).status).toBe(403);expect(fetch).toHaveBeenCalledTimes(2);expect(fetch.mock.calls[1][1].headers.get('X-Locat-Device-Proof')).toBe('renewed-proof');await transport(window.location.origin+'/_matrix/client/v3/keys/upload',{method:'POST',body:'{}'});expect(fetch).toHaveBeenCalledTimes(3);await transport(window.location.origin+'/_matrix/client/v3/sendToDevice/m.room.encrypted/transaction',{method:'PUT',body:'{}'});expect(fetch).toHaveBeenCalledTimes(4);}finally{await value.close();}
+});
+
+it('requires a committed ciphertext journal before invoking the encrypted send transport',async()=>{
+ vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});crypto.getOwnDeviceKeys.mockResolvedValueOnce({ed25519:'YWJj',curve25519:'YWJj'});
+ const fetch=vi.fn().mockResolvedValue(new Response('{}',{status:403}));vi.stubGlobal('fetch',fetch);const value=await openMatrixCryptoSession(binding),transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch;
+ const transaction='locat_11111111-1111-4111-8111-111111111111',roomId='!room:test',url=window.location.origin+'/_matrix/client/v3/rooms/'+encodeURIComponent(roomId)+'/send/m.room.encrypted/'+transaction,body=JSON.stringify({algorithm:'m.megolm.v1.aes-sha2',sender_key:'YWJj',ciphertext:'ZGVm',session_id:'Z2hp',device_id:'DEVICE'}),outbox=createMatrixOutbox(JSON.stringify([window.location.origin,binding.accountId,binding.userId,binding.deviceId]),binding.deviceId,'YWJj');
+ try{await expect(transport(url,{method:'PUT',body})).rejects.toThrow('transaction changed');expect(fetch).not.toHaveBeenCalled();await outbox.prepare({peerId:'b'.repeat(32),roomId,transaction,devices:'["BOB"]',createdAt:Date.now()});fetch.mockImplementation(async()=>{expect((await outbox.load())?.body).toBe(body);return new Response('{}',{status:403});});expect((await transport(url,{method:'PUT',body})).status).toBe(403);expect(fetch).toHaveBeenCalledOnce();expect((await outbox.load())?.attempts).toBe(1);}finally{await value.close();}
 });

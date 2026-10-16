@@ -1,10 +1,11 @@
-import type {MatrixClient,MatrixEvent} from 'matrix-js-sdk';
+import type {MatrixOutbox,PendingMatrixSend} from './matrixOutbox';
+import {MatrixEvent,EventStatus,type MatrixClient} from 'matrix-js-sdk';
 import type {VerificationPeer} from './matrixVerificationSession';
 import {trackAuthorizedMatrixPeer} from './matrixTrackedPeer.mjs';
 export type ConversationMessage={id:string;text?:string;mine:boolean;createdAt:number;failed:boolean};
-export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transport:string;busy:boolean;roomReady?:boolean;historyAvailable?:boolean;error?:string;messages:ConversationMessage[]};
+export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transport:string;busy:boolean;roomReady?:boolean;historyAvailable?:boolean;pendingSend?:PendingMatrixSend;error?:string;messages:ConversationMessage[]};
 /** Account-owned controller. Plaintext is projected only from successfully decrypted SDK events. */
-export function createMatrixConversationSession(client:MatrixClient,resolvePeer:(accountId:string)=>Promise<VerificationPeer>,bootstrap:(accountId:string)=>Promise<{roomId:string}>,enableSync:()=>Promise<void>){
+export function createMatrixConversationSession(client:MatrixClient,resolvePeer:(accountId:string)=>Promise<VerificationPeer>,bootstrap:(accountId:string)=>Promise<{roomId:string}>,enableSync:()=>Promise<void>,outbox?:MatrixOutbox){
  let retry:{roomId:string;text:string;transaction:string;createdAt:number;attempts:number;devices:string;event?:MatrixEvent}|null=null;
  let closed=false,busy=false,version=0,historyPages=0,state:ConversationSnapshot={transport:'connecting',busy:false,messages:[]};
  const decrypting=new WeakSet<MatrixEvent>();
@@ -27,6 +28,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
   const transport=client.getSyncState()??'connecting',roomReady=room?.getMyMembership()==='join'&&room?.getMember(state.peer?.matrixUserId??'')?.membership==='join'&&room?.currentState.getStateEvents('m.room.encryption','')?.getContent().algorithm==='m.megolm.v1.aes-sha2';if(JSON.stringify(unique)!==JSON.stringify(state.messages)||transport!==state.transport||roomReady!==state.roomReady||historyAvailable!==state.historyAvailable)publish({messages:unique,transport,roomReady,historyAvailable});
  }
  const timer=setInterval(project,300);
+ async function refreshPending(){if(!outbox)return;let pending=await outbox.load();if(pending&&!pending.body){await outbox.complete(pending.transaction);if(retry?.transaction===pending.transaction)retry=null;pending=undefined;}publish({pendingSend:pending});}
  async function guard(epoch:number){
   const selected=state.peer,roomId=state.roomId;if(!selected||!roomId)throw new Error('Open a contact conversation first.');
   const peer=await resolvePeer(selected.accountId);requireCurrent(epoch);if(peer.matrixUserId!==selected.matrixUserId||!peer.devices.length)throw new Error('Contact or device authorization changed.');
@@ -45,7 +47,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
  }
  return {
   subscribe(listener:(state:ConversationSnapshot)=>void){listeners.add(listener);listener(state);return()=>{listeners.delete(listener);};},
-  open(accountId:string){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;historyPages=0;const epoch=++version;publish({busy:true,error:undefined,messages:[],roomId:undefined,peer:undefined,historyAvailable:false});try{const peer=await resolvePeer(accountId);requireCurrent(epoch);const {roomId}=await bootstrap(accountId);requireCurrent(epoch);await client.joinRoom(roomId);requireCurrent(epoch);publish({peer,roomId});await enableSync();requireCurrent(epoch);project();}catch(reason){if(!closed&&version===epoch)publish({error:reason instanceof Error?reason.message:'Conversation setup failed.',roomId:undefined,peer:undefined,messages:[],roomReady:false,historyAvailable:false});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+  open(accountId:string){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;historyPages=0;const epoch=++version;publish({busy:true,error:undefined,messages:[],roomId:undefined,peer:undefined,historyAvailable:false});try{await refreshPending();requireCurrent(epoch);const peer=await resolvePeer(accountId);requireCurrent(epoch);const {roomId}=await bootstrap(accountId);requireCurrent(epoch);await client.joinRoom(roomId);requireCurrent(epoch);publish({peer,roomId});await enableSync();requireCurrent(epoch);await refreshPending();requireCurrent(epoch);project();}catch(reason){if(!closed&&version===epoch)publish({error:reason instanceof Error?reason.message:'Conversation setup failed.',roomId:undefined,peer:undefined,messages:[],roomReady:false,historyAvailable:false});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
   loadOlder(){return track(async()=>{if(closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{
    if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Messaging is reconnecting. History was not requested.');
    const {roomId}=await guard(epoch),room=client.getRoom(roomId)!;
@@ -58,11 +60,24 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
    // Synapse transaction mappings are finite-lived; an old transaction is not a permanent deduplication guarantee.
    if(retry&&(Date.now()<retry.createdAt||Date.now()-retry.createdAt>300000))throw new Error('The five-minute retry window expired. Stop messaging and inspect history before another send.');
    if(retry&&retry.attempts>=3)throw new Error('The three-attempt retry limit was reached. Stop messaging and inspect history before another send.');
-   if(!retry){await crypto.forceDiscardSession(roomId);requireCurrent(epoch);const checked=await guard(epoch);if(checked.devices!==devices)throw new Error('Contact devices changed while rotating encryption.');retry={roomId,text,devices,transaction:'locat_'+globalThis.crypto.randomUUID(),createdAt:Date.now(),attempts:0};}
+   if(outbox&&state.pendingSend)throw new Error('Review the pending encrypted send before composing another message.');
+   if(!retry){await crypto.forceDiscardSession(roomId);requireCurrent(epoch);const checked=await guard(epoch);if(checked.devices!==devices)throw new Error('Contact devices changed while rotating encryption.');const fresh={roomId,text,devices,transaction:'locat_'+globalThis.crypto.randomUUID(),createdAt:Date.now(),attempts:0};if(outbox){await outbox.prepare({peerId:state.peer!.accountId,roomId,transaction:fresh.transaction,devices,createdAt:fresh.createdAt});requireCurrent(epoch);}retry=fresh;}
    const pendingSend=retry;pendingSend.attempts++;let result;
    try{if(pendingSend.attempts>1){if(!pendingSend.event)throw new Error('The original SDK event is unavailable; automatic replay is blocked.');result=pendingSend.event.getId()?.startsWith('$')?{event_id:pendingSend.event.getId()!}:await client.resendEvent(pendingSend.event,client.getRoom(roomId)!);}else result=await client.sendTextMessage(roomId,text,pendingSend.transaction);}
    catch(reason){const room=client.getRoom(roomId);const pendingEvents:MatrixEvent[]=[];try{pendingEvents.push(...(room?.getPendingEvents()??[]));}catch{/* Chronological rooms keep pending events on their timeline. */}pendingEvents.push(...(room?.getLiveTimeline().getEvents()??[]));pendingSend.event=pendingEvents.find(event=>event.getTxnId()===pendingSend.transaction);if(pendingSend.event?.getId()?.startsWith('$'))result={event_id:pendingSend.event.getId()!};else throw reason;}
-   requireCurrent(epoch);retry=null;project();return {eventId:result.event_id};}catch(reason){if(!closed&&version===epoch)publish({error:'Send was not confirmed. Check the conversation before retrying; a server-accepted message may still arrive. '+(reason instanceof Error?reason.message:'Encryption failed.')});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+   if(outbox)await outbox.complete(pendingSend.transaction);requireCurrent(epoch);retry=null;publish({pendingSend:undefined});project();return {eventId:result.event_id};}catch(reason){if(outbox&&!closed){try{await refreshPending();}catch{/* Preserve the original failure; storage failures still prevent sends. */}}if(!closed&&version===epoch)publish({error:'Send was not confirmed. Check the conversation before retrying; a server-accepted message may still arrive. '+(reason instanceof Error?reason.message:'Encryption failed.')});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+  recoverPending(){return track(async()=>{if(!outbox||closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{
+   if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Wait for messaging to reconnect.');
+   const pending=await outbox.load();requireCurrent(epoch);if(!pending?.body||pending.peerId!==state.peer?.accountId||pending.roomId!==state.roomId)throw new Error('Open the original pending conversation.');
+   const checked=await guard(epoch);if(checked.devices!==pending.devices)throw new Error('Contact devices changed. Pending ciphertext was not resent.');outbox.check(pending);
+   const room=client.getRoom(pending.roomId)!;let event=room.getEventForTxnId(pending.transaction);
+   let eventId=event?.getId();if(!eventId?.startsWith('$')){
+    if(!event){event=new MatrixEvent({event_id:'~'+pending.transaction,room_id:pending.roomId,sender:client.getUserId()!,type:'m.room.encrypted',content:JSON.parse(pending.body),origin_server_ts:pending.createdAt});event.setTxnId(pending.transaction);event.setStatus(EventStatus.NOT_SENT);room.addPendingEvent(event,pending.transaction);}
+    const result=await client.resendEvent(event,room);eventId=result.event_id;
+   }
+   if(!eventId?.startsWith('$'))throw new Error('The encrypted retry was not acknowledged.');await outbox.complete(pending.transaction);requireCurrent(epoch);retry=null;publish({pendingSend:undefined});project();return {eventId};
+  }catch(reason){if(!closed){await refreshPending().catch(()=>{});publish({error:reason instanceof Error?reason.message:'Encrypted retry failed.'});}throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
+  forgetPending(){return track(async()=>{if(!outbox||closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;try{const pending=await outbox.load();requireCurrent(epoch);if(!pending)throw new Error('No pending encrypted retry remains.');await outbox.complete(pending.transaction);requireCurrent(epoch);retry=null;publish({pendingSend:undefined,error:undefined});}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
   async close(){if(closed)return;closed=true;version++;clearInterval(timer);retry=null;listeners.clear();await Promise.allSettled([...pending]);},
  };
 }
