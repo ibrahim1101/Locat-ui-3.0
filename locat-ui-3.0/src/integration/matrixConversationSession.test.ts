@@ -40,3 +40,7 @@ it('observes an existing SDK decryption promise without continually requesting r
  let finish:()=>void=()=>{};const existing=new Promise<void>(done=>{finish=done;});events=[{getWireType:()=> 'm.room.encrypted',getId:()=> '$pending',getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>true,getDecryptionPromise:()=>existing}];
  try{await session.open(peer.accountId);await new Promise(resolve=>setTimeout(resolve,650));expect(decrypt).not.toHaveBeenCalled();let closed=false;const closing=session.close().then(()=>{closed=true;});await Promise.resolve();expect(closed).toBe(false);finish();await closing;expect(closed).toBe(true);}finally{finish();}
 });
+
+it('shares shutdown completion so a second close cannot release ownership before pending work settles',async()=>{
+ await session.open(peer.accountId);let finish:(value:typeof peer)=>void=()=>{};resolve.mockImplementationOnce(()=>new Promise(done=>{finish=done;}));const sending=expect(session.send('private draft')).rejects.toThrow('closed');const first=session.close(),second=session.close();expect(first).toBe(second);let settled=false;void second.then(()=>{settled=true;});await Promise.resolve();expect(settled).toBe(false);finish(peer);await Promise.all([first,second,sending]);expect(settled).toBe(true);expect(send).not.toHaveBeenCalled();
+});

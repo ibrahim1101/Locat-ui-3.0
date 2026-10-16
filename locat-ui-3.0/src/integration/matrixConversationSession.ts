@@ -7,6 +7,7 @@ export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transpor
 /** Account-owned controller. Plaintext is projected only from successfully decrypted SDK events. */
 export function createMatrixConversationSession(client:MatrixClient,resolvePeer:(accountId:string)=>Promise<VerificationPeer>,bootstrap:(accountId:string)=>Promise<{roomId:string}>,enableSync:()=>Promise<void>,outbox?:MatrixOutbox){
  let retry:{roomId:string;text:string;transaction:string;createdAt:number;attempts:number;devices:string;event?:MatrixEvent}|null=null;
+ let closing:Promise<void>|null=null;
  let closed=false,busy=false,version=0,historyPages=0,state:ConversationSnapshot={transport:'connecting',busy:false,messages:[]};
  const decrypting=new WeakSet<MatrixEvent>();
  const listeners=new Set<(state:ConversationSnapshot)=>void>(),pending=new Set<Promise<unknown>>();
@@ -78,7 +79,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
    if(!eventId?.startsWith('$'))throw new Error('The encrypted retry was not acknowledged.');await outbox.complete(pending.transaction);requireCurrent(epoch);retry=null;publish({pendingSend:undefined});project();return {eventId};
   }catch(reason){if(!closed){await refreshPending().catch(()=>{});publish({error:reason instanceof Error?reason.message:'Encrypted retry failed.'});}throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
   forgetPending(){return track(async()=>{if(!outbox||closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;try{const pending=await outbox.load();requireCurrent(epoch);if(!pending)throw new Error('No pending encrypted retry remains.');await outbox.complete(pending.transaction);requireCurrent(epoch);retry=null;publish({pendingSend:undefined,error:undefined});}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
-  async close(){if(closed)return;closed=true;version++;clearInterval(timer);retry=null;listeners.clear();await Promise.allSettled([...pending]);},
+  close(){if(closing)return closing;closed=true;version++;clearInterval(timer);retry=null;listeners.clear();return closing=Promise.allSettled([...pending]).then(()=>{});},
  };
 }
 export type MatrixConversationSession=ReturnType<typeof createMatrixConversationSession>;

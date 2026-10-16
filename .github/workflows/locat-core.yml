@@ -28,8 +28,24 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install ffmpeg openssl --yes --no-progress
-          "$env:ProgramFiles\OpenSSL-Win64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $ErrorActionPreference = 'Stop'
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install ffmpeg openssl --yes --no-progress
+            $env:Path = "$env:ProgramFiles\OpenSSL-Win64\bin;" + [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $env:Path
+            $tools = @('ffmpeg', 'ffprobe', 'openssl')
+            $missing = @($tools | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) })
+            if ($missing.Count -eq 0) { break }
+            if ($attempt -eq 3) { throw "Media/TLS installation incomplete after three attempts: $($missing -join ', ')" }
+            Write-Warning 'Package feed or tool installation unavailable; retrying in ten seconds.'
+            Start-Sleep -Seconds 10
+          }
+          $tools | ForEach-Object { Split-Path (Get-Command $_).Source } | Select-Object -Unique | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          ffmpeg -version
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg startup failed' }
+          ffprobe -version
+          if ($LASTEXITCODE -ne 0) { throw 'FFprobe startup failed' }
+          openssl version
+          if ($LASTEXITCODE -ne 0) { throw 'OpenSSL startup failed' }
       - name: Install macOS media and TLS test tools
         if: runner.os == 'macOS'
         run: |
