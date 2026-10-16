@@ -67,14 +67,15 @@ export function matrixBindingStore(sql,devices,managedDevices){
  };
 }
 export function createMatrixBindingHandler({store,provider,provisioner,conversations,body,json,audit}){
- const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30),peerLimit=createRateLimiter(30);
+ // Reviewed SDK sends require several fresh peer guards; cap active reads per account, not per device.
+ const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30),peerLimit=createRateLimiter(30),activePeerLimit=createRateLimiter(120);
  return async({req,res,url,userId,actor,session,recheck})=>{
   const action=url.pathname.slice('/api/link/matrix/'.length);
   if(req.method==='GET'&&action==='status'){json(res,200,{configured:!!provider,managedProvisioning:!!provisioner,serverName:provider?.serverName??null,...store.status(userId,actor),authorizedHere:store.current(userId,actor)?.sessionHash===matrixTokenHash(session)&&store.current(userId,actor)?.expiresAt>Date.now()});return true;}
   if(req.method==='GET'&&action==='peer'){
-   if(!provider)fail(503,'Matrix sidecar is not configured');const retryAfter=peerLimit(userId);if(retryAfter)throw Object.assign(new Error('Messaging contact lookup rate limit exceeded'),{status:429,retryAfter});
+   if(!provider)fail(503,'Matrix sidecar is not configured');const own=store.current(userId,actor),active=!!own&&own.sessionHash===matrixTokenHash(session)&&own.expiresAt>Date.now();const retryAfter=(active?activePeerLimit:peerLimit)(userId);if(retryAfter)throw Object.assign(new Error('Messaging contact lookup rate limit exceeded'),{status:429,retryAfter});
    if([...url.searchParams.keys()].length!==1||url.searchParams.size!==1||(!url.searchParams.has('accountId')&&!url.searchParams.has('matrixUserId'))||url.searchParams.has('accountId')&&!/^[a-f0-9]{32}$/.test(url.searchParams.get('accountId')??'')||url.searchParams.has('matrixUserId')&&!/^@[^\s:]{1,255}:[^\s]{1,255}$/.test(url.searchParams.get('matrixUserId')??''))fail(400,'Choose one local contact account identity');
-   const own=store.current(userId,actor);if(!own||own.sessionHash!==matrixTokenHash(session)||own.expiresAt<=Date.now())fail(403,'Bind this messaging device to the current Locat session first');
+   if(!active)fail(403,'Bind this messaging device to the current Locat session first');
    recheck();json(res,200,url.searchParams.has('accountId')?store.peer(userId,actor,url.searchParams.get('accountId')):store.peerByMatrix(userId,actor,url.searchParams.get('matrixUserId')));return true;
   }
   if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device','conversation'].includes(action))fail(404,'Unknown Matrix binding action');

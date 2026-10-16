@@ -66,3 +66,15 @@ test('cleanup cannot act after authorization changes while its request body is b
   await reading;allowed=false;release();await assert.rejects(operation,{status:401});assert.equal(mutated,false,action+' must retain the fresh authorization guard');
  }
 });
+
+test('active session-bound peer guards have a bounded shared messaging budget without admitting expired or foreign sessions',async()=>{
+ let current=null,peers=0,authorized=true;
+ const handler=createMatrixBindingHandler({store:{current:()=>current,peer(){peers++;return {matrixUserId:'@peer:matrix.test'};}},provider:{},body:async()=>({}),json(){},audit(){}});
+ const call=(session='session',actor=1,userId='owner')=>handler({req:{method:'GET'},res:{},url:new URL('http://locat.test/api/link/matrix/peer?accountId='+'b'.repeat(32)),userId,actor,session,recheck(){if(!authorized)throw Object.assign(new Error('Revoked'),{status:403});}});
+ for(let index=0;index<30;index++)await assert.rejects(call(),{status:403});await assert.rejects(call(),{status:429});assert.equal(peers,0);
+ current={sessionHash:matrixTokenHash('session'),expiresAt:Date.now()+60000};
+ for(let index=0;index<120;index++)await call('session',index%2+1);assert.equal(peers,120);await assert.rejects(call(),{status:429});
+ await assert.rejects(call('foreign',1,'foreign-session-budget'),{status:403});
+ current={...current,expiresAt:0};await assert.rejects(call('session',1,'expired-budget'),{status:403});
+ current={...current,expiresAt:Date.now()+60000};authorized=false;await assert.rejects(call('session',1,'revoked-budget'),{status:403});assert.equal(peers,120);
+});

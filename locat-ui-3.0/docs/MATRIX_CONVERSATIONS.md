@@ -64,3 +64,6 @@ Starting source **db644f7**; fixture-only local **3ea832c25f704c98f56501fb65eecc
 
 
 Cancelling a failed managed renewal preserves an established Matrix device and its published keys. Locat blocks the unconfirmed grant and reports partial cleanup; its upstream token can remain valid on the private homeserver until explicit managed-device revocation. Matrix logout removes the whole associated device and all its tokens. It is not a non-destructive single-token cleanup; restoring deleted server device state requires recovery.
+
+
+Pending room recovery: new rooms carry a random operation alias/marker. Reopen performs read-only checks of that exact original private encrypted room, never another create attempt. Existing ready IDs are retained. Old pending reservations without aliases, unavailable state or lost authorization stay blocked; a currently authorized joined member, normally the creator, must perform recovery.
