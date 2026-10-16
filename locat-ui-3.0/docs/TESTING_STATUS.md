@@ -1,30 +1,22 @@
-# Locat UI3 current testing status — 2026-10-15
+# Locat UI3 current testing status — 2026-10-16
 
-This is acceptance evidence for this UI3 application. Original-Locat tests and roadmap implementation labels are feature-reference material, not proof that the new app has those capabilities.
-
-## Current source
-
-Production-source revision: `353ca2b5a28302860aff548a95aa3917142dc4c4`. Fixture cleanup revision: `f3a41830cca43b13565f8d1914b136c5eada512d`.
+Evidence is for this application, not certification inherited from the original Locat repository. Full roadmap/all-49 scope remains in MASTER_ROADMAP.md and ORIGINAL_LOCAT_REQUIREMENTS.md.
 
 | Check | Observed result |
 | --- | --- |
-| TypeScript / ESLint / production build | Passed locally |
-| Frontend | 250 passed across 62 files |
-| Backend | 105 passed |
-| Corrected Chromium CI | Workflow 38784656103 / job 116593436148: seven scenarios passed (40.7s), three foundation repetitions passed (12.5s) |
-| Current OS source CI | Ubuntu, macOS and Windows verification jobs passed on workflow 38784656103 |
-| Preceding accepted timeline CI | Workflow 38781851921: Ubuntu, macOS, Windows and Chromium jobs passed; seven browser scenarios (40.4s) plus three foundation repetitions (12.2s) |
+| Current production source | Local 01c1e85bc987ff9f0608997c202f6f065fcce003, published within 413c1cc5d45255d002f35724547ed837483e57f2 |
+| Local type/lint/build | Passed |
+| Frontend | 262 passed / 65 files |
+| Backend | 111 passed |
+| Real Synapse/production HTTPS | Guarded controller + refreshed pinned keys, complete encrypted transport, offline restart, tamper/revocation and lost-ack original-event idempotence pass |
+| Accepted full browser candidate | 2d0e2ad / workflow 38868622567 / job 116867181610: seven scenarios (1.3m), three repetitions (10.3s); all four jobs succeeded |
+| Normal-build follow-on | 413c1cc / workflow 38869589775: all OS jobs passed; browser 116870283567 passed six scenarios but messaging timed out in tamper interception setup |
+| Corrected fixture | Local abc6ebb995a1c97988d17bc9a81affd96950da7d; normal-build browser rerun pending |
 
-The current browser scenario tests stored WebP metadata through the fixture account's native IndexedDB, native 800×400-to-320×160 resizing and local cards/import readiness while fixture server inventory is withheld. These assertions now have an observed passing run. Runs 38783128218 and 38784072597 failed Photos fixture inspection/cleanup respectively; the other six scenarios passed in each. No CSP or success assertion was relaxed. Detailed failed/pass evidence remains in [BROWSER_FOUNDATION_ACCEPTANCE.md](BROWSER_FOUNDATION_ACCEPTANCE.md) and [ENGINEERING_HISTORY.md](ENGINEERING_HISTORY.md).
+The accepted full browser flow used actual accounts/cookies/proofs, Contacts UI, mutual SAS, native IndexedDB crypto ownership, composer send/decrypt, unverified-device block, offline delivery after actual Synapse restart, reload/key/trust/history reopening, cross-account denial, ciphertext tamper rejection, live device revocation and Matrix write/database/WAL plaintext checks. The subsequent normal-source run passed through send/offline/reload/cross-account, then failed before a newly intercepted sync request appeared. The corrected handler registers before post-reload sync and enables tampering only later; existing offline checks run without it. A corrected actual browser pass is still required.
 
-## What the evidence does and does not cover
+Default source enables encrypted text after the full accepted candidate; the acceptance-only build setting is removed. This is experimental development, not public-beta, independent security review or physical/international-network acceptance. Read SESSION_HANDOFF.md and MESSAGING_QUICKSTART.md.
 
-- Actual Chromium foundation, two-context Link transfer/revocation, managed Matrix store continuity, Contacts-to-SAS comparisons, encrypted history workers, Photos and Sentinel have preceding observed passes. Current thumbnail/readiness additions passed the corrected run.
-- Storage regression uses fake-indexeddb: old synchronous clone failure partially committed; explicit abort now preserves existing rows and prevents partial inserts. Provider quota/cache fallback is mocked; real-disk quota behavior is not certified.
-- Photo unit/DOM tests cover import-calendar grouping, invalid/legacy timestamps, drawing/history, tags, bounded duplicate hashing, thumbnail bounds/late cleanup and hydration races. Source downloads and original-file preservation also have actual browser assertions.
-- Source CI on Windows/macOS/Linux is not a native installer, physical input, hardware codec, background notification, screen-capture/TURN, complete recovery or federation certification.
-- Private conversations remain disabled; cloud Photos backup/sync/sharing, camera/EXIF timelines and full identity recovery remain incomplete. Browser-local media/thumbnail copies remain plaintext as described in the UI.
+Existing browser coverage for Link/private stores/history workers/Photos/Sentinel remains. Three-OS source jobs do not certify native installers, hardware codecs/input, notifications, capture/control or actual TURN relay. Durable sender outbox, broad history/multiple-room lifecycle, full identity recovery/cross-signing, federation/public hosting and native acceptance remain incomplete. Browser-local media remains plaintext as described in the UI.
 
-Read [SESSION_HANDOFF.md](SESSION_HANDOFF.md), [MASTER_ROADMAP.md](MASTER_ROADMAP.md), [ORIGINAL_LOCAT_REQUIREMENTS.md](ORIGINAL_LOCAT_REQUIREMENTS.md) and [NATIVE_PLATFORM_STATUS.md](NATIVE_PLATFORM_STATUS.md) before expanding acceptance claims.
-
-Previous testing notes are preserved byte-for-byte in [archive/TESTING_STATUS_353ca2b.md](archive/TESTING_STATUS_353ca2b.md). Historical statements there do not supersede later failures or the current checkpoint.
+Historical media acceptance: f3a4183 / workflow 38784656103 passed all four jobs, seven scenarios (40.7s) and three repetitions (12.5s), including native thumbnails/local-readiness. Earlier history is retained in ENGINEERING_HISTORY.md, BROWSER_FOUNDATION_ACCEPTANCE.md and docs/archive/TESTING_STATUS_353ca2b.md.

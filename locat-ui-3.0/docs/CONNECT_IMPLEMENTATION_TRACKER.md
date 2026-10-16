@@ -50,3 +50,5 @@ Candidate run 38868048025 / browser 116865324508 failed after unverified-device 
 ## Observed working browser conversations — 2026-10-16
 
 2d0e2ad / workflow 38868622567 / browser 116867181610 passed seven scenarios (1.3m), then three repetitions (10.3s); all four jobs passed. Two actual built UI accounts exchange SDK-encrypted text with SAS, offline/Synapse restart, reload/trust/history, unverified-device, cross-account, tamper, revocation and no-plaintext checks. Normal source now enables Send after that acceptance, removes the CI-only build setting and explicitly refreshes SDK peer keys before guards; its own normal-build CI remains to be observed. Secure-conversation behavior is demonstrated in isolated Chromium, while broader B–G/public/native/federation/recovery scope remains incomplete.
+
+Normal-build follow-on 413c1cc / run 38869589775 passed all OS jobs but browser messaging timed out before the tamper setup observed a new intercepted request. The corrected fixture registers interception before post-reload sync starts; no crypto assertion was relaxed. Production source is unchanged; corrected normal-build acceptance remains pending.

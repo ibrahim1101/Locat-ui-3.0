@@ -1,6 +1,6 @@
 # Self-hosted UI 3.0 server
 
-Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Private chat, reviewed messaging E2EE, native clients and advanced administration remain incomplete. Progressive FFmpeg conversion is connected with documented limits. Nothing is automatically deployed.
+Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Experimental encrypted text conversations now use the optional private Matrix/Synapse service and have actual browser acceptance. Full recovery, broader messaging, native clients and advanced administration remain incomplete. See MESSAGING_QUICKSTART.md for the verified workflow and limits. Progressive FFmpeg conversion is connected with documented limits. Nothing is automatically deployed.
 
 ## One machine
 

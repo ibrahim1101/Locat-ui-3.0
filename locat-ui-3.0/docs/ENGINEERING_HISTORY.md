@@ -1,3 +1,11 @@
+## Normal-build browser tamper interception ordering
+
+413c1cc5d45255d002f35724547ed837483e57f2 / workflow 38869589775 passed Ubuntu/macOS/Windows source jobs. Browser 116870283567 passed six scenarios; the messaging scenario passed actual send/offline restart/reload/cross-account stages, then timed out before seeing a new sync request in its tamper setup. The prior complete candidate at 2d0e2ad remains accepted historical evidence, not a pass for this failed follow-on.
+
+Fixture checkpoint abc6ebb995a1c97988d17bc9a81affd96950da7d installs the sync handler before post-reload crypto starts and enables mutation only for the tamper stage. This removes the timing dependency on forcing a newly intercepted request with a brief offline pulse. Earlier real offline/restart checks occur before this route handler is installed, so interception does not bypass offline semantics. Sender identity comes from DOM text content, and header-capture promises tolerate context teardown without dumping credentials. Required tamper/decryption-failure/revocation/no-plaintext assertions and timeouts are retained. Production source remains 01c1e85, locally validated with 262 frontend/111 backend, type/lint/build and real refreshed-key HTTPS/lost-ack acceptance. Node syntax/browser discovery pass; corrected browser execution remains pending.
+
+Updated stale UI-only READMEs, self-hosting introduction and added MESSAGING_QUICKSTART.md. The guide distinguishes verified browser text flow, operator prerequisites and incomplete recovery/native/global scope. No services or DNS activated.
+
 ## Full encrypted UI/security browser acceptance; normal Send enabled
 
 Corrected source 2d0e2ad2f8e423e003e6b57156a3205dc8317f91 / workflow 38868622567 passed all four jobs. Browser 116867181610 passed seven scenarios (1.3m) and three repetitions (10.3s). The complete built UI scenario passed actual Send/decrypt, unverified-device block, offline recipient + homeserver restart, reload/native key/trust/history recovery and reply, cross-account credentials rejection, tampered ciphertext rejection, live Devices revocation/new-access denial and Matrix write/database/WAL plaintext absence. The earlier locator failure remains a failed run, not counted as messaging acceptance.

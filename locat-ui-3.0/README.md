@@ -1,10 +1,14 @@
 # Locat UI 3.0
 
-A presentation-only UI foundation for the Locat ecosystem. It is built with React 19, TypeScript, Vite, Tailwind and Lucide, and runs standalone on isolated fixtures. It contains no backend, auth, crypto or media engine.
+The live Locat UI 3.0 development app, with a self-hosted Node server, authenticated accounts, local/media/private-store integrations and optional Matrix/Synapse encrypted text conversations. React 19, TypeScript, Vite, Tailwind and Lucide retain the UI 3.0 theme. Preview fixtures remain explicitly separate.
+
+See [SELF_HOSTING.md](docs/SELF_HOSTING.md), [MESSAGING_QUICKSTART.md](docs/MESSAGING_QUICKSTART.md), [SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md) and the complete [MASTER_ROADMAP.md](docs/MASTER_ROADMAP.md). Browser tests do not certify public deployment, independent security review or physical native compatibility.
 
 ```bash
-npm install
-npm run dev      # http://localhost:5173
+npm ci
+npm run build
+npm start        # built app + API, after operator configuration
+# For frontend work: npm run dev and npm run dev:server
 npm run check && npm run lint && npm test && npm run build
 ```
 
