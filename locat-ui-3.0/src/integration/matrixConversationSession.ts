@@ -70,9 +70,12 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
   recoverPending(){return track(async()=>{if(!outbox||closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{
    if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Wait for messaging to reconnect.');
    const pending=await outbox.load();requireCurrent(epoch);if(!pending?.body||pending.peerId!==state.peer?.accountId||pending.roomId!==state.roomId)throw new Error('Open the original pending conversation.');
-   const checked=await guard(epoch);if(checked.devices!==pending.devices)throw new Error('Contact devices changed. Pending ciphertext was not resent.');outbox.check(pending);
-   const room=client.getRoom(pending.roomId)!;let event=room.getEventForTxnId(pending.transaction);
-   let eventId=event?.getId();if(!eventId?.startsWith('$')){
+   const checked=await guard(epoch);if(checked.devices!==pending.devices)throw new Error('Contact devices changed. Pending ciphertext was not resent.');
+   const room=client.getRoom(pending.roomId)!,wire=JSON.parse(pending.body) as Record<string,string>;
+   const acknowledged=(event:MatrixEvent)=>event.getId()?.startsWith('$')&&event.getSender()===client.getUserId()&&event.getRoomId()===pending.roomId&&event.getWireType()==='m.room.encrypted'&&(event.getTxnId()===pending.transaction||event.getUnsigned().transaction_id===pending.transaction)&&Object.keys(event.getWireContent()).length===Object.keys(wire).length&&Object.keys(wire).every(key=>event.getWireContent()[key]===wire[key]);
+   let event=room.getEventForTxnId(pending.transaction);const known=[...(event?[event]:[]),...room.getLiveTimeline().getEvents().slice(-200)].find(acknowledged);
+   let eventId=known?.getId();if(!eventId){outbox.check(pending);
+
     if(!event){event=new MatrixEvent({event_id:'~'+pending.transaction,room_id:pending.roomId,sender:client.getUserId()!,type:'m.room.encrypted',content:JSON.parse(pending.body),origin_server_ts:pending.createdAt});event.setTxnId(pending.transaction);event.setStatus(EventStatus.NOT_SENT);room.addPendingEvent(event,pending.transaction);}
     const result=await client.resendEvent(event,room);eventId=result.event_id;
    }
