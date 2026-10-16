@@ -91,9 +91,12 @@ jobs:
           cache-dependency-path: locat-ui-3.0/package-lock.json
       - run: npm ci
       - run: npm run build
-      - name: Install isolated Chromium test runtime
+        id: browser_build
+      - name: Install isolated browser runtimes
+        id: browser_runtimes
         run: npx playwright install --with-deps chromium firefox
       - name: Install browser Cinema media tools
+        id: browser_media_tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Set up browser Matrix acceptance Python
         uses: actions/setup-python@v5
@@ -109,11 +112,12 @@ jobs:
         env:
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
         run: npm run test:browser
-      - name: Real Firefox Cinema acceptance
+      - name: Firefox Cinema and existing-feature acceptance
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_media_tools.outcome == 'success' }}
         env:
           LOCAT_BROWSER_ENGINE: firefox
           LOCAT_BROWSER_REPORT: test-results/cinema-firefox-results.json
-        run: npm run test:browser -- cinema.spec.mjs
+        run: npm run test:browser -- cinema.spec.mjs foundation.spec.mjs link.spec.mjs photos.spec.mjs sentinel.spec.mjs
       - name: Repeated private-store foreground acceptance
         env:
           LOCAT_BROWSER_REPORT: test-results/private-store-repeat-results.json
