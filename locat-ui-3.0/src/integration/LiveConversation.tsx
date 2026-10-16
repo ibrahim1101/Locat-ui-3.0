@@ -7,8 +7,8 @@ import {cannot} from '../contracts/common';
 import type {ComposerDraft} from '../contracts/messaging';
 import {useMatrixOwner} from './matrixOwnerContext';
 import type {ConversationSnapshot} from './matrixConversationSession';
-// Remains closed until the controller and actual built-client acceptance are recorded.
-export const conversationSendAccepted=false;
+// Only the isolated CI acceptance build exercises Send until its browser security flow passes.
+export const conversationSendAccepted=import.meta.env.VITE_LOCAT_MESSAGING_ACCEPTANCE==='true';
 export function LiveConversation({peerId}:{peerId:string}){
  const owner=useMatrixOwner(),navigate=useNavigate();const handle=owner?.handle;
  const [state,setState]=useState<ConversationSnapshot>({transport:'connecting',busy:false,messages:[]}),[error,setError]=useState(''),[draft,setDraft]=useState<ComposerDraft>({text:''});

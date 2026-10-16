@@ -1,3 +1,9 @@
+## Native owner/room prerequisite accepted; full browser messaging candidate
+
+Prerequisite source bf24e71b0db6e684cbc75495f42355879b749416 / run 38866823701 passed all four jobs. Browser 116861467492 passed seven scenarios (53.6s) plus three repetitions (12.0s), including actual native browser owner retention/navigation and synchronized private rooms while Send remained disabled. Local source check/lint/test:all/build passed 261 frontend/65 files and 111 backend. Real HTTPS controller acceptance deliberately drops an accepted response and verifies identical transaction/ciphertext and one received message.
+
+Follow-on local source ecd9a9e5d0fa22565f9d1eebb9693c82fb10b55b adds complete browser messaging/security assertions and synthetic fixture restart/persistence scans. Only the isolated browser acceptance job enables Send with a build-time setting; default app builds remain gated. Existing Origin/cookie/proof/binding, certificate scope, legacy 501 and crypto checks are unchanged. New scenarios are not claimed passed until observed CI. Fixture restart/no-plaintext scanner smoke, node syntax/discovery and source checks passed. After candidate acceptance remove the test-only gate setting, enable the default source gate and verify the normal browser build. No deployment/DNS/main/release/cost actions.
+
 ## Account-owned crypto and gated browser conversations
 
 Start 16fe2040a018bb1d4e12aa27f6f063a584c203a9; local source 0fbf626d11fd1e3ca136a87ed64fb9c70cc3c86e. Implemented account-keyed Matrix owner, explicit Settings adoption/stop, real Contacts conversation route, UI3 Composer/MessageBubble projections and production controller with current trust/contact/device/membership checks, outbound-session rotation, bounded original SDK event retry and shutdown tracking. Send is deliberately false pending browser acceptance. No preview conversations/data are projected into live mode.

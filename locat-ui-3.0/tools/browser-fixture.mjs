@@ -38,7 +38,7 @@ export async function startBrowserFixture({matrix=false}={}){
   const deadline=Date.now()+20000;
   while(Date.now()<deadline){
    if(startupError)throw startupError;if(child.exitCode!==null)throw new Error('Browser fixture server exited: '+diagnostic);
-   if(await ready())return {origin,stop};await pause(100);
+   if(await ready())return {origin,stop,restartHomeserver:async()=>{if(!synapse)throw new Error('No synthetic homeserver is running');await synapse.restart();},assertNoMessagePlaintext:async markers=>{if(!Array.isArray(markers)||!markers.length||markers.length>10||markers.some(marker=>typeof marker!=='string'||marker.length<32||marker.length>1024))throw new Error('Use bounded unique synthetic markers');for(const file of ['fixture.sqlite','fixture.sqlite-wal',...(synapse?['browser-synapse.sqlite','browser-synapse.sqlite-wal']:[])]){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT'&&file.endsWith('-wal'))continue;throw error;}if(markers.some(marker=>bytes.includes(Buffer.from(marker))))throw new Error('Synthetic message plaintext found in fixture persistence');}if(markers.some(marker=>diagnostic.includes(marker)))throw new Error('Synthetic message plaintext found in captured server diagnostics');}};await pause(100);
   }
   throw new Error('Browser fixture readiness timed out: '+diagnostic);
  }catch(error){await stop();throw error;}
