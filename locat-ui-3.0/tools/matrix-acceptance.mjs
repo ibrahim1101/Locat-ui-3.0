@@ -152,7 +152,7 @@ try{
  gatewayAlice.client.stopClient();gatewayBob.client.stopClient();
 
  for(const file of [database,database+'-wal',join(dir,'locat-binding.sqlite'),join(dir,'locat-binding.sqlite-wal')]){let bytes;try{bytes=await readFile(file);}catch(error){if(error.code==='ENOENT')continue;throw error;}assert.equal(bytes.includes(Buffer.from(marker)),false,'Gateway message plaintext must not enter either server database');}
- const httpsCheck=await runMatrixHttpsAcceptance({dir,upstream:baseUrl,registration,quiet,until});
+ const httpsCheck=await runMatrixHttpsAcceptance({dir,upstream:baseUrl,registration,quiet,until,restartHomeserver:async()=>{child.kill();await Promise.race([once(child,'exit'),pause(5000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}child=spawn(python,['-m','synapse.app.homeserver','--config-path',config],{cwd:dir,stdio:'ignore'});await until(async()=>{if(child.exitCode!==null)throw new Error('Restarted HTTPS test homeserver exited');try{return (await fetch(baseUrl+'/_matrix/client/versions',{signal:AbortSignal.timeout(1000)})).ok;}catch{return false;}},'HTTPS multi-room homeserver recovery');}});
  await provider.logout(aliceAccount.access_token);await assert.rejects(provider.inspect(aliceAccount.access_token),{status:401});
  const anotherBob=await provisioner.provision(bobAccount.locatAccountId,bobAccount.linkDeviceId,()=>{});
  await provisioner.revokeDevice(bobAccount.locatAccountId,bobAccount.linkDeviceId,()=>{});await assert.rejects(provider.inspect(anotherBob.accessToken),{status:401});await assert.rejects(provider.inspect(bobAccount.access_token),{status:401});
