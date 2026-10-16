@@ -116,7 +116,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await conversationController.open(charlie.user.id);
   alice.network.roomSyncStarted=false;for(const control of alice.network.pending)control.abort();
   await until(()=>alice.client.getRooms().filter(room=>room.getMyMembership()==='join').length===2,'new private room on existing HTTPS SDK client',60000);
-  await conversationController.open(bob.user.id);
+  await conversationController.open(bob.user.id);alice.network.roomSyncStarted=false;for(const control of alice.network.pending)control.abort();
   bob.network.online=false;for(const control of bob.network.pending)control.abort();const afterRoomChange=await conversationController.send(messageMarker+'_MULTI_OFFLINE');await restartHomeserver();bob.network.online=true;
   await until(async()=>{const event=bob.client.getRoom(conversation.roomId)?.findEventById(afterRoomChange.eventId);if(!event)return false;await bob.client.decryptEventIfNeeded(event);return event.getContent().body===messageMarker+'_MULTI_OFFLINE';},'HTTPS offline decryption after adding another room and restarting homeserver',60000);
   const retainedPins=await alice.client.getCrypto().getOwnDeviceKeys();

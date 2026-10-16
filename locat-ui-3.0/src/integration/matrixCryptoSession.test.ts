@@ -65,6 +65,6 @@ it('refreshes room state on each open without letting an old sync acknowledge a 
   fetch.mockResolvedValueOnce(new Response('{}',{status:503}));await sync();expect(query(2).get('full_state')).toBe('true');
   await sync();expect(query(3).get('full_state')).toBe('true');expect(query(3).get('locat_conversations')).toBe('1');
   await sync();expect(query(4).has('full_state')).toBe(false);expect(query(4).get('since')).toBe('previous');
-  await conversations.open('b'.repeat(32));await sync();expect(query(5).get('full_state')).toBe('true');expect(start).not.toHaveBeenCalled();
+  await conversations.open('b'.repeat(32));await sync();expect(query(5).get('full_state')).toBe('true');window.dispatchEvent(new Event('online'));await sync();expect(query(6).get('full_state')).toBe('true');expect(query(6).has('since')).toBe(false);await sync();expect(query(7).get('since')).toBe('previous');expect(start).not.toHaveBeenCalled();
  }finally{await value.close();}
 });
