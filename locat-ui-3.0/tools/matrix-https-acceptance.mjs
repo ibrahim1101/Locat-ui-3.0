@@ -42,6 +42,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
  async function json(path,options,status=200){const response=await api(path,options);assert.equal(response.status,status,'HTTPS '+path+' status');return response.json();}
  try{
   await until(async()=>{if(child.exitCode!==null)throw new Error('Production HTTPS server exited during acceptance');try{return (await api('/api/ready')).ok;}catch{return false;}},'production HTTPS server readiness');
+  const discovery=await json('/.well-known/locat');assert.equal(discovery.capabilities.privateMessaging,true);assert.equal(discovery.capabilities.federation,false);assert.equal(discovery.capabilities.webSocket,true);assert.equal(discovery.origin,origin);assert.ok(!JSON.stringify(discovery).includes(upstream),'Public discovery must not expose the private homeserver endpoint');
   async function account(username,bind=true){
    const password=randomBytes(24).toString('base64url'),user=(await json('/api/auth/register',{method:'POST',data:{username,displayName:'Synthetic HTTPS '+username,password}},201)).user;
    const login=await api('/api/auth/login',{method:'POST',data:{username,password}});assert.equal(login.status,200);const setCookie=login.headers.get('set-cookie');assert.match(setCookie,/; Secure/);assert.match(setCookie,/; HttpOnly/);assert.match(setCookie,/SameSite=Strict/);const cookie=setCookie.split(';')[0];
@@ -73,6 +74,7 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   const abandoned=await account('https_abandoned',false);await json('/api/link/revoke',{...abandoned.auth,method:'POST',data:{id:abandoned.linkDeviceId}});
   await until(async()=>(await fetch(upstream+'/_matrix/client/v3/account/whoami',{headers:{Authorization:'Bearer '+abandoned.issued.accessToken}})).status===401,'queued revocation of unbound managed device');
   const alice=await account('https_alice'),bob=await account('https_bob');
+  const diagnostic=await json('/api/diagnostics',alice.auth);assert.equal(diagnostic.privateMessaging,'configured; device verification required');assert.ok(!JSON.stringify(diagnostic).includes(upstream),'Diagnostics must not expose the private homeserver endpoint');
   const aliceDevices=await json('/api/link/devices',alice.auth),aliceMessaging=aliceDevices.devices.find(device=>device.matrix?.deviceId===alice.issued.deviceId)?.matrix;assert.equal(aliceMessaging?.binding,'authorized');assert.equal(aliceMessaging.managed,true);
   await json('/api/contacts/request',{...alice.auth,method:'POST',data:{userId:bob.user.id}});
   await json('/api/contacts/respond',{...bob.auth,method:'POST',data:{userId:alice.user.id,accept:true}});

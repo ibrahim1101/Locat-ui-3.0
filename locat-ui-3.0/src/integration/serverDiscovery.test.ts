@@ -14,3 +14,13 @@ it('validates discovery and never sends credentials or follows server redirects'
  value.origin='https://evil.test';await expect(discoverHomeserver('https://locat.test')).rejects.toThrow(/compatible/);
  fetch.mockResolvedValue(new Response('a'.repeat(8193)));await expect(discoverHomeserver('https://locat.test')).rejects.toThrow(/Invalid/);
 });
+
+it('accepts configured messaging capability but rejects malformed or missing protocol capability flags',async()=>{
+ const value={app:'Locat',protocolVersion:1,serverId:'d95426f0-df52-45bc-b831-182975e41712',origin:'https://locat.test',capabilities:{sameOriginApi:true,privateMessaging:true,federation:false,webSocket:true}};
+ const fetch=vi.fn().mockImplementation(async()=>new Response(JSON.stringify(value)));vi.stubGlobal('fetch',fetch);
+ expect((await discoverHomeserver(value.origin)).capabilities.privateMessaging).toBe(true);
+ for(const field of ['privateMessaging','federation','webSocket'])for(const invalid of [undefined,'false',1,{}]){
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify({...value,capabilities:{...value.capabilities,[field]:invalid}})));
+  await expect(discoverHomeserver(value.origin)).rejects.toThrow(/compatible/);
+ }
+});

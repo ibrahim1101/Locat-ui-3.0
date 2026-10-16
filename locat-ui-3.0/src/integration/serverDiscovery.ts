@@ -18,6 +18,6 @@ export async function discoverHomeserver(input:string,signal?:AbortSignal):Promi
   try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>8192)throw new Error('Invalid server discovery response.');chunks.push(value);}}finally{await reader.cancel();}
   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
   let data:ServerDiscovery;try{data=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new Error('Invalid server discovery response.');}
-  if(data?.app!=='Locat'||data.protocolVersion!==1||data.origin!==origin||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(data.serverId)||!data.capabilities||typeof data.capabilities.sameOriginApi!=='boolean'||!data.capabilities.sameOriginApi)throw new Error('This address does not offer a compatible Locat server.');
+  if(data?.app!=='Locat'||data.protocolVersion!==1||data.origin!==origin||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(data.serverId)||!data.capabilities||typeof data.capabilities.sameOriginApi!=='boolean'||!data.capabilities.sameOriginApi||[data.capabilities.privateMessaging,data.capabilities.federation,data.capabilities.webSocket].some(value=>typeof value!=='boolean'))throw new Error('This address does not offer a compatible Locat server.');
   return data;
 }

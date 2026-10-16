@@ -13,3 +13,6 @@ Container boundary: compose.cloudflare.yml currently configures the web/API conn
 
 
 Optional Linux host route now has a preparation-only profile: see HOST_CONNECTOR_PREPARATION.md and repository-root compose.cloudflare-host.yml. Only cloudflared shares the host network; existing host Node/private loopback Synapse remain unchanged. The original bridge profile above still does not integrate Matrix. The new profile uses an exact-host ingress and catch-all 404, exposes no database/admin/SSH listener and never starts automatically. Local proxy-boundary tests pass; actual Docker/ingress CI and public/ARM64 acceptance must be observed separately. No public activation is authorized by this preparation.
+
+
+Observed private-hop acceptance: source 1c3367a, workflow 38961333506 connector job 117176862160 passed actual Compose/offline cloudflared ingress and nonroot Linux host-network HTTP/session/WebSocket/revocation checks. This does not activate or certify the public edge, ARM64 or Matrix-through-tunnel operation. Discovery now distinguishes configured Matrix capability from absent setup; it is not an upstream health check or device authorization.

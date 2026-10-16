@@ -107,13 +107,13 @@ async function handle(req, res) {
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
-    capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:true},
+    capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true},
   },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
     const media = await mediaLibrary.refresh();
-    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: "not-enabled", nativeClients: "not-verified" });
+    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
   }
   if (url.pathname === "/api/media" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });

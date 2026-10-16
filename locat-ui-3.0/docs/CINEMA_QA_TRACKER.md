@@ -49,3 +49,6 @@ Extra real Firefox tests: storage/Link identity persistence, two-user encrypted 
 The CI Firefox step now runs these five scenarios, including Cinema, independently of earlier Chromium test success once build/runtime/media tools are installed. Default sandbox settings remain. Commands: npm run check; npm run lint; npm run test:all (289 frontend / 119 backend); npm run build (all passed, existing bundle warning); node --check browser-tests/photos.spec.mjs; PyYAML workflow inspection; git diff --check; isolated Firefox Cinema and four existing-feature Playwright commands. Raw diagnostics/logs remain local synthetic test artifacts, not user credentials/files.
 
 Next: observe standard-browser CI, fix any remaining failures, record exact accepted commit/run, then implement the Linux host connector preparation without activating a public service. Full roadmap and platform/public-network limitations remain unchanged.
+
+
+Final expanded Cinema/feature acceptance: dd8e3fa, workflow 38960012457, all four jobs green; 9 Chromium (8.1m), 5 Firefox (28.6s), 3 repeated storage (12.7s). CINEMA-001–005 automated regression coverage passed under standard CI sandbox settings. Full original movie/physical Windows/Pi tests remain external acceptance limits.
