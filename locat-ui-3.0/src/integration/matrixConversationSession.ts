@@ -7,6 +7,7 @@ export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transpor
 export function createMatrixConversationSession(client:MatrixClient,resolvePeer:(accountId:string)=>Promise<VerificationPeer>,bootstrap:(accountId:string)=>Promise<{roomId:string}>,enableSync:()=>Promise<void>){
  let retry:{roomId:string;text:string;transaction:string;createdAt:number;attempts:number;devices:string;event?:MatrixEvent}|null=null;
  let closed=false,busy=false,version=0,historyPages=0,state:ConversationSnapshot={transport:'connecting',busy:false,messages:[]};
+ const decrypting=new WeakSet<MatrixEvent>();
  const listeners=new Set<(state:ConversationSnapshot)=>void>(),pending=new Set<Promise<unknown>>();
  const publish=(patch:Partial<ConversationSnapshot>)=>{if(closed)return;state={...state,...patch};for(const listener of listeners)listener(state);};
  const requireCurrent=(epoch:number)=>{if(closed||version!==epoch)throw new Error('Conversation changed or messaging closed.');};
@@ -16,7 +17,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
   const messages:ConversationMessage[]=[];
   for(const event of room?.getLiveTimeline().getEvents().slice(-200)??[]){
    if(event.getWireType()!=='m.room.encrypted'||!event.getId()?.startsWith('$')||![client.getUserId(),state.peer?.matrixUserId].includes(event.getSender()))continue;
-   if(event.isBeingDecrypted()||event.shouldAttemptDecryption()){void track(()=>client.decryptEventIfNeeded(event)).catch(()=>{});continue;}
+   if(event.isBeingDecrypted()||event.shouldAttemptDecryption()){if(!decrypting.has(event)){decrypting.add(event);void track(()=>event.isBeingDecrypted()?event.getDecryptionPromise()??Promise.resolve():client.decryptEventIfNeeded(event)).finally(()=>decrypting.delete(event)).catch(()=>{});}continue;}
    const content=event.getContent();if(event.isDecryptionFailure()){messages.push({id:event.getId()!,mine:event.getSender()===client.getUserId(),createdAt:event.getTs(),failed:true});continue;}
    if(event.getType()!=='m.room.message'||content.msgtype!=='m.text'||typeof content.body!=='string'||new TextEncoder().encode(content.body).length>16384)continue;
    messages.push({id:event.getId()!,text:content.body,mine:event.getSender()===client.getUserId(),createdAt:event.getTs(),failed:false});

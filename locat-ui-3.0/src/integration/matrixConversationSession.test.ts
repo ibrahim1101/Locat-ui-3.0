@@ -3,11 +3,11 @@ import type {MatrixClient} from 'matrix-js-sdk';
 import {createMatrixConversationSession,type MatrixConversationSession} from './matrixConversationSession';
 vi.mock('./matrixTrackedPeer.mjs',()=>({trackAuthorizedMatrixPeer:vi.fn(async()=>{})}));
 const peer={accountId:'b'.repeat(32),matrixUserId:'@bob:test',devices:[{deviceId:'BOB'}]};
-let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
-beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
+let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,decrypt:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
+beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});decrypt=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
  const room={oldState:pagination,getPendingEvents:()=>pendingEvents,getLiveTimeline:()=>({getEvents:()=>events}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})},getMembers:()=>members.map(userId=>({userId,membership:'join'})),getMyMembership:()=> 'join',getMember:()=>({membership:'join'})};
  const crypto={getUserDeviceInfo:vi.fn(async()=>new Map([[peer.matrixUserId,new Map([['BOB',{}]])]])),getDeviceVerificationStatus:vi.fn(async()=>({isVerified:()=>verified})),isEncryptionEnabledInRoom:vi.fn(async()=>true),forceDiscardSession:discard};
- const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,resendEvent:resend,scrollback,decryptEventIfNeeded:vi.fn(async()=>{})};
+ const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,resendEvent:resend,scrollback,decryptEventIfNeeded:decrypt};
  session=createMatrixConversationSession(client as unknown as MatrixClient,resolve,async()=>({roomId:'!room:test'}),async()=>{});
 });
 afterEach(async()=>{await session.close();});
@@ -34,4 +34,9 @@ it('never replays an uncertain event after the five-minute retry window or a bac
  await session.open(peer.accountId);send.mockImplementation(async(_room:string,_text:string,transaction:string)=>{pendingEvents=[{getTxnId:()=>transaction,getId:()=> '~pending'}];throw new Error('Uncertain acknowledgement');});
  const started=Date.now(),clock=vi.spyOn(Date,'now').mockReturnValue(started);
  try{await expect(session.send('secret')).rejects.toThrow('Uncertain');clock.mockReturnValue(started+300001);await expect(session.send('secret')).rejects.toThrow('retry window expired');clock.mockReturnValue(started-1);await expect(session.send('secret')).rejects.toThrow('retry window expired');expect(send).toHaveBeenCalledOnce();expect(resend).not.toHaveBeenCalled();}finally{clock.mockRestore();}
+});
+
+it('observes an existing SDK decryption promise without continually requesting retries, and awaits it on close',async()=>{
+ let finish:()=>void=()=>{};const existing=new Promise<void>(done=>{finish=done;});events=[{getWireType:()=> 'm.room.encrypted',getId:()=> '$pending',getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>true,getDecryptionPromise:()=>existing}];
+ try{await session.open(peer.accountId);await new Promise(resolve=>setTimeout(resolve,650));expect(decrypt).not.toHaveBeenCalled();let closed=false;const closing=session.close().then(()=>{closed=true;});await Promise.resolve();expect(closed).toBe(false);finish();await closing;expect(closed).toBe(true);}finally{finish();}
 });
