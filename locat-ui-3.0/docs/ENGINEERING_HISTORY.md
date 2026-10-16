@@ -1,3 +1,9 @@
+## Accepted normal encrypted text UI build
+
+443963655f3084f8526f44504b6ea3e2ecb7641b / workflow 38870437274 / browser 116872990381 passed all seven scenarios in 56.4 seconds and three repetitions in 11.7 seconds. The normal app build contains no acceptance-only setting; Send is enabled after the preceding complete candidate acceptance. Current browser flow confirms real composer exchange/decryption, unverified-device denial, offline/homeserver restart, reload/key/trust/history/reply, tamper/cross-account/revocation and no-plaintext checks. Source/fresh-SDK crypto implementation is unchanged from 01c1e85; this fixture correction resolves the interception ordering failure without relaxing success checks. Ubuntu/macOS jobs succeeded; Windows finishing at observation.
+
+The core same-homeserver two-user UI objective is demonstrated only within the isolated Chromium/certificate fixture boundary. Local 262 frontend/65 files, 111 backend, check/lint/build and real refreshed-key HTTPS/lost-ack acceptance pass. Full original roadmap is intact; next work is durable sender/uncertain-send/history/multiple-room reliability, not a public release/global/native completion claim. Messaging usage guide and READMEs are current.
+
 ## Normal-build browser tamper interception ordering
 
 413c1cc5d45255d002f35724547ed837483e57f2 / workflow 38869589775 passed Ubuntu/macOS/Windows source jobs. Browser 116870283567 passed six scenarios; the messaging scenario passed actual send/offline restart/reload/cross-account stages, then timed out before seeing a new sync request in its tamper setup. The prior complete candidate at 2d0e2ad remains accepted historical evidence, not a pass for this failed follow-on.
