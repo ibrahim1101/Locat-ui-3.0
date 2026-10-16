@@ -1,26 +1,21 @@
 # Locat UI3 current testing status — 2026-10-16
 
-Evidence is for this application, not certification inherited from the original Locat repository. Full roadmap/all-49 scope remains in MASTER_ROADMAP.md and ORIGINAL_LOCAT_REQUIREMENTS.md.
+Evidence applies to this app and its exact source, not earlier original-Locat releases or physical platform certification. Full all-49/A–AM scope is preserved.
 
 | Check | Observed result |
 | --- | --- |
-| Current production source | Local 01c1e85bc987ff9f0608997c202f6f065fcce003, accepted within 443963655f3084f8526f44504b6ea3e2ecb7641b |
-| Local type/lint/build | Passed |
-| Frontend | 266 passed / 65 files |
+| Current runtime | Local 6e5eb2e4c93ab52337121cef1f22b2c16187d463, published within 1e8216d385965b06d1de1b59ae3527206df12e6c |
+| Latest fixture | 944753443bdc660e995a34e1018c46b71b4ca5db |
+| Local check/lint/build | Passed; existing large SDK chunk warning |
+| Frontend | 267 passed / 65 files |
 | Backend | 111 passed |
-| Real Synapse/production HTTPS | Guarded controller + refreshed pinned keys, complete encrypted transport, offline restart, tamper/revocation and lost-ack original-event idempotence pass |
-| Accepted full browser candidate | 2d0e2ad / workflow 38868622567 / job 116867181610: seven scenarios (1.3m), three repetitions (10.3s); all four jobs succeeded |
-| Normal-build follow-on | 413c1cc / workflow 38869589775: all OS jobs passed; browser 116870283567 passed six scenarios but messaging timed out in tamper interception setup |
-| Accepted corrected normal build | 4439636 / workflow 38870437274 / browser 116872990381: seven scenarios (56.4s), three repetitions (11.7s); Ubuntu/macOS succeeded, Windows job 116872990651 also succeeded; all four passed |
+| Actual Synapse/HTTPS | Encrypted guarded controller transport, lost-ack idempotence, bounded SDK history, receiving-controller projection after multi-room/full-sync/offline restart, same-device/new-token identical event and current authorization/revocation pass |
+| Historical full accepted browser | 4439636 / 38870437274 / 116872990381: seven scenarios 56.4s + three repetitions 11.7s; all four jobs passed |
+| Stronger sender diagnostic | 84a14b3 / 38882443056 / 116912144817 failed: retained draft and explicit reconnect refusal; old text locator had not proven acknowledgement |
+| Processed-sync fix browser | 1e8216d / 38882934374 / 116913733717 passed real acknowledgement, multi-room/retry/offline/reload/history, stopped at tamper routing flag; not full acceptance |
+| Latest complete acceptance | 38884136009 at 9447534 failed one-page-exhaustion fixture assumption; corrected up-to-three-page run pending |
+| Separate Chromium process restart | Passed at a941aa3 / 38880790709 / 116906763002 with same native device keys; that workflow's messaging scenario failed |
 
-The accepted full browser flow used actual accounts/cookies/proofs, Contacts UI, mutual SAS, native IndexedDB crypto ownership, composer send/decrypt, unverified-device block, offline delivery after actual Synapse restart, reload/key/trust/history reopening, cross-account denial, ciphertext tamper rejection, live device revocation and Matrix write/database/WAL plaintext checks. The subsequent normal-source run passed through send/offline/reload/cross-account, then failed before a newly intercepted sync request appeared. The corrected handler registers before post-reload sync and enables tampering only later; existing offline checks run without it. The corrected normal build passed the complete browser flow and all repetitions, with no acceptance-only Send build setting.
+Current runtime adds processed current-room sync gating, bounded history loading, five-minute/three-attempt uncertain-event retries and non-requeuing decryption observation. The fixture requires actual message-history acknowledgement and successful delivery of a modified ciphertext response before checking rejection. See SESSION_HANDOFF.md for exact failures, actual commands and next task. Full attempt chronology remains ENGINEERING_HISTORY.md and archived handoffs.
 
-Default source enables encrypted text after the full accepted candidate; the acceptance-only build setting is removed. This is experimental development, not public-beta, independent security review or physical/international-network acceptance. Read SESSION_HANDOFF.md and MESSAGING_QUICKSTART.md.
-
-Existing browser coverage for Link/private stores/history workers/Photos/Sentinel remains. Three-OS source jobs do not certify native installers, hardware codecs/input, notifications, capture/control or actual TURN relay. Durable sender outbox, broad history/multiple-room lifecycle, full identity recovery/cross-signing, federation/public hosting and native acceptance remain incomplete. Browser-local media remains plaintext as described in the UI.
-
-Historical media acceptance: f3a4183 / workflow 38784656103 passed all four jobs, seven scenarios (40.7s) and three repetitions (12.5s), including native thumbnails/local-readiness. Earlier history is retained in ENGINEERING_HISTORY.md, BROWSER_FOUNDATION_ACCEPTANCE.md and docs/archive/TESTING_STATUS_353ca2b.md.
-
-The working text/UI path now meets the same-homeserver two-user secure-conversation objective in isolated Chromium. Broader durable sender/history/multi-room reliability, real process restart, public/international deployment and native hardware remain separate unfinished work.
-
-Current reliability follow-ons: published 474663e (room refresh) and 4b39f39 (bounded history); latest local retry-expiry/token-reissue/setup-retry source is pending publication/CI. Local 266 frontend/111 backend, type/lint/build and actual HTTPS/Synapse paging/third-room/new-token duplicate replay pass. Browser runs 38878644477 and 38879316491 each failed six-pass/one-failure at second-room setup/refresh, not accepted replacements for 4439636. See SESSION_HANDOFF.md for pending follow-on diagnostics and exact next task.
+No complete reliability/public-beta/native/international-network claim. Durable sender storage, comprehensive old-history/recovery, gateway-process restart/proof recovery, global hosting, federation, actual TURN/media and physical platform acceptance remain open. Browser-local media remains plaintext as described in the UI. Source jobs on three operating systems do not certify native installers/hardware/notifications/control. Current UI3 theme and original media/Link/Sentinel/private-store features remain in scope.
