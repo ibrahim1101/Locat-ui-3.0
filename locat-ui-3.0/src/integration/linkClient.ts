@@ -1,5 +1,5 @@
 import {loadLinkIdentity,type StoredLinkIdentity} from './linkIdentityStore';import {deviceSharedKey,solveDeviceChallenge} from './linkCrypto';
-import {linkRequest} from './linkRequest';
+import {linkRequest,LinkResponseError} from './linkRequest';
 export class BrowserLinkClient {
  private identity:StoredLinkIdentity|null=null;private proof:{token:string;deviceId:number;expiresAt:number}|null=null;private pending:Promise<{token:string;deviceId:number;expiresAt:number}>|null=null;private epoch=0;private disposed=false;
  constructor(readonly accountId:string){}
@@ -7,6 +7,9 @@ export class BrowserLinkClient {
  close(){this.disposed=true;this.epoch++;this.lifetime.abort();this.identity=null;this.proof=null;this.pending=null;}
  private async raw(path:string,input?:unknown,proof?:string){if(this.disposed)throw new Error('Device client closed');return linkRequest(path,input,proof,this.lifetime.signal,this.accountId);}
  async connect(){if(this.disposed)throw new Error("Device client closed");if(this.proof&&this.proof.expiresAt>Date.now()+60000)return this.proof;if(this.pending)return this.pending;const epoch=this.epoch,check=()=>{if(epoch!==this.epoch)throw new Error('Device operation invalidated');};const pending=(async()=>{const identity=this.identity??await loadLinkIdentity(this.accountId);check();this.identity=identity;const registered=await this.raw('register',{name:'This browser',platform:'web',publicKey:identity.publicKeyB64});check();const challenge=await this.raw('challenge',{id:registered.id});check();const answer=await solveDeviceChallenge(identity,challenge);check();const proof=await this.raw('prove',{id:challenge.id,answer});check();this.proof=proof;return proof;})();this.pending=pending;try{return await pending;}finally{if(epoch===this.epoch)this.pending=null;}}
- async request(path:string,input?:unknown){const current=await this.connect();return this.raw(path,input,current.token);}
+ /** A rejected old proof may be replaced once for a read, never for a mutation. */
+ async renewRejectedProof(token:string){if(this.proof?.token===token)this.proof=null;return this.connect();}
+ async request(path:string,input?:unknown){const current=await this.connect();try{return await this.raw(path,input,current.token);}catch(error){if(input!==undefined||!(error instanceof LinkResponseError)||error.status!==403)throw error;const renewed=await this.renewRejectedProof(current.token);return this.raw(path,undefined,renewed.token);}}
+
  async sharedKey(pairId:string,peer:number){const snapshot=await this.request('devices');const pair=snapshot.pairs.find((row:{id:string;status:string})=>row.id===pairId&&row.status==='verified');const device=snapshot.devices.find((row:{id:number;publicKey:string;revokedAt:number|null})=>row.id===peer&&!row.revokedAt);const identity=await loadLinkIdentity(this.accountId);if(this.disposed)throw new Error('Device client closed');if(!pair||!device||identity.pins[pairId]!==device.publicKey)throw new Error('Confirm this device pairing and pinned peer key in Devices first.');return deviceSharedKey(identity.privateKey,device.publicKey,this.accountId,pairId);}
 }
