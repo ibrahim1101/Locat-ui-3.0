@@ -1,3 +1,9 @@
+## First full messaging candidate failure and close barrier
+
+Run 38868048025 at a82308d295ad4316d19980e3dff84d809722503c / browser job 116865324508 passed six scenarios; messaging reached and passed unverified-device send denial, then its cleanup failed because an article/heading locator resolved two Revoke device buttons. Changed the fixture to the exact current-browser heading suffix and direct parent card. Required crypto/auth assertions remain intact; actual subsequent Send/offline/reload/tamper/revocation assertions were not reached and are not claimed passed.
+
+Source follow-on c8e8bf5f19f3ab76b4b1c811c0870361ef1c104b also serializes account-owner shutdown: it retains the closing handle, rejects adoption until store release completes and disables repeated Stop. A regression proves replacement is blocked during asynchronous close. Local check/lint/test:all/build pass 262 frontend/65 files and 111 backend; targeted owner/Settings tests passed. Default builds still disable Send; isolated browser acceptance must pass before removing the test build setting and enabling default Send.
+
 ## Native owner/room prerequisite accepted; full browser messaging candidate
 
 Prerequisite source bf24e71b0db6e684cbc75495f42355879b749416 / run 38866823701 passed all four jobs. Browser 116861467492 passed seven scenarios (53.6s) plus three repetitions (12.0s), including actual native browser owner retention/navigation and synchronized private rooms while Send remained disabled. Local source check/lint/test:all/build passed 261 frontend/65 files and 111 backend. Real HTTPS controller acceptance deliberately drops an accepted response and verifies identical transaction/ciphertext and one received message.

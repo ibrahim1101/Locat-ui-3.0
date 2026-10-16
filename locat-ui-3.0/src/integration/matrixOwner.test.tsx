@@ -13,3 +13,7 @@ it('retains a handle while children navigate and closes it on account replacemen
 it('rejects a foreign handle and explicitly releases the current owner',async()=>{
  const close=vi.fn(async()=>{});render(<MatrixOwnerProvider accountId="alice"><Probe/></MatrixOwnerProvider>);await expect(owner!.adopt({accountId:'bob',closed:false,close} as unknown as MatrixHandle)).rejects.toThrow('account changed');expect(close).toHaveBeenCalledOnce();await act(()=>owner!.adopt({accountId:'alice',closed:false,close} as unknown as MatrixHandle));await act(()=>owner!.stop());expect(screen.getByText('closed')).toBeVisible();expect(close).toHaveBeenCalledTimes(2);
 });
+it('holds ownership until shutdown completes and refuses a replacement during store release',async()=>{
+ let finish:()=>void=()=>{};const close=vi.fn(()=>new Promise<void>(done=>{finish=done;}));render(<MatrixOwnerProvider accountId="alice"><Probe/></MatrixOwnerProvider>);
+ await act(()=>owner!.adopt({accountId:'alice',closed:false,close} as unknown as MatrixHandle));let stopping:Promise<void>;act(()=>{stopping=owner!.stop();});expect(owner!.stopping).toBe(true);await expect(owner!.adopt({accountId:'alice',closed:false,close:vi.fn()} as unknown as MatrixHandle)).rejects.toThrow('finish closing');await act(async()=>{finish();await stopping!;});expect(owner!.stopping).toBe(false);expect(owner!.handle).toBeNull();expect(close).toHaveBeenCalledOnce();
+});
