@@ -47,3 +47,22 @@ test('managed setup endpoint requires empty derived-identity input and existing 
  for(let i=0;i<8;i++)await handler(context);await assert.rejects(handler(context),{status:429});
  const unavailable=createMatrixBindingHandler({store:{},provider:{},body:async()=>({}),json(){},audit(){}});await assert.rejects(unavailable(context),{status:503});
 });
+
+test('exhausted Matrix setup allowance preserves separately bounded cleanup and revocation',async()=>{
+ let input={},provisioned=0,cancelled=0,revoked=0,loggedOut=0,disconnected=0,allowed=true;
+ const handler=createMatrixBindingHandler({store:{authorize(){},disconnect(){disconnected++;}},provider:{async logout(){loggedOut++;}},provisioner:{async provision(){provisioned++;return {};},async cancel(_user,_actor,_token,recheck){recheck();cancelled++;},async revokeDevice(_user,_actor,recheck){recheck();revoked++;}},body:async()=>input,json(){},audit(){}});
+ const command=action=>handler({req:{method:'POST'},res:{},url:new URL('https://locat.test/api/link/matrix/'+action),userId:'owner',actor:1,session:'session',recheck(){if(!allowed)throw Object.assign(new Error('Session revoked'),{status:401});}});
+ for(let i=0;i<10;i++)await command('provision');assert.equal(provisioned,10);await assert.rejects(command('provision'),{status:429});await assert.rejects(command('bind'),{status:429});
+ input={accessToken:'synthetic-matrix-token-0001'};allowed=false;await assert.rejects(command('cancel-provision'),{status:401});assert.equal(cancelled,0);allowed=true;
+ await command('cancel-provision');await command('logout');input={};await command('disconnect');await command('revoke-managed-device');assert.equal(cancelled,1);assert.equal(loggedOut,1);assert.equal(disconnected,2);assert.equal(revoked,1);
+ input={accessToken:'synthetic-matrix-token-0001'};for(let i=0;i<25;i++)await command('cancel-provision');await assert.rejects(command('cancel-provision'),{status:429});await assert.rejects(command('provision'),{status:429});
+});
+
+test('cleanup cannot act after authorization changes while its request body is being read',async()=>{
+ for(const action of ['cancel-provision','disconnect','logout','revoke-managed-device']){
+  let release,entered,allowed=true,mutated=false;const reading=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+  const handler=createMatrixBindingHandler({store:{authorize(){mutated=true;},disconnect(){mutated=true;}},provider:{async logout(){mutated=true;}},provisioner:{async cancel(){mutated=true;},async revokeDevice(){mutated=true;}},body:async()=>{entered();await gate;return ['logout','cancel-provision'].includes(action)?{accessToken:'synthetic-matrix-token-0001'}:{};},json(){mutated=true;},audit(){mutated=true;}});
+  const operation=handler({req:{method:'POST'},res:{},url:new URL('https://locat.test/api/link/matrix/'+action),userId:'owner',actor:1,session:'session',recheck(){if(!allowed)throw Object.assign(new Error('Session revoked'),{status:401});}});
+  await reading;allowed=false;release();await assert.rejects(operation,{status:401});assert.equal(mutated,false,action+' must retain the fresh authorization guard');
+ }
+});

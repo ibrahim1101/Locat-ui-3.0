@@ -1,3 +1,4 @@
+import {isMatrixCleanupAction} from '../shared/matrixCleanupProfile.mjs';
 import {linkPayloadStore,handleLinkPayload} from './linkPayloads.mjs';
 import {remoteStore,handleRemote} from './remote.mjs';
 import {randomUUID} from 'node:crypto';
@@ -26,7 +27,7 @@ export function linkStore(sql,matrixRevocations){
  store.payloads=linkPayloadStore(sql,store);store.remote=remoteStore(sql,store);return store;
 }
 export function createLinkHandler({store,sessionUser,sessionToken,body,json,audit,connectivity,matrixBinding}){
- const limit=createRateLimiter(60),chunkLimit=createRateLimiter(4000),iceLimit=createRateLimiter(30);return async(req,res,url,origin)=>{
+ const limit=createRateLimiter(60),cleanupLimit=createRateLimiter(30),chunkLimit=createRateLimiter(4000),iceLimit=createRateLimiter(30);return async(req,res,url,origin)=>{
  if(!url.pathname.startsWith('/api/link/'))return false;
  const user=sessionUser(req);if(!user)fail(401,'Not authenticated');
  const session=sessionToken(req);if(!session)fail(401,'Not authenticated');
@@ -41,7 +42,7 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  };
  const readBody=async(request,maximum)=>{const input=await body(request,maximum);recheck();return input;};
  const action=url.pathname.slice('/api/link/'.length);
- if(req.method==='POST'){if(req.headers.origin!==origin)fail(403,'Origin mismatch');const retryAfter=(action==='payload/chunk'||action==='remote/signal'?chunkLimit:limit)(user.id);if(retryAfter)throw Object.assign(new Error('Device command rate limit exceeded'),{status:429,retryAfter});}
+ if(req.method==='POST'){if(req.headers.origin!==origin)fail(403,'Origin mismatch');const retryAfter=(action==='payload/chunk'||action==='remote/signal'?chunkLimit:action==='revoke'||action.startsWith('matrix/')&&isMatrixCleanupAction(action.slice('matrix/'.length))?cleanupLimit:limit)(user.id);if(retryAfter)throw Object.assign(new Error('Device command rate limit exceeded'),{status:429,retryAfter});}
  if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed');
  if(req.method==='POST'&&['register','challenge','prove'].includes(action)){
  const input=await readBody(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');

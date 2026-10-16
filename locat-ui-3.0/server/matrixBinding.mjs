@@ -1,3 +1,4 @@
+import {isMatrixCleanupAction} from '../shared/matrixCleanupProfile.mjs';
 import {createPrivateMatrixConversation} from './matrixConversations.mjs';
 import {createHash} from 'node:crypto';
 import {createRateLimiter} from './rateLimit.mjs';
@@ -77,8 +78,8 @@ export function createMatrixBindingHandler({store,provider,provisioner,conversat
    recheck();json(res,200,url.searchParams.has('accountId')?store.peer(userId,actor,url.searchParams.get('accountId')):store.peerByMatrix(userId,actor,url.searchParams.get('matrixUserId')));return true;
   }
   if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device','conversation'].includes(action))fail(404,'Unknown Matrix binding action');
-  const retryAfter=(action==='cancel-provision'?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
-  const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');
+  const retryAfter=(isMatrixCleanupAction(action)?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
+  const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');recheck();
   if(action==='conversation'){const value=await createPrivateMatrixConversation({provider,store:conversations,bindings:store,userId,actor,session,input,recheck});json(res,200,value);return true;}
   if(action==='revoke-managed-device'){if(Object.keys(input).length)fail(400,'Invalid managed revocation');if(!provisioner)fail(503,'Managed messaging accounts are not configured');try{await provisioner.revokeDevice(userId,actor,recheck);}catch(error){audit(userId,'matrix.device.revocation.unconfirmed','warning');throw error;}audit(userId,'matrix.device.revoked');json(res,200,{ok:true,upstreamDeviceRevocationConfirmed:true});return true;}
   if(action==='cancel-provision'){if(Object.keys(input).some(key=>key!=='accessToken'))fail(400,'Invalid managed cancellation');if(!provisioner)fail(503,'Managed messaging accounts are not configured');await provisioner.cancel(userId,actor,input.accessToken,recheck);audit(userId,'matrix.provision.cancelled');json(res,200,{ok:true,upstreamLogoutConfirmed:true});return true;}

@@ -53,3 +53,15 @@ test('an old tab expected-account guard rejects a new cookie owner before regist
   await handler({method:'GET',headers:{'x-locat-account':'a','x-locat-device-proof':token}},{},new URL('https://locat.test/api/link/devices'),'https://locat.test');assert.equal(response.status,200);assert.equal(response.value.currentDeviceId,ids[0]);
  });
 });
+
+test('ordinary Link command exhaustion cannot starve bounded proved cleanup or device revocation',async()=>{
+ await fixture(async({db,session,hash,ids,token})=>{
+  let input={},cleanups=0;const origin='https://locat.test';const handler=createLinkHandler({store:db.link,sessionUser:()=>db.sessionUser(hash,Date.now()),sessionToken:()=>session,body:async()=>input,json(){},audit(){},matrixBinding:async({actor,recheck})=>{recheck();assert.equal(actor,ids[0]);cleanups++;return true;}});
+  const command=(action,proof=token)=>handler({method:'POST',headers:{origin,'x-locat-account':'a','x-locat-device-proof':proof}},{},new URL(origin+'/api/link/'+action),origin);
+  for(let i=0;i<60;i++)await command('heartbeat');await assert.rejects(command('heartbeat'),{status:429});
+  await assert.rejects(command('matrix/cancel-provision','invalid-proof'));assert.equal(cleanups,0);
+  for(const action of ['cancel-provision','logout','disconnect','revoke-managed-device'])await command('matrix/'+action);assert.equal(cleanups,4);
+  input={id:ids[1]};await command('revoke');assert.throws(()=>db.link.owned('a',ids[1]),/revoked/);
+  for(let i=0;i<24;i++)await command('matrix/cancel-provision');await assert.rejects(command('matrix/cancel-provision'),{status:429});await assert.rejects(command('heartbeat'),{status:429});
+ });
+});

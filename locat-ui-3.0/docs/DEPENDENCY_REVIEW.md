@@ -1,0 +1,10 @@
+# Dependency review — 2026-10-16
+
+Commands: `npm audit --json`; `npm audit --omit=dev --json --fetch-retries=0 --fetch-timeout=15000`; `npm view braces version --fetch-retries=0 --fetch-timeout=15000`; `npm view postcss-selector-parser version --fetch-retries=0 --fetch-timeout=15000`. Audited lockfile at ff77e5d; no package changes made by these commands.
+
+The production-only audit reported zero known findings. Full audit reported seven affected dependency nodes: five high (braces, chokidar, micromatch, fast-glob, Tailwind CSS) and two moderate (postcss-selector-parser, postcss-nested). This reflects two advisory roots with dependent packages counted as affected nodes; it is not seven distinct vulnerabilities. These packages are in the development/build toolchain. The production server serves built static assets and does not compile caller-supplied CSS/glob patterns. This scope assessment is not an independent security review or a guarantee against unknown vulnerabilities.
+
+- [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): braces <=3.0.3 stack exhaustion from deeply nested patterns. Registry latest is 3.0.3; advisory lists no patched version. Tailwind 3.4.19 depends on this graph. Do not suppress it or silently claim a clean full audit. A Tailwind major migration must preserve the established UI3 theme and receive built-browser compatibility acceptance; it is not automatically applied as an audit force-fix.
+- [GHSA-rj75-hqrm-r3gf](https://github.com/advisories/GHSA-rj75-hqrm-r3gf): selector parser CPU exhaustion; patched version 7.1.6 exists. Evaluate a narrowly scoped build-dependency override and verify generated CSS byte-for-byte plus full validation before accepting it. No parser override has been applied at this checkpoint.
+
+Do not feed untrusted user patterns/styles to build tools, run development servers as public production infrastructure, or substitute audit counts for authentication, E2EE, browser/native or independent-review acceptance. Re-run audits against the actual release lockfile before public beta. Matrix SDK 44.0.0 and Rust crypto 18.9.0 remain pinned and unchanged.
