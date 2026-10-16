@@ -120,13 +120,31 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await conversationController.open(bob.user.id);alice.network.roomSyncStarted=false;for(const control of alice.network.pending)control.abort();
   bob.network.online=false;for(const control of bob.network.pending)control.abort();const afterRoomChange=await conversationController.send(messageMarker+'_MULTI_OFFLINE');await restartHomeserver();bob.network.online=true;
   await until(()=>receivingState?.messages.some(message=>message.id===afterRoomChange.eventId&&message.text===messageMarker+'_MULTI_OFFLINE'),'HTTPS receiving controller projection after adding another room and restarting homeserver',60000);
+  // Real encrypted dataset beyond one server page; SDK fixture writes use the protected gateway.
+  const historyIds=[];
+  for(let index=0;index<55;index++){const result=await alice.client.sendTextMessage(conversation.roomId,messageMarker+'_PAGE_'+index);historyIds.push(result.event_id);}
+  await until(()=>historyIds.every((id,index)=>receivingState?.messages.some(message=>message.id===id&&message.text===messageMarker+'_PAGE_'+index&&!message.failed)),'55 encrypted messages projected by the actual receiving controller',60000);
+  assert.equal(new Set(receivingState.messages.filter(message=>historyIds.includes(message.id)).map(message=>message.id)).size,55);
+  assert.ok(!JSON.stringify(alice.network.encryptedWrites).includes(messageMarker),'Multi-page fixture transport remains ciphertext only');
   const retainedPins=await alice.client.getCrypto().getOwnDeviceKeys();
   await Promise.all(conversations.map(controller=>controller.close()));for(const client of clients)client.stopClient();
 
   const reissued=await json('/api/link/matrix/provision',{...alice.auth,method:'POST',data:{}});assert.equal(reissued.deviceId,alice.issued.deviceId);assert.equal(reissued.userId,alice.issued.userId);assert.notEqual(reissued.accessToken,alice.issued.accessToken);
   await json('/api/link/matrix/bind',{...alice.auth,method:'POST',data:{...reissued,publicKeys:retainedPins}});
   const originalWrite=alice.network.roomWrites[0],replayed=await json(originalWrite.path,{...alice.auth,method:'PUT',data:JSON.parse(originalWrite.body),headers:{Authorization:'Bearer '+reissued.accessToken}});assert.equal(replayed.event_id,encryptedMessage.event_id,'Same device/transaction/ciphertext after token reissue must return the original event');
-  const reissuedHistory=await json(conversationPath+'/messages?dir=b&limit=50',{...alice.auth,headers:{Authorization:'Bearer '+reissued.accessToken}}),acknowledged=reissuedHistory.chunk.find(event=>event.event_id===encryptedMessage.event_id);assert.ok(acknowledged,'The original ciphertext must remain in authorized history after token reissue');assert.equal(acknowledged.unsigned?.transaction_id,originalWrite.path.split('/').at(-1),'Same-device history must retain the original transaction echo after token reissue');
+  const historyEvents=[];let historyCursor;let actualHistoryPages=0;
+  for(let page=0;page<3;page++){
+   const query=new URLSearchParams({dir:'b',limit:'50',...(historyCursor?{from:historyCursor}:{})});
+   const result=await json(conversationPath+'/messages?'+query,{...alice.auth,headers:{Authorization:'Bearer '+reissued.accessToken}});actualHistoryPages++;
+   assert.ok(result.chunk.length<=50,'Actual encrypted history page respects the 50-event bound');
+   for(const event of result.chunk){assert.ok(!JSON.stringify(event).includes(messageMarker),'Server history must not reveal message content');historyEvents.push(event);}
+   if(historyIds.every(id=>historyEvents.some(event=>event.event_id===id))&&historyEvents.some(event=>event.event_id===encryptedMessage.event_id))break;
+   assert.ok(result.end&&result.end!==historyCursor,'Actual history must advance its pagination cursor');historyCursor=result.end;
+  }
+  assert.ok(actualHistoryPages>=2,'55 ciphertext events require multiple real server pages');
+  assert.equal(historyEvents.filter(event=>historyIds.includes(event.event_id)).length,55,'Every synthetic message appears exactly once across real pages');
+  assert.equal(new Set(historyEvents.map(event=>event.event_id)).size,historyEvents.length,'History pages must not overlap events');
+  const acknowledged=historyEvents.find(event=>event.event_id===encryptedMessage.event_id);assert.ok(acknowledged,'The original ciphertext must remain in authorized history after token reissue');assert.equal(acknowledged.unsigned?.transaction_id,originalWrite.path.split('/').at(-1),'Same-device history must retain the original transaction echo after token reissue');
 
   const currentBearer={Authorization:'Bearer '+reissued.accessToken};
   const retainedCleanup=await json('/api/link/matrix/cancel-provision',{...alice.auth,method:'POST',data:{accessToken:alice.issued.accessToken}});assert.deepEqual(retainedCleanup,{ok:true,upstreamLogoutConfirmed:false,locatGrantBlocked:true,existingDeviceRetained:true});
@@ -144,10 +162,10 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   assert.equal((await api(protectedPath,{...alice.auth,headers:currentBearer})).status,403,'Revoked Link identity blocks the Matrix gateway');
   await until(async()=>(await fetch(upstream+protectedPath,{headers:currentBearer})).status===401,'queued Link revocation invalidates actual Matrix session');
   await until(async()=>(await fetch(upstream+protectedPath,{headers:bearer})).status===401,'queued Link revocation invalidates the earlier Matrix token too');
-  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,reissued.accessToken,...[alice,bob,charlie,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
+  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal','test.sqlite','test.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,...(file.startsWith('locat-')?[reissued.accessToken,...[alice,bob,charlie,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])]:[])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat and Synapse persistence must not contain message plaintext or raw Locat authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:currentBearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, controller-guarded encrypted key distribution/room sync/send/decryption and lost-ack original-event idempotency, bounded SDK history paging, multi-room offline homeserver restart and same-device transaction idempotency and history transaction echo and non-destructive unbound-token cancellation after token reissue, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, controller-guarded encrypted key distribution/room sync/send/decryption and lost-ack original-event idempotency, bounded SDK history paging and 55-message multi-page encrypted transport, multi-room offline homeserver restart and same-device transaction idempotency and history transaction echo and non-destructive unbound-token cancellation after token reissue, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled([...controllers,...conversations].map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}

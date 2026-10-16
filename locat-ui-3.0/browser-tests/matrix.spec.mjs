@@ -45,7 +45,7 @@ test('persistent Chromium process restart retains native messaging device keys',
 });
 
 test('two real browser accounts verify, retain crypto and exchange encrypted messages through reconnect and reload',async({browser})=>{
- test.setTimeout(240000);
+ test.setTimeout(660000);
  const contexts=[];let failure,tamperClosing=false;
  async function account(name){
   const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'});contexts.push(context);await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
@@ -123,12 +123,27 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
    expect(outboxRouteError).toBe(false);hiddenEvent='';await alice.page.unroute(sendPattern,loseAcknowledgement);await alice.page.unroute(syncPattern,syncRoute);
   });
   await test.step('Reload, reopen persistent keys and send from the same verified device',async()=>{await bob.page.reload();await installTamperRoute(bob);const reopened=await bind(bob);await reopened.getByRole('button',{name:'Keep messaging active',exact:true}).click();await bob.page.getByTestId('nav-messages').click();await bob.page.getByRole('button',{name:'Open encrypted conversation',exact:true}).click();await expect(bob.page.getByText('Encrypted room synchronized.',{exact:true})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[1],{exact:true})).toBeVisible();await bob.page.getByLabel('Message',{exact:true}).fill(markers[2]);await bob.page.getByRole('button',{name:'Send',exact:true}).click();await expect.poll(async()=>({draftCleared:(await bob.page.getByLabel('Message',{exact:true}).inputValue())==='',alerts:await bob.page.getByRole('alert').allTextContents()}),{timeout:30000}).toEqual({draftCleared:true,alerts:[]});await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[2],{exact:true})).toBeVisible({timeout:30000});await expect(alice.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[2],{exact:true})).toBeVisible({timeout:30000});});
+  const pagedMessages=Array.from({length:55},(_,index)=>markers[2]+'_PAGE_'+index);
+  await test.step('Send 55 real UI messages and reopen a limited history timeline',async()=>{
+   // Keep production contact/message limits enabled. Pace real composer sends; never replay failures.
+   console.info('Starting paced 55-message UI history acceptance with unchanged production rate limits.');await new Promise(resolve=>setTimeout(resolve,30000));
+   for(let index=0;index<pagedMessages.length;index++){
+    const text=pagedMessages[index];await expect(alice.page.getByLabel('Message',{exact:true})).toBeEnabled();await alice.page.getByLabel('Message',{exact:true}).fill(text);await alice.page.getByRole('button',{name:'Send',exact:true}).click();
+    await expect.poll(async()=>({draftCleared:(await alice.page.getByLabel('Message',{exact:true}).inputValue())==='',alerts:await alice.page.getByRole('alert').allTextContents()}),{timeout:30000}).toEqual({draftCleared:true,alerts:[]});
+    await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(text,{exact:true})).toBeVisible({timeout:30000});
+    if((index+1)%10===0)console.info('Acknowledged and decrypted '+(index+1)+' of 55 UI history messages.');
+    if(index+1<pagedMessages.length)await new Promise(resolve=>setTimeout(resolve,5200));
+   }
+   await bob.page.reload();await installTamperRoute(bob);const reopened=await bind(bob);await reopened.getByRole('button',{name:'Keep messaging active',exact:true}).click();await bob.page.getByTestId('nav-messages').click();await bob.page.getByRole('button',{name:'Open encrypted conversation',exact:true}).click();await expect(bob.page.getByText('Encrypted room synchronized.',{exact:true})).toBeVisible({timeout:30000});
+   await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(pagedMessages[54],{exact:true})).toBeVisible({timeout:30000});
+   await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(pagedMessages[0],{exact:true})).toHaveCount(0);await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toHaveCount(0);
+  });
   await test.step('Load bounded older encrypted pages through the actual history control',async()=>{
    const older=bob.page.getByRole('button',{name:'Load older encrypted messages',exact:true});await expect(older).toBeEnabled();let pages=0;
    while(pages<3&&!await older.isDisabled()){
     const requested=bob.page.waitForRequest(request=>{const url=new URL(request.url());return url.pathname.endsWith('/messages')&&url.pathname.startsWith('/_matrix/client/v3/rooms/');}),responded=bob.page.waitForResponse(response=>{const url=new URL(response.url());return url.pathname.endsWith('/messages')&&url.pathname.startsWith('/_matrix/client/v3/rooms/');});await older.click();const url=new URL((await requested).url());expect(url.searchParams.get('dir')).toBe('b');expect(Number(url.searchParams.get('limit'))).toBeGreaterThan(0);expect(Number(url.searchParams.get('limit'))).toBeLessThanOrEqual(50);expect((await responded).status()).toBe(200);await expect(bob.page.getByLabel('Message',{exact:true})).toBeEnabled();await expect(bob.page.getByRole('alert')).toHaveText([]);await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toHaveCount(1);await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[1],{exact:true})).toHaveCount(1);pages++;
    }
-   expect(pages).toBeGreaterThan(0);await expect(older).toBeDisabled();
+   expect(pages).toBeGreaterThan(0);await expect(older).toBeDisabled();for(const text of pagedMessages)await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(text,{exact:true})).toHaveCount(1);
   });
   await test.step('Reject a different account using the sender session and proof',async()=>{const headers=await aliceHeaders;expect(headers).toBeTruthy();const denied=await bob.page.evaluate(async headers=>(await fetch('/_matrix/client/v3/account/whoami',{credentials:'same-origin',headers})).status,headers);expect(denied).toBe(403);});
   await test.step('Reject modified ciphertext in the actual receiving browser',async()=>{
