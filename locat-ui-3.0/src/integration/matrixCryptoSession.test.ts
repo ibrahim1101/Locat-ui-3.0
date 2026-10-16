@@ -3,7 +3,7 @@ import {openMatrixCryptoSession} from './matrixCryptoSession';
 const {create,init,stop,crypto,linkRequest,linkClose,decryptHistory}=vi.hoisted(()=>({decryptHistory:vi.fn(),create:vi.fn(),init:vi.fn(),stop:vi.fn(),linkRequest:vi.fn().mockResolvedValue({}),linkClose:vi.fn(),crypto:{importRoomKeysAsJson:vi.fn(),globalBlacklistUnverifiedDevices:false,getOwnDeviceKeys:vi.fn(async()=>({ed25519:'synthetic-public-signing',curve25519:'synthetic-public-identity'}))}}));
 vi.mock('./linkClient',()=>({BrowserLinkClient:class{connect=async()=>({token:'synthetic-proof'});request=linkRequest;close=linkClose;}}));
 vi.mock('./matrixHistory',()=>({decryptHistoryFile:decryptHistory,encryptHistoryExport:vi.fn()}));
-vi.mock('matrix-js-sdk',()=>({createClient:create}));
+vi.mock('matrix-js-sdk',()=>({createClient:create,ClientEvent:{Sync:'sync'}}));
 const binding={accountId:'a'.repeat(32),userId:'@alice:locat.test',deviceId:'DEVICE',accessToken:'synthetic-test-token'};
 beforeEach(()=>{vi.clearAllMocks();linkRequest.mockReset().mockResolvedValue({});init.mockResolvedValue(undefined);create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop});vi.stubGlobal('isSecureContext',true);vi.stubGlobal('indexedDB',{});});
 afterEach(()=>vi.unstubAllGlobals());
@@ -48,23 +48,26 @@ it('holds the crypto store lock until an in-progress history import settles duri
  const value=await openMatrixCryptoSession(binding);const importing=value.importHistory('synthetic encrypted file','synthetic-passphrase');const rejected=expect(importing).rejects.toThrow('completed locally');await vi.waitFor(()=>expect(crypto.importRoomKeysAsJson).toHaveBeenCalled());const closing=value.close();expect(stop).not.toHaveBeenCalled();finish();await rejected;await closing;expect(stop).toHaveBeenCalledOnce();
 });
 
-it('refreshes room state on each open without letting an old sync acknowledge a newer selection',async()=>{
+it('waits for processed fresh room state, rejects stale refreshes and cancels setup on close',async()=>{
  vi.stubGlobal('navigator',{locks:{request:async(_name:string,_options:unknown,callback:(lock:object)=>Promise<void>)=>callback({})}});
  const room={oldState:{paginationToken:null},getLiveTimeline:()=>({getEvents:()=>[]}),getMyMembership:()=> 'join',getMember:()=>({membership:'join'}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})}};
- const start=vi.fn();create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop,getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=>binding.userId,joinRoom:vi.fn(async()=>{}),startClient:start});
+ const listeners=new Set<(value:string)=>void>(),on=vi.fn((_event:string,listener:(value:string)=>void)=>listeners.add(listener)),off=vi.fn((_event:string,listener:(value:string)=>void)=>listeners.delete(listener)),emit=()=>{for(const listener of listeners)listener('SYNCING');};
+ const start=vi.fn();create.mockReturnValue({initRustCrypto:init,getCrypto:()=>crypto,stopClient:stop,getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=>binding.userId,joinRoom:vi.fn(async()=>{}),startClient:start,on,off});
  linkRequest.mockImplementation(async(path:string)=>path.startsWith('matrix/peer?')?{accountId:'b'.repeat(32),matrixUserId:'@bob:locat.test',devices:[{deviceId:'BOB'}]}:path==='matrix/conversation'?{roomId:'!room:locat.test'}:{});
  const fetch=vi.fn<(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>>().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch',fetch);
  const value=await openMatrixCryptoSession(binding),transport=create.mock.calls[0][0].fetchFn as typeof globalThis.fetch;
- const sync=()=>transport(window.location.origin+'/_matrix/client/v3/sync?since=previous');
- const query=(index:number)=>new URL(String(fetch.mock.calls[index][0])).searchParams;
+ const sync=()=>transport(window.location.origin+'/_matrix/client/v3/sync?since=previous'),query=(index:number)=>new URL(String(fetch.mock.calls[index][0])).searchParams;
  try{
   await value.bind();await sync();expect(query(0).has('locat_conversations')).toBe(false);
-  const conversations=value.conversations();await conversations.open('b'.repeat(32));
-  let finish:(response:Response)=>void=()=>{};fetch.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));const old=sync();await vi.waitFor(()=>expect(fetch).toHaveBeenCalledTimes(2));expect(query(1).get('full_state')).toBe('true');expect(query(1).has('since')).toBe(false);
-  await conversations.open('c'.repeat(32));expect(fetch.mock.calls[1][1]?.signal?.aborted).toBe(true);finish(new Response('{}'));await old;
-  fetch.mockResolvedValueOnce(new Response('{}',{status:503}));await sync();expect(query(2).get('full_state')).toBe('true');
-  await sync();expect(query(3).get('full_state')).toBe('true');expect(query(3).get('locat_conversations')).toBe('1');
-  await sync();expect(query(4).has('full_state')).toBe(false);expect(query(4).get('since')).toBe('previous');
-  await conversations.open('b'.repeat(32));await sync();expect(query(5).get('full_state')).toBe('true');window.dispatchEvent(new Event('online'));await sync();expect(query(6).get('full_state')).toBe('true');expect(query(6).has('since')).toBe(false);await sync();expect(query(7).get('since')).toBe('previous');expect(start).not.toHaveBeenCalled();
+  const conversations=value.conversations();let opened=false;const first=conversations.open('b'.repeat(32)).then(()=>{opened=true;});await vi.waitFor(()=>expect(on).toHaveBeenCalledOnce());emit();await Promise.resolve();expect(opened).toBe(false);
+  await sync();expect(query(1).get('full_state')).toBe('true');expect(query(1).has('since')).toBe(false);expect(opened).toBe(false);emit();await first;
+  let finish:(response:Response)=>void=()=>{};fetch.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));const old=sync();await vi.waitFor(()=>expect(fetch).toHaveBeenCalledTimes(3));
+  opened=false;const second=conversations.open('c'.repeat(32)).then(()=>{opened=true;});await vi.waitFor(()=>expect(on).toHaveBeenCalledTimes(2));expect(fetch.mock.calls[2][1]?.signal?.aborted).toBe(true);finish(new Response('{}'));await old;emit();await Promise.resolve();expect(opened).toBe(false);
+  fetch.mockResolvedValueOnce(new Response('{}',{status:503}));await sync();emit();expect(query(3).get('full_state')).toBe('true');expect(opened).toBe(false);
+  await sync();expect(query(4).get('full_state')).toBe('true');expect(query(4).get('locat_conversations')).toBe('1');emit();await second;
+  await sync();expect(query(5).has('full_state')).toBe(false);expect(query(5).get('since')).toBe('previous');
+  const third=conversations.open('b'.repeat(32));await vi.waitFor(()=>expect(on).toHaveBeenCalledTimes(3));await sync();expect(query(6).get('full_state')).toBe('true');emit();await third;
+  window.dispatchEvent(new Event('online'));await sync();expect(query(7).get('full_state')).toBe('true');expect(query(7).has('since')).toBe(false);await sync();expect(query(8).get('since')).toBe('previous');expect(start).not.toHaveBeenCalled();
+  const interrupted=conversations.open('c'.repeat(32)),rejected=expect(interrupted).rejects.toThrow('closed');await vi.waitFor(()=>expect(on).toHaveBeenCalledTimes(4));await value.close();await rejected;expect(listeners.size).toBe(0);
  }finally{await value.close();}
 });
