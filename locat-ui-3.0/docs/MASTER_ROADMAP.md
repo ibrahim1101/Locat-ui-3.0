@@ -1497,3 +1497,7 @@ You have my authorization for routine development commits and pushes to the appr
 
 
 Implementation evidence: see FEATURE_MATRIX.md, CONNECT_IMPLEMENTATION_TRACKER.md and ENGINEERING_HISTORY.md. This directive describes authorized scope, not completed behavior.
+
+## Critical execution priority — 2026-10-16
+
+The global-connectivity/E2EE directive changes implementation order only. Prioritize actual UI encrypted conversations, reliability and browser acceptance before global hosting, federation, WebRTC/TURN and native validation; preserve every section and original requirement above. First server dependency implemented: authorized private Matrix v12 rooms and registered-room ciphertext transport, additive schema 15. Full protected key distribution, scoped sync and user-facing Send/Receive are unfinished; no milestone or public-beta completion claim. See MATRIX_CONVERSATIONS.md and SESSION_HANDOFF.md for exact evidence and next task.

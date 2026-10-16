@@ -75,6 +75,13 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   const aliceDevices=await json('/api/link/devices',alice.auth),aliceMessaging=aliceDevices.devices.find(device=>device.matrix?.deviceId===alice.issued.deviceId)?.matrix;assert.equal(aliceMessaging?.binding,'authorized');assert.equal(aliceMessaging.managed,true);
   await json('/api/contacts/request',{...alice.auth,method:'POST',data:{userId:bob.user.id}});
   await json('/api/contacts/respond',{...bob.auth,method:'POST',data:{userId:alice.user.id,accept:true}});
+  const conversation=await json('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:alice.issued.accessToken}});assert.equal(conversation.created,true);
+  assert.deepEqual(await json('/api/link/matrix/conversation',{...bob.auth,method:'POST',data:{accountId:alice.user.id,accessToken:bob.issued.accessToken}}),{roomId:conversation.roomId,created:false});
+  const conversationPath='/_matrix/client/v3/rooms/'+encodeURIComponent(conversation.roomId);
+  assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:bob.issued.accessToken}})).status,403);
+  assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:alice.issued.accessToken},headers:{Origin:'https://foreign.invalid'}})).status,403);
+  assert.equal((await api('/_matrix/client/v3/join/'+encodeURIComponent(conversation.roomId),{...bob.auth,method:'POST',data:{},headers:{Authorization:'Bearer '+bob.issued.accessToken}})).status,200);
+  const roomState=await json(conversationPath+'/state',{...alice.auth,headers:{Authorization:'Bearer '+alice.issued.accessToken}});assert.equal(roomState.find(event=>event.type==='m.room.encryption').content.algorithm,'m.megolm.v1.aes-sha2');
   const protectedPath='/_matrix/client/v3/account/whoami',bearer={Authorization:'Bearer '+alice.issued.accessToken};
   assert.equal((await api(protectedPath,{headers:bearer})).status,401,'Matrix bearer alone is insufficient');
   assert.equal((await api(protectedPath,{cookie:alice.auth.cookie,headers:bearer})).status,403,'Cookie and bearer without proof are insufficient');
@@ -95,6 +102,8 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   assert.equal(alice.client.getRooms().length,0);assert.equal(bob.client.getRooms().length,0);
   await Promise.all(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
   await json('/api/contacts/block',{...alice.auth,method:'POST',data:{userId:bob.user.id,blocked:true}});
+  assert.equal((await api(conversationPath+'/messages?dir=b',{...alice.auth,headers:bearer})).status,403,'Blocking removes conversation history access');
+  assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:alice.issued.accessToken}})).status,404,'Blocking prevents conversation discovery');
   assert.equal((await api('/api/link/matrix/peer?accountId='+bob.user.id,alice.auth)).status,404,'Blocking removes peer discovery');
   assert.equal((await api('/_matrix/client/v3/keys/query',{...alice.auth,method:'POST',data:{device_keys:{[bob.issued.userId]:[]}},headers:bearer})).status,403,'Blocking removes key discovery');
   await json('/api/link/matrix/revoke-managed-device',{...bob.auth,method:'POST',data:{}});

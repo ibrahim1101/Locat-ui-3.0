@@ -32,3 +32,7 @@ Current durable follow-on: schema 13 now queues cleanup of bound Matrix devices 
 
 
 Current browser acceptance supersedes earlier pending-browser checkpoint notes for the exercised subset: BROWSER_FOUNDATION_ACCEPTANCE.md records actual Chromium managed provisioning/binding, exclusive native IndexedDB writer/key continuity, peer SAS rejection/mutual verification and standard history workers. It also records browser Link/private-store evidence and exact runs. Conversation Send, cross-signing/full identity recovery, federation/global trust, actual TURN/media relay and native acceptance remain open. The all-49 register and complete A–AM roadmap remain in scope.
+
+## 2026-10-16 critical-priority override
+
+Immediate order is secure conversations → reliability → actual browser acceptance → global readiness → federation → real-time relay → native validation. The complete ecosystem remains in scope. Production room bootstrap and registered-room ciphertext transport are implemented with real Synapse/HTTPS acceptance (see MATRIX_CONVERSATIONS.md). This is partial P0 foundation: room-free verification sync remains, complete protected key distribution and conversation UI are pending, Send is still disabled, and Milestones A–G are not completed by this batch. Next: authorized encrypted key distribution and scoped room sync, then account-scoped UI session ownership.

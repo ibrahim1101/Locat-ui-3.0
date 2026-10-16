@@ -1,3 +1,4 @@
+import {createPrivateMatrixConversation} from './matrixConversations.mjs';
 import {createHash} from 'node:crypto';
 import {createRateLimiter} from './rateLimit.mjs';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
@@ -62,7 +63,7 @@ export function matrixBindingStore(sql,devices,managedDevices){
  disconnect(userId,actor){devices.owned(userId,actor);return sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=? AND linkDeviceId=?').run(userId,actor);}
  };
 }
-export function createMatrixBindingHandler({store,provider,provisioner,body,json,audit}){
+export function createMatrixBindingHandler({store,provider,provisioner,conversations,body,json,audit}){
  const limit=createRateLimiter(10),cleanupLimit=createRateLimiter(30),peerLimit=createRateLimiter(30);
  return async({req,res,url,userId,actor,session,recheck})=>{
   const action=url.pathname.slice('/api/link/matrix/'.length);
@@ -73,9 +74,10 @@ export function createMatrixBindingHandler({store,provider,provisioner,body,json
    const own=store.current(userId,actor);if(!own||own.sessionHash!==matrixTokenHash(session)||own.expiresAt<=Date.now())fail(403,'Bind this messaging device to the current Locat session first');
    recheck();json(res,200,url.searchParams.has('accountId')?store.peer(userId,actor,url.searchParams.get('accountId')):store.peerByMatrix(userId,actor,url.searchParams.get('matrixUserId')));return true;
   }
-  if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device'].includes(action))fail(404,'Unknown Matrix binding action');
+  if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device','conversation'].includes(action))fail(404,'Unknown Matrix binding action');
   const retryAfter=(action==='cancel-provision'?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
   const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');
+  if(action==='conversation'){const value=await createPrivateMatrixConversation({provider,store:conversations,bindings:store,userId,actor,session,input,recheck});json(res,200,value);return true;}
   if(action==='revoke-managed-device'){if(Object.keys(input).length)fail(400,'Invalid managed revocation');if(!provisioner)fail(503,'Managed messaging accounts are not configured');try{await provisioner.revokeDevice(userId,actor,recheck);}catch(error){audit(userId,'matrix.device.revocation.unconfirmed','warning');throw error;}audit(userId,'matrix.device.revoked');json(res,200,{ok:true,upstreamDeviceRevocationConfirmed:true});return true;}
   if(action==='cancel-provision'){if(Object.keys(input).some(key=>key!=='accessToken'))fail(400,'Invalid managed cancellation');if(!provisioner)fail(503,'Managed messaging accounts are not configured');await provisioner.cancel(userId,actor,input.accessToken,recheck);audit(userId,'matrix.provision.cancelled');json(res,200,{ok:true,upstreamLogoutConfirmed:true});return true;}
   if(action==='provision'){if(Object.keys(input).length)fail(400,'Managed identity fields cannot be chosen by the browser');if(!provisioner)fail(503,'Managed messaging accounts are not configured');const value=await provisioner.provision(userId,actor,recheck);audit(userId,'matrix.session.provisioned');json(res,200,value);return true;}

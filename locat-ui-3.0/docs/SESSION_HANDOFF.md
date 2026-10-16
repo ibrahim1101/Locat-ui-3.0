@@ -1,4 +1,4 @@
-# Locat UI3 current handoff — 2026-10-15
+# Locat UI3 current handoff — 2026-10-16
 
 Continue the full authorized roadmap without routine approval questions. Preserve the current UI3 theme, all 49 original requirements and the complete A–AM ecosystem scope. A commit is a checkpoint, not completion of the project.
 
@@ -6,7 +6,23 @@ Continue the full authorized roadmap without routine approval questions. Preserv
 
 Work only on `integration/locat-core` in `ibrahim1101/Locat-ui-3.0`; application sources/scripts are in the nested `locat-ui-3.0` directory. Read the repository AGENTS.md. The original Locat repo is a read-only feature reference. Ordinary development commits/publication are authorized; main merges, public deployment/DNS, releases, paid resources and destructive changes require separate authorization. Preserve data and use additive schema changes only.
 
-## Current implementation
+## Critical messaging checkpoint
+
+The 2026-10-16 directive makes secure conversations the immediate priority, ahead of optional recovery/media work. Full ecosystem scope is preserved. Starting local HEAD `5a00c4b` / remote `5bd7e010d529e07cf742933cc919e74793ef0629`; ending source checkpoint `09e7091d792d70cf1dc2813c01d643fc79e4dbf1` (development-branch publication/CI status must be recorded after observation).
+
+Implemented production `POST /api/link/matrix/conversation`: exact cookie/proof/bearer binding, accepted unblocked contact, durable one-room-per-pair reservation, private non-federated Matrix v12 room with Megolm encryption and joined-only history. Uncertain creation stays pending; retries do not blindly create duplicates. Additive schema 15 includes the room registry and backup-verifier manifest. Existing data remains intact; never downgrade the database in place.
+
+The same-origin gateway now permits only registered/contact-authorized room joins, metadata, bounded encrypted history and standard encrypted sends with matching device/curve-key pins. Plaintext sends, room-state writes, arbitrary invitations and foreign rooms remain denied. Authorization is rechecked after upstream waits. UI Send remains disabled. Sync is deliberately still room-free and encrypted to-device key delivery is not yet exposed; this is a server foundation, not operational browser chat or Milestone A completion. See MATRIX_CONVERSATIONS.md.
+
+Commands: `git fetch origin integration/locat-core`, `git merge --ff-only origin/integration/locat-core`, `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`, focused Node room/gateway/migration/backup tests, and `LOCAT_TEST_SYNAPSE_PYTHON=/workspace/scratch/8b3ebd8f9a46/synapse-test-env/bin/python npm run test:matrix`.
+
+Observed local source validation: type/lint/build pass; 250 frontend / 62 files and 107 backend tests pass. Actual Synapse passes production private-room creation, pair discovery, SDK-encrypted send through the protected gateway, real recipient decryption, transaction idempotence, ciphertext-only history and removed-contact denial. The actual HTTPS production server also tests room creation/discovery/join/state with real login/proof/token guards, wrong Origin/token rejection and block denial. Key distribution/recipient synchronization in this synthetic send test still use the direct isolated Synapse path; no end-to-end browser conversation claim. The final post-gateway scan of both homeserver/Locat database and WAL files passed. Failures/fixes are in ENGINEERING_HISTORY.md.
+
+Latest observed prior CI: workflow `38785504517` at `5bd7e01` completed successfully. New source CI/browser acceptance remains pending until observed. No DNS/public exposure/release/main merge occurred.
+
+Exact next dependency: implement bounded proof/contact/device-authorized encrypted to-device key distribution and opt-in registered-room sync with current authorization filtering; exercise both SDK clients entirely through the protected gateway. Then move the crypto session lifetime out of the Settings sheet into an account-scoped owner and wire existing conversation UI. Verify browser send/receive, offline/reload/revocation/tamper/no-plaintext before enabling Send. Cross-signing recovery is not the immediate priority.
+
+## Previous accepted media implementation
 
 The latest production-source changes are in `353ca2b5a28302860aff548a95aa3917142dc4c4`; browser cleanup follow-up `f3a41830cca43b13565f8d1914b136c5eada512d` changes only the test fixture and engineering history. Both are published on the development branch.
 
@@ -26,7 +42,7 @@ Timeline source 488a4fb / workflow 38781851921 passed all four jobs; its browser
 
 ## Next work
 
-The current source/fixture checkpoint has observed CI acceptance. Continue independently implementable roadmap work; observe and investigate new CI results when source changes. Prioritize the remaining communication/key-recovery foundation before enabling conversations: use pinned SDK code/primary protocol sources, preserve proof/account/device/contact checks, and require actual Synapse plus browser acceptance. Other open media scope includes explicit EXIF/capture-date behavior, legacy thumbnail lifecycle, backup/sync and permission-controlled sharing.
+Continue the critical messaging dependency above. Preserve the previous accepted media features and full A–AM roadmap; do not restart them.
 
 Native installers, physical devices, hardware codecs, TURN/network capture/control, full identity recovery, federation and public hosting remain separate incomplete acceptance/work streams. Do not treat them as implemented merely because a shell or source job exists.
 
