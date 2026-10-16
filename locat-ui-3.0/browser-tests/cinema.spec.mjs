@@ -1,0 +1,33 @@
+import {test,expect} from '@playwright/test';
+import {randomBytes} from 'node:crypto';
+import {startBrowserFixture} from '../tools/browser-fixture.mjs';
+let fixture;
+test.beforeAll(async()=>{fixture=await startBrowserFixture({media:true});});
+test.afterAll(async()=>{await fixture?.stop();});
+test('Cinema: real storage guards, clickable controls, server metadata and compatible HEVC conversion',async({browser})=>{
+ test.setTimeout(120000);
+ const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'}),page=await context.newPage();
+ const external=[],streams=[],errors=[];
+ await context.route('**/*',route=>{if(new URL(route.request().url()).origin===fixture.origin)return route.continue();external.push(true);return route.abort();});
+ page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/media/stream/'))streams.push(request.url());});
+ try{
+  const username='cinema_'+randomBytes(6).toString('hex'),password=randomBytes(24).toString('base64url');await page.goto(fixture.origin);
+  const account=await page.evaluate(async input=>{const response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});return {status:response.status,...await response.json()};},{username,password,displayName:'Cinema QA'});expect(account.status).toBe(201);
+  await page.getByTestId('login-username').fill(username);await page.getByTestId('login-password').fill(password);await page.getByTestId('login-submit').click();await expect(page.getByTestId('entry-flow')).toHaveCount(0);await page.goto(fixture.origin+'/cinema');
+  await page.getByLabel('Import Cinema files').setInputFiles(fixture.mediaFiles.large);await expect(page.getByRole('alert').filter({hasText:'256 MiB'})).toBeVisible();
+  const count=await page.evaluate(async owner=>{const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-media:'+owner);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});try{return await new Promise((resolve,reject)=>{const tx=db.transaction('items'),request=tx.objectStore('items').count();tx.oncomplete=()=>resolve(request.result);tx.onabort=()=>reject(tx.error);});}finally{db.close();}},account.user.id);expect(count).toBe(0);
+  await page.getByLabel('Open Cinema video without copying').setInputFiles(fixture.mediaFiles.h264);await expect(page.getByTestId('video-player')).toBeVisible();await page.getByRole('button',{name:'Close player'}).click();await page.reload();await expect(page.getByText(/Device · session only/)).toHaveCount(0);
+  await page.getByRole('button').filter({hasText:'Browser-H264.mkv'}).click();await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();let dialog=page.getByRole('dialog',{name:'Playback compatibility'});
+  await expect(dialog.getByText(/h264 \/ aac/)).toBeVisible();const remux=dialog.getByRole('button',{name:'Remux · copy streams into MP4'});await expect(remux).toBeEnabled();await remux.focus();await page.keyboard.press('Space');await expect(dialog).toHaveCount(0);
+  await expect.poll(()=>streams.some(url=>url.includes('mode=remux'))).toBe(true);await expect.poll(()=>page.locator('video').evaluate(video=>video.readyState)).toBeGreaterThanOrEqual(1);
+  await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();dialog=page.getByRole('dialog',{name:'Playback compatibility'});await dialog.getByRole('button',{name:'Direct playback · supports seeking'}).click();await expect(dialog).toHaveCount(0);await expect(page.locator('video')).toHaveAttribute('src',/^[^?]+$/);
+  await page.getByRole('button',{name:'Close player'}).click();await page.getByRole('button').filter({hasText:'Browser-HEVC-4K.mkv'}).click();await page.getByRole('button',{name:'Stream info'}).click();const info=page.getByRole('dialog',{name:'Stream details'});await expect(info.getByText('hevc · 3840×2160',{exact:true})).toBeVisible();expect(await info.innerText()).not.toContain('undefined');await info.getByRole('button',{name:'Close',exact:true}).last().click();
+  await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();dialog=page.getByRole('dialog',{name:'Playback compatibility'});await expect(dialog.getByRole('button',{name:'Remux · copy streams into MP4'})).toBeDisabled();await expect(dialog.getByText(/Remux keeps the original codec/)).toBeVisible();
+  const convert=dialog.getByRole('button',{name:'Convert to H.264/AAC · up to 1080p'});await convert.focus();await page.keyboard.press('Enter');await expect(dialog).toHaveCount(0);await expect.poll(()=>streams.some(url=>url.includes('mode=transcode'))).toBe(true);await expect.poll(()=>page.locator('video').evaluate(video=>({ready:video.readyState,width:video.videoWidth,height:video.videoHeight})) ,{timeout:30000}).toEqual({ready:4,width:1920,height:1080});
+  const before=streams.filter(url=>url.includes('mode=transcode')).length;
+  await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();await page.getByRole('dialog',{name:'Playback compatibility'}).getByRole('button',{name:'Convert to H.264/AAC · up to 1080p'}).click();await expect.poll(()=>streams.filter(url=>url.includes('mode=transcode')).length).toBeGreaterThan(before);
+  await expect(page.getByLabel('Seek',{exact:true})).toBeDisabled();await expect(page.getByTestId('player-error')).toHaveCount(0);expect(errors).toEqual([]);expect(external).toEqual([]);
+  await page.route('**/api/media/stream/*?mode=transcode',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'FFmpeg is unavailable'})}));
+  await page.getByTestId('video-player').hover();await page.getByRole('button',{name:'Playback options',exact:true}).click();await page.getByRole('dialog',{name:'Playback compatibility'}).getByRole('button',{name:'Convert to H.264/AAC · up to 1080p'}).click();await expect(page.getByTestId('player-error')).toContainText('Server conversion could not be played');
+ }finally{await context.close();}
+});

@@ -73,3 +73,25 @@ test('real FFprobe/FFmpeg process authorized open files, preserve selected audio
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('a converter that produces no output fails before HTTP success and releases its slot',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-empty-conversion-'));let fd;
+ try{
+  const file=join(dir,'invalid.mkv');await writeFile(file,'not a video');fd=await open(file,'r');let headers=false;
+  const processor=createMediaProcessor({executable:process.execPath});
+  const response=new Writable({write(_chunk,_encoding,done){done();}});response.writeHead=()=>{headers=true;};
+  await assert.rejects(processor.stream(fd,response),error=>error.status===503&&/could not produce/.test(error.message));assert.equal(headers,false);assert.equal(processor.active,0);
+ }finally{await fd?.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('real 4K HEVC/AAC source probes correctly and converts to bounded H264/AAC output',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-hevc-4k-'));let server;
+ try{
+  const source=join(dir,'hevc.mkv');
+  await exec('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:size=3840x2160:rate=2','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1','-c:v','libx265','-threads','1','-preset','ultrafast','-pix_fmt','yuv420p','-x265-params','pools=1:frame-threads=1:log-level=error','-c:a','aac','-y',source],{timeout:30000});
+  let fd=await open(source,'r');try{const result=await probeMedia(fd);assert.equal(result.videoCodec,'hevc');assert.equal(result.audioCodec,'aac');assert.equal(result.width,3840);assert.equal(result.height,2160);assert.equal(result.strategy,'transcode');}finally{await fd.close();}
+  const processor=createMediaProcessor();server=createServer(async(_req,res)=>{const input=await open(source,'r');try{await processor.stream(input,res,{transcode:true});}catch(error){if(!res.headersSent){res.writeHead(error.status??500);res.end();}else res.destroy();}finally{await input.close();}});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const response=await fetch('http://127.0.0.1:'+server.address().port);assert.equal(response.status,200);const output=join(dir,'compatible.mp4');await writeFile(output,Buffer.from(await response.arrayBuffer()));
+  const result=JSON.parse((await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,width,height','-of','json',output])).stdout);assert.deepEqual(result.streams.find(stream=>stream.codec_type==='video'),{codec_name:'h264',codec_type:'video',width:1920,height:1080});assert.equal(result.streams.find(stream=>stream.codec_type==='audio').codec_name,'aac');assert.equal(processor.active,0);
+ }finally{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await rm(dir,{recursive:true,force:true});}
+});

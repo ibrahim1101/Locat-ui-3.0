@@ -61,6 +61,15 @@ export function createMediaProcessor({ maximum = 2, timeoutMs = 4 * 60 * 60 * 10
           input = fd.createReadStream({ start: 0, autoClose: false });
           input.on('error', cancel); child.stdin.on('error', () => {}); input.pipe(child.stdin);
           child.stderr.resume();
+          // Do not commit HTTP 200 for a worker that exits before producing any MP4 bytes.
+          const first=await new Promise((resolve,reject)=>{
+            const startup=setTimeout(()=>{cleanup();cancel();reject(unavailable('FFmpeg did not produce a stream within 30 seconds. Try a compatible preconverted file.'));},30000);
+            const cleanup=()=>{clearTimeout(startup);child.stdout.off('data',ready);};
+            const ready=chunk=>{child.stdout.pause();cleanup();resolve(chunk);};
+            child.stdout.once('data',ready);
+            void closed.then(()=>{cleanup();reject(unavailable('FFmpeg could not produce an MP4 stream. Check the source format and host conversion support.'));});
+          });
+          child.stdout.unshift(first);
           res.writeHead(200, { 'Content-Type': 'video/mp4', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin', 'Content-Disposition': 'inline' });
           await pipeline(child.stdout, res, { end: false });
           const result = await closed;

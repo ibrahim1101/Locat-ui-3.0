@@ -1,3 +1,4 @@
+import {checkMediaImport,mediaStorageError} from "./mediaStoragePolicy";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSession } from "../app/session";
 import { LiveMediaContext } from "./liveMedia";
@@ -43,14 +44,23 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
   }, [account, authenticated,loadServer,disposeServer]);
   async function run(operation: () => Promise<void>) {
     setError("");
-    try { await operation(); } catch (error) { setError(error instanceof Error ? error.message : "Media operation failed"); }
+    try { await operation(); } catch (error) { setError(mediaStorageError(error).message); }
   }
   return <LiveMediaContext.Provider value={{ items, loading, importing:imports>0, serverLoading, error, serverError, serverLibraries: server?.libraries,
     refreshServer: async()=>{if(!authenticated){setServerError("Sign in to read server media");return;}await loadServer();},
+    openVideo: async file => {
+      setError('');
+      if(mediaKind(file)!=='video'){setError('Choose a video file to open without copying.');return;}
+      await hydration.current;
+      const id=crypto.randomUUID();
+      setLocal(old=>[...old,{id,kind:'video',name:file.name,file,size:file.size,addedAt:Date.now(),album:'Open this session',favorite:false,position:0,source:'device',temporary:true}]);
+      return id;
+    },
     importFiles: files => run(async () => {
       setImports(count=>count+1);
       try{
         await hydration.current;
+        await checkMediaImport(Array.from(files));
         let additions:LocalMediaItem[]=[];const started=performance.now();
         for(const file of Array.from(files)){
           const kind=mediaKind(file);if(!kind)throw new Error(`Unsupported media file: ${file.name}`);
@@ -70,8 +80,8 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
     }),
     update: item => run(async () => {
       const saved = item.source === "server" ? { ...item, file: new Blob() } : item;
-      await writeMedia(account, [saved]); setLocal(old => [...old.filter(row => row.id !== item.id), saved]);
+      if(!item.temporary)await writeMedia(account, [saved]); setLocal(old => [...old.filter(row => row.id !== item.id), saved]);
     }),
-    remove: id => run(async () => { if (id.startsWith("server:")) throw new Error("Server files are read-only"); await writeMedia(account, [], id); setLocal(old => old.filter(row => row.id !== id)); }),
+    remove: id => run(async () => { if (id.startsWith("server:")) throw new Error("Server files are read-only"); if(!local.some(item=>item.id===id&&item.temporary))await writeMedia(account, [], id); setLocal(old => old.filter(row => row.id !== id)); }),
   }}>{children}</LiveMediaContext.Provider>;
 }

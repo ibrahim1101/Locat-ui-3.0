@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {LiveMediaProvider} from './LiveMediaProvider';
@@ -38,4 +39,15 @@ it('waits for initial local hydration before publishing a new import',async()=>{
  let resolve!:(items:LocalMediaItem[])=>void;vi.mocked(readMedia).mockReturnValueOnce(new Promise(done=>{resolve=done;}));vi.stubGlobal('fetch',vi.fn(async()=>snapshot('Server')));const {unmount}=render(<LiveMediaProvider><Probe/></LiveMediaProvider>);
  try{fireEvent.change(screen.getByLabelText('Test import'),{target:{files:[new File(['new'],'new.mp3',{type:'audio/mpeg'})]}});expect(writeMedia).not.toHaveBeenCalled();await act(async()=>{resolve([storedPhoto()]);});await screen.findByText('existing.png,new.mp3');}
  finally{unmount();await act(async()=>{resolve([storedPhoto()]);});}
+});
+
+it('rejects a multi-gigabyte import before a write and keeps temporary playback and progress out of IndexedDB',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>snapshot('Server')));let media!:ReturnType<typeof useLiveMedia>;
+ function Consumer(){const current=useLiveMedia();useEffect(()=>{media=current;},[current]);return <Probe/>;}
+ render(<LiveMediaProvider><Consumer/></LiveMediaProvider>);await screen.findByText('Device ready');
+ const file=new File(['fixture'],'Onimusha_all_boss.mkv');Object.defineProperty(file,'size',{value:13191223154});
+ await act(async()=>{await media.importFiles([file]);});expect(screen.getByText(/Browser import is limited/)).toBeVisible();expect(writeMedia).not.toHaveBeenCalled();
+ let id:string|undefined;await act(async()=>{id=await media.openVideo?.(file);});const temporary=media.items.find(item=>item.id===id)!;expect(temporary.temporary).toBe(true);expect(temporary.file).toBe(file);
+ await act(async()=>{await media.update({...temporary,position:15,favorite:true});});expect(media.items.find(item=>item.id===id)?.position).toBe(15);expect(writeMedia).not.toHaveBeenCalled();
+ await act(async()=>{await media.remove(id!);});expect(media.items.some(item=>item.id===id)).toBe(false);expect(writeMedia).not.toHaveBeenCalled();
 });

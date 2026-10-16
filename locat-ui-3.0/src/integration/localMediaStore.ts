@@ -1,5 +1,6 @@
+import { MAX_BROWSER_IMPORT_BYTES, mediaStorageError } from "./mediaStoragePolicy";
 export type LocalMediaKind = "video" | "audio" | "photo";
-export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; tags?: string[]; thumbnail?: Blob; source?: "device" | "server"; streamUrl?: string };
+export type LocalMediaItem = { id: string; kind: LocalMediaKind; name: string; file: Blob; size: number; addedAt: number; album: string; favorite: boolean; position: number; tags?: string[]; thumbnail?: Blob; source?: "device" | "server"; streamUrl?: string; temporary?: boolean };
 export function mediaKind(file: Pick<File, "type" | "name">): LocalMediaKind | null {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
@@ -32,6 +33,7 @@ export async function readMedia(accountId: string): Promise<LocalMediaItem[]> {
   } finally { db.close(); }
 }
 export async function writeMedia(accountId: string, items: LocalMediaItem[], removeId?: string): Promise<void> {
+  if(items.some(item=>item.temporary||item.file.size>MAX_BROWSER_IMPORT_BYTES)||items.reduce((sum,item)=>sum+item.file.size+(item.thumbnail?.size??0),0)>MAX_BROWSER_IMPORT_BYTES)throw new Error('Large or temporary files cannot be copied into browser storage. Open video without copying or use server streaming.');
   const db = await openStore(accountId);
   try {
     await new Promise<void>((resolve, reject) => {
@@ -41,7 +43,7 @@ export async function writeMedia(accountId: string, items: LocalMediaItem[], rem
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(failure ?? tx.error ?? new Error("Media save aborted; browser storage may be full."));
       // Request errors abort by default; wait for that outcome before reporting failure.
-      tx.onerror = () => {};
+      tx.onerror = event => { failure ??= (event.target as IDBRequest).error; };
       try {
         items.forEach(item => store.put(item));
         if (removeId) store.delete(removeId);
@@ -49,5 +51,5 @@ export async function writeMedia(accountId: string, items: LocalMediaItem[], rem
         failure=error;tx.abort();
       }
     });
-  } finally { db.close(); }
+  } catch(error) { throw mediaStorageError(error); } finally { db.close(); }
 }
