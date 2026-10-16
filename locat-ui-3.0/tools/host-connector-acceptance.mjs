@@ -26,7 +26,8 @@ try{
  const rendered=JSON.parse((await exec('docker',['compose','-f',join(root,'compose.cloudflare-host.yml'),'--profile','prepared-host-connector','config','--format','json'],{env:{...runtime,CLOUDFLARED_IMAGE:image,LOCAT_HOST_CONNECTOR_CONFIG_FILE:prepared.configFile,LOCAT_TUNNEL_CREDENTIALS_FILE:credentialFile}})).stdout);
  assert.deepEqual(Object.keys(rendered.services),['cloudflared']);const connector=rendered.services.cloudflared;
  assert.equal(connector.network_mode,'host');assert.ok(!connector.ports?.length);assert.equal(connector.read_only,true);assert.ok(connector.cap_drop.includes('ALL'));assert.ok(connector.security_opt.includes('no-new-privileges:true'));
- assert.equal(connector.volumes.length,1);assert.equal(connector.volumes[0].read_only,true);assert.equal(connector.volumes[0].bind.create_host_path,false);
+ assert.equal(connector.volumes.length,1);assert.equal(connector.volumes[0].read_only,true);// Compose canonical JSON omits false-valued bind options. Explicit true must never pass.
+ assert.equal(connector.volumes[0].bind.create_host_path??false,false);
  const offline=['run','--rm','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--mount',`type=bind,src=${prepared.configFile},dst=/etc/cloudflared/config.yml,readonly`,image,'tunnel','--config','/etc/cloudflared/config.yml','ingress'];
  await exec('docker',[...offline,'validate'],{timeout:120000});
  const match=(await exec('docker',[...offline,'rule','https://connector.locat.invalid/cinema'],{timeout:30000})).stdout;
