@@ -4,6 +4,24 @@ on:
     branches: [integration/locat-core]
   pull_request:
 jobs:
+  connector-preparation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: locat-ui-3.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: locat-ui-3.0/package-lock.json
+      - run: npm ci
+      - name: Offline ingress and isolated Linux host connector acceptance
+        run: node tools/host-connector-acceptance.mjs
   verify:
     strategy:
       fail-fast: false

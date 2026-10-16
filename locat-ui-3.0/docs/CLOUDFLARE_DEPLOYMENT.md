@@ -16,3 +16,6 @@ Primary source checked 2026-10-15: https://developers.cloudflare.com/tunnel/feat
 
 
 The standalone Compose connector profile does not wire Matrix provisioning or a private Synapse upstream. See GLOBAL_CONNECTIVITY.md for the container-loopback boundary. Keep all browser Matrix routes through Locat, including when operating behind a tunnel; never add a direct Synapse ingress rule. The proposed personal hostname is replaceable example configuration, not a required application domain or confirmed service.
+
+
+Optional Linux host route now has a preparation-only profile: see HOST_CONNECTOR_PREPARATION.md and repository-root compose.cloudflare-host.yml. Only cloudflared shares the host network; existing host Node/private loopback Synapse remain unchanged. The original bridge profile above still does not integrate Matrix. The new profile uses an exact-host ingress and catch-all 404, exposes no database/admin/SSH listener and never starts automatically. Local proxy-boundary tests pass; actual Docker/ingress CI and public/ARM64 acceptance must be observed separately. No public activation is authorized by this preparation.

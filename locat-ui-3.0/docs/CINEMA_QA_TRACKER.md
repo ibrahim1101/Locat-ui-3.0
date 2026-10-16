@@ -1,6 +1,6 @@
 # Cinema QA — Windows/Firefox report and regression coverage
 
-Reported file: `Onimusha_all_boss.mkv`, HEVC Main, 3840×2160, AAC-LC, Matroska, 13,191,223,154 bytes. The user's original file is not available to this environment and has not been copied/uploaded. Current candidate is local 7883cef; all browser acceptance below is pending CI until recorded explicitly.
+Reported file: `Onimusha_all_boss.mkv`, HEVC Main, 3840×2160, AAC-LC, Matroska, 13,191,223,154 bytes. The user's original file is not available to this environment and has not been copied/uploaded. Accepted runtime **aa380e7fec7aff7f2c5c24da910678da12843d56**, workflow **38958989048**: all four jobs green, including **9 Chromium scenarios (8.1m), Firefox Cinema (7.9s), and 3 storage repetitions (12.4s)**. Both CI browsers used standard sandbox settings. All five IDs have automated regression acceptance; physical Windows Firefox, the full original movie and Pi performance remain unverified. Earlier pending entries below are historical and superseded by this result.
 
 | ID | Verified source issue and change | Current evidence |
 |---|---|---|

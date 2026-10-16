@@ -1,0 +1,23 @@
+# Preparation only. Linux Docker Engine; Locat and its private Matrix upstream run on the host.
+# No service starts without the explicit profile. Public activation requires separate authorization.
+services:
+  cloudflared:
+    profiles: [prepared-host-connector]
+    image: ${CLOUDFLARED_IMAGE:?Set an operator-verified pinned cloudflared image or digest}
+    network_mode: host
+    command: [tunnel, --no-autoupdate, --config, /etc/cloudflared/config.yml, run]
+    volumes:
+      - type: bind
+        source: ${LOCAT_HOST_CONNECTOR_CONFIG_FILE:?Set the private prepared host connector config}
+        target: /etc/cloudflared/config.yml
+        read_only: true
+        bind:
+          create_host_path: false
+    secrets: [tunnel_credentials]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+secrets:
+  tunnel_credentials:
+    file: ${LOCAT_TUNNEL_CREDENTIALS_FILE:?Set a private existing credential file outside this repository}
