@@ -56,12 +56,12 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
    assert.equal((await api('/api/link/prove',{method:'POST',cookie,data:{id:challenge.id,answer}})).status,403,'Device challenge replay must fail');
    const auth={cookie,proof},issued=await json('/api/link/matrix/provision',{...auth,method:'POST',data:{}});
    if(!bind)return {user,password,username,auth,issued,linkDeviceId:device.id};
-   const fetchFn=(input,init={})=>{const headers=new Headers(init.headers);headers.set('Cookie',cookie);headers.set('Origin',origin);headers.set('X-Locat-Device-Proof',proof);headers.set('Authorization','Bearer '+issued.accessToken);return transport(input,{...init,headers});};
+   const network={conversations:false,roomSyncStarted:false,pending:new Set(),encryptedWrites:[]};const fetchFn=async(input,init={})=>{const target=new URL(String(input));if(network.conversations&&target.pathname==='/_matrix/client/v3/sync'){target.searchParams.set('locat_conversations','1');if(!network.roomSyncStarted){target.searchParams.delete('since');target.searchParams.set('full_state','true');}}if(target.pathname.includes('/send/m.room.encrypted/')||target.pathname.includes('/sendToDevice/m.room.encrypted/'))network.encryptedWrites.push(init.body);const headers=new Headers(init.headers);headers.set('Cookie',cookie);headers.set('Origin',origin);headers.set('X-Locat-Device-Proof',proof);headers.set('Authorization','Bearer '+issued.accessToken);const control=new AbortController();network.pending.add(control);try{const response=await transport(target,{...init,headers,signal:init.signal?AbortSignal.any([init.signal,control.signal]):control.signal});if(response.ok&&network.conversations&&target.pathname==='/_matrix/client/v3/sync')network.roomSyncStarted=true;return response;}finally{network.pending.delete(control);}};
    const client=createClient({baseUrl:origin,fetchFn,userId:issued.userId,deviceId:issued.deviceId,accessToken:issued.accessToken,verificationMethods:['m.sas.v1'],logger:quiet});clients.push(client);
    await client.initRustCrypto({useIndexedDB:true,cryptoDatabasePrefix:'synthetic-https-'+user.id});const publicKeys=await client.getCrypto().getOwnDeviceKeys();
    await json('/api/link/matrix/bind',{...auth,method:'POST',data:{...issued,publicKeys}});
    const controller=createMatrixVerificationSession(client,query=>json('/api/link/matrix/peer?'+new URLSearchParams(query),auth));controllers.push(controller);let state;controller.subscribe(value=>{state=value;});
-   return {user,password,username,auth,issued,client,controller,state:()=>state};
+   return {user,password,username,auth,issued,client,controller,network,state:()=>state};
   }
   const unbound=await account('https_unbound',false),unboundStatus=await json('/api/link/matrix/status',unbound.auth);
   const unboundDevices=await json('/api/link/devices',unbound.auth);assert.equal(unboundDevices.devices.find(device=>device.id===unbound.linkDeviceId).matrix.binding,'unbound');
@@ -100,7 +100,14 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await until(()=>alice.state().phase==='comparing'&&bob.state().phase==='comparing','HTTPS SAS comparison');assert.deepEqual(alice.state().decimal,bob.state().decimal);assert.deepEqual(alice.state().emoji,bob.state().emoji);
   await alice.controller.confirm();assert.notEqual(alice.state().phase,'verified');await bob.controller.confirm();await until(()=>alice.state().phase==='verified'&&bob.state().phase==='verified','HTTPS stored device trust');
   assert.equal(alice.client.getRooms().length,0);assert.equal(bob.client.getRooms().length,0);
-  await Promise.all(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
+  await Promise.all(controllers.map(controller=>controller.close()));
+  for(const peer of [alice,bob]){peer.client.getCrypto().globalBlacklistUnverifiedDevices=true;peer.network.conversations=true;for(const control of peer.network.pending)control.abort();}
+  await until(()=>alice.client.getRoom(conversation.roomId)?.getMyMembership()==='join'&&bob.client.getRoom(conversation.roomId)?.getMyMembership()==='join','production HTTPS conversation sync',60000);
+  const messageMarker='LOCAT_SYNTHETIC_HTTPS_'+randomBytes(16).toString('hex');const encryptedMessage=await alice.client.sendTextMessage(conversation.roomId,messageMarker);
+  await until(async()=>{const event=bob.client.getRoom(conversation.roomId)?.findEventById(encryptedMessage.event_id);if(!event)return false;await bob.client.decryptEventIfNeeded(event);return event.getContent().body===messageMarker;},'production HTTPS SDK message encryption and recipient decryption',60000);
+  assert.ok(alice.network.encryptedWrites.length>0);assert.ok(!JSON.stringify(alice.network.encryptedWrites).includes(messageMarker));
+  for(const client of clients)client.stopClient();
+
   await json('/api/contacts/block',{...alice.auth,method:'POST',data:{userId:bob.user.id,blocked:true}});
   assert.equal((await api(conversationPath+'/messages?dir=b',{...alice.auth,headers:bearer})).status,403,'Blocking removes conversation history access');
   assert.equal((await api('/api/link/matrix/conversation',{...alice.auth,method:'POST',data:{accountId:bob.user.id,accessToken:alice.issued.accessToken}})).status,404,'Blocking prevents conversation discovery');
@@ -113,10 +120,10 @@ export async function runMatrixHttpsAcceptance({dir,upstream,registration,quiet,
   await json('/api/link/revoke',{...alice.auth,method:'POST',data:{id:ownLink.id}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,403,'Revoked Link identity blocks the Matrix gateway');
   await until(async()=>(await fetch(upstream+protectedPath,{headers:bearer})).status===401,'queued Link revocation invalidates actual Matrix session');
-  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken]))assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
+  for(const file of ['locat-binding.sqlite','locat-binding.sqlite-wal']){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT')continue;throw error;}for(const secret of [messageMarker,...[alice,bob,unbound,abandoned].flatMap(account=>[account.password,account.auth.cookie.split('=')[1],account.auth.proof,account.issued.accessToken])])assert.equal(bytes.includes(Buffer.from(secret)),false,'Locat persistence must not contain raw authentication secrets');}
   await json('/api/auth/logout',{...alice.auth,method:'POST',data:{}});
   assert.equal((await api(protectedPath,{...alice.auth,headers:bearer})).status,401,'Locat logout invalidates gateway session');
-  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
+  return 'production HTTPS server: real login/Secure cookie/private-key proof, managed provisioning/binding, mutual SAS, encrypted key distribution/room sync/send/recipient decryption, unbound-device cleanup, password-confirmed other-session sign-out and socket invalidation, block/durable Link-to-Matrix revoke/logout enforcement';
  }finally{
   await Promise.allSettled(controllers.map(controller=>controller.close()));for(const client of clients)client.stopClient();
   if(child.exitCode===null&&child.signalCode===null){child.kill();await Promise.race([once(child,'exit'),pause(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit');}}

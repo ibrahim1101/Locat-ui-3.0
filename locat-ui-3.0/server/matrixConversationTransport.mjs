@@ -10,6 +10,11 @@ export function conversationRoute(path,method){
  return null;
 }
 export function validateConversationRequest(route,input,query){
+ if(route.action==='members'){
+  for(const key of query.keys())if(!['at','membership','not_membership'].includes(key)||query.getAll(key).length!==1)fail(400,'Invalid room membership query');
+  if(query.has('at')&&(query.get('at').length>2048||/[\x00-\x1f\x7f]/.test(query.get('at'))))fail(400,'Invalid membership cursor');
+  for(const key of ['membership','not_membership'])if(query.has(key)&&!['join','invite','leave','ban','knock'].includes(query.get(key)))fail(400,'Invalid membership selection');return;
+ }
  if(route.action==='messages'){
   const allowed=new Set(['from','to','dir','limit','filter']);for(const key of query.keys())if(!allowed.has(key)||query.getAll(key).length!==1)fail(400,'Invalid encrypted history query');
   if(!['b','f'].includes(query.get('dir')??''))fail(400,'Choose a history direction');

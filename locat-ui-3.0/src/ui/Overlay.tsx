@@ -19,7 +19,12 @@ export function Sheet({ open, onClose, title, description, children, footer, siz
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
-    const t = setTimeout(() => panel.current?.querySelector<HTMLElement>("[autofocus],input,textarea,button:not([data-close])")?.focus() ?? panel.current?.focus(), 30);
+    const t = setTimeout(() => {
+      const current = panel.current;
+      if (!current || current.contains(document.activeElement)) return;
+      const target = current.querySelector<HTMLElement>("[autofocus],input,textarea,button:not([data-close])");
+      (target ?? current).focus();
+    }, 30);
     return () => { clearTimeout(t); prev?.focus?.(); };
   }, [open]);
   if (!open) return null;
