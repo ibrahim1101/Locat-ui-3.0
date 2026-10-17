@@ -29,3 +29,17 @@ it('does not intercept native Space activation on modal buttons and reports insp
  render(<LiveVideoPlayer item={item} onClose={()=>{}}/>);fireEvent.click(screen.getByRole('button',{name:'Playback options'}));await screen.findByText('FFprobe is unavailable');const direct=screen.getByRole('button',{name:'Direct playback · supports seeking'});
  expect(fireEvent.keyDown(direct,{key:' ',code:'Space',bubbles:true,cancelable:true})).toBe(true);
 });
+
+it('explains local HEVC limits without offering a nonfunctional server conversion',async()=>{
+ const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:locat-test-video');
+ const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+ const local:LocalMediaItem={...item,id:'local:video',source:'device',streamUrl:undefined,file:new Blob(['synthetic'],{type:'video/x-matroska'})};
+ render(<LiveVideoPlayer item={local} onClose={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Playback options'}));
+ expect(await screen.findByText(/browser-local files cannot use the server FFmpeg converter/)).toBeVisible();
+ expect(screen.getByText(/Opening a large video without copying avoids IndexedDB limits/)).toBeVisible();
+ expect(screen.getByRole('button',{name:/Retry direct playback/})).toBeEnabled();
+ expect(screen.queryByRole('button',{name:/Convert to H.264/})).toBeNull();
+ expect(fetch).not.toHaveBeenCalled();
+ create.mockRestore();revoke.mockRestore();
+});
