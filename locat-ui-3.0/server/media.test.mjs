@@ -30,3 +30,18 @@ test('server scans are bounded, read-only, opt-in and omit private paths', async
     assert.equal(missing.libraries[0].available, false);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('explicit refresh discovers additions and removals without waiting for cache expiry', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'locat-refresh-'));
+  try {
+    const library = createMediaLibrary([dir], { cacheMs: 3600000 });
+    assert.equal((await library.refresh()).items.length, 0);
+    await writeFile(join(dir, 'new.mp4'), 'synthetic fixture');
+    assert.equal((await library.refresh()).items.length, 0);
+    const added = await library.refresh({ force: true });
+    assert.equal(added.items.length, 1);
+    assert.equal(added.items[0].name, 'new.mp4');
+    await rm(join(dir, 'new.mp4'));
+    assert.equal((await library.refresh({ force: true })).items.length, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
