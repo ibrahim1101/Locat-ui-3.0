@@ -61,8 +61,9 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
     }
     records = next; libraries = status; truncated = capped; refreshedAt = Date.now();
   }
-  async function refresh() {
-    if (!pending && (!refreshedAt || Date.now() - refreshedAt >= cacheMs)) pending = scan().finally(() => { pending = undefined; });
+  async function refresh({ force = false } = {}) {
+    if (pending) await pending;
+    if (!pending && (force || !refreshedAt || Date.now() - refreshedAt >= cacheMs)) pending = scan().finally(() => { pending = undefined; });
     await pending;
     return { libraries, truncated, refreshedAt, items: [...records.values()].map(({ id, name, kind, size, addedAt, album }) => ({ id: 'server:' + id, name, kind, size, addedAt, album, source: 'server', favorite: false, position: 0, streamUrl: '/api/media/stream/' + id })) };
   }
