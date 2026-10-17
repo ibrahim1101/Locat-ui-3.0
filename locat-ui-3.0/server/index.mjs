@@ -115,6 +115,14 @@ async function handle(req, res) {
     const media = await mediaLibrary.refresh();
     return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
   }
+  if (url.pathname === "/api/media/refresh" && req.method === "POST") {
+    const user = sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
+    const result = await mediaLibrary.refresh({ force: true });
+    db.audit(user.id, "media.library.refreshed");
+    return json(res, 200, result);
+  }
   if (url.pathname === "/api/media" && req.method === "GET") {
     if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
     return json(res, 200, await mediaLibrary.refresh());
