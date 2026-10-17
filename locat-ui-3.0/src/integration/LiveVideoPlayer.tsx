@@ -45,7 +45,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   async function perform(operation: () => Promise<void>) { try { await operation(); } catch (error) { set({ state: "error", error: { code: "unknown", message: error instanceof Error ? error.message : "Playback failed" } }); } }
   async function inspect(showDialog=true) {
     if(showDialog)setCompatibility(true); setCompatibilityError("");
-    if (!direct) { if(showDialog)setCompatibilityError("Server conversion is only available for server-library files. Local playback uses this device's decoder."); return; }
+    if (!direct) { if(showDialog)setCompatibilityError("This file is open from your device. Firefox cannot decode every MKV/HEVC video, and browser-local files cannot use the server FFmpeg converter. To convert without changing the original, make the file available in an authorized server media folder, refresh Server Library, and select Convert to H.264/AAC. Alternatively open a compatible H.264/AAC MP4 copy."); return; }
     inspectControl.current?.abort();const control=new AbortController();inspectControl.current=control;
     try {
       const response = await fetch(direct.replace("/stream/", "/probe/"), { credentials: "same-origin", cache: "no-store", signal:control.signal });
@@ -85,14 +85,14 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
         onVolume: volume => { if (video.current) video.current.volume = volume; set({ volume }); },
         onMute: () => { if (video.current) { video.current.muted = !video.current.muted; set({ muted: video.current.muted }); } },
       }} />
-    <Sheet open={compatibility} onClose={() => setCompatibility(false)} title="Playback compatibility" description="Select how your server delivers this video." size="md">
+    <Sheet open={compatibility} onClose={() => setCompatibility(false)} title="Playback compatibility" description={direct ? "Select how your server delivers this video." : "Local file playback uses your browser’s built-in decoders."} size="md">
       <div className="space-y-4">
         {compatibilityError && <p role="alert" className="text-danger">{compatibilityError}</p>}
         {probe && <><p className="text-sm text-ink-2">{probe.videoCodec ?? "No video"} / {probe.audioCodec ?? "No audio"} · {probe.container}</p><p className="text-sm text-ink-3">{probe.reason}</p>{probe.strategy==="transcode"&&<p className="text-sm text-warn">Remux keeps the original codec and cannot make HEVC compatible. Choose Convert to H.264/AAC.</p>}</>}
-        <Button block aria-pressed={delivery==="direct"} onClick={() => selectDelivery("direct")}>Direct playback · supports seeking</Button>
+        <Button block aria-pressed={delivery==="direct"} onClick={() => selectDelivery("direct")}>{direct ? "Direct playback · supports seeking" : "Retry direct playback · uses browser decoder"}</Button>
         {probe && probe.strategy !== "unsupported" && <><Button block disabledReason={!['direct', 'remux'].includes(probe.strategy)?"Remux cannot change HEVC or other unsupported codecs. Choose Convert to H.264/AAC.":undefined} onClick={() => selectDelivery("remux")}>Remux · copy streams into MP4</Button><Button block aria-pressed={delivery==="transcode"} onClick={() => selectDelivery("transcode")}>Convert to H.264/AAC · up to 1080p</Button></>}
         {probe && probe.audioTracks.length > 1 && <label className="block text-sm font-semibold">Audio for converted playback<select className="mt-2 w-full rounded-xl bg-s2 p-3 hairline" value={selectedAudioIndex ?? ""} onChange={event => setSelectedAudioIndex(event.target.value === "" ? null : Number(event.target.value))}><option value="">First audio track</option>{probe.audioTracks.map(track => <option key={track.index} value={track.index}>{track.title || `Track ${track.index}`} · {track.language} · {track.codec}</option>)}</select></label>}
-        <p className="text-xs text-ink-3">Remux and conversion restart from the beginning and cannot seek. They require FFmpeg on the host and share two conversion slots. Browser decoding and native-device compatibility still need verification.</p>
+        <p className="text-xs text-ink-3">{direct ? "Remux and conversion restart from the beginning and cannot seek. They require FFmpeg on the host and share two conversion slots. Browser decoding and native-device compatibility still need verification." : "Opening a large video without copying avoids IndexedDB limits, but does not add HEVC support to Firefox. The original file is never modified by this player."}</p>
       </div>
     </Sheet>
   </div>;
