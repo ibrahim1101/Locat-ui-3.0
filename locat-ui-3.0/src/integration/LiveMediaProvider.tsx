@@ -47,7 +47,7 @@ export function LiveMediaProvider({ children }: { children: ReactNode }) {
     try { await operation(); } catch (error) { setError(mediaStorageError(error).message); }
   }
   return <LiveMediaContext.Provider value={{ items, loading, importing:imports>0, serverLoading, error, serverError, serverLibraries: server?.libraries,
-    refreshServer: async()=>{if(!authenticated){setServerError("Sign in to read server media");return;}await loadServer();},
+    refreshServer: async()=>{if(!authenticated){setServerError("Sign in to read server media");return;}try{await accountRequest("/api/media/refresh",account,{});await loadServer();}catch(error){setServerError(error instanceof Error?error.message:"Could not refresh server media");}},
     openVideo: async file => {
       setError('');
       if(mediaKind(file)!=='video'){setError('Choose a video file to open without copying.');return;}
