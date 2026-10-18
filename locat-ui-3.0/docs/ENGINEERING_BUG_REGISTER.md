@@ -66,3 +66,8 @@ Cinema-001–010 remain in CINEMA_QA_TRACKER.md, including unresolved guided ser
 ### Accepted 2026-10-18 checkpoint
 
 Commit8c79940f5d0c715d3bbe70e49b70a02e47f7e0e4 (runtime `0be90a070ddfcee60b0ef72689646341a1c0f9d7`), workflow 39132471838: all five jobs green, standard real Vite/StrictMode acceptance,11 Chromium 8.3m/7 Firefox 39.9s/3 storage 12.4s. Ubuntu297 frontend/131 backend and actual Synapse passed; Windows297 frontend/130 backend plus1 explicitUnix stalled-worker skip. CINEMA011/SERVER001/REMOTE001/MEDIA-REFRESH002 automated acceptance now observed, without closing physical/platform/global or full-roadmap requirements. Next: deterministic rapid active-seek burst/setup acceptance, then explicit library ownership/friend ACLs, guided source configuration and BUILD001 compatible tooling remediation. Cinema006/008/009/010 remaining limits unchanged; all 49 requirements / A–AM scope intact. See final SESSION_HANDOFF entry for exact evidence, previous failures and source boundaries. No deployment/public exposure.
+
+
+## CINEMA-012 — Rapid converted seeks lose playing intent
+
+Severity medium. While playing, seek twice before replacement metadata arrives: final source remains paused. Root cause: second seek derived intent from the newly mounted, paused loading element. Keep captured intent while switching. The playing regression failed before the fix, paused regression passed; both pass after. Actual browser holds intermediate requests, releases final real conversion and requires advancing playback; three local Firefox repetitions pass. Source9a6bd93c09aefd95c103e7cd2d77e28681369acc; standard candidate CI pending. This does not certify unlimited rapid-seek worker load or original movie/Pi performance.
