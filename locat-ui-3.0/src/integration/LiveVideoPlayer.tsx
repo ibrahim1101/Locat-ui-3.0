@@ -30,7 +30,9 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   const lastProgress=useRef<number|null>(null);
   const bindVideo=useCallback((element:HTMLVideoElement|null)=>{
     const previous=video.current;video.current=element;
-    if(previous&&previous!==element){previous.pause();previous.removeAttribute('src');previous.load();}
+    // React development StrictMode detaches and immediately reattaches this ref.
+    // Cancel only after confirming the old element was actually replaced/unmounted.
+    if(previous&&previous!==element)queueMicrotask(()=>{if(video.current!==previous){previous.pause();previous.removeAttribute('src');previous.load();}});
   },[]);
   const latestItem = useRef(item);
   const saveProgress = useRef(update);

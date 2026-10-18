@@ -123,10 +123,14 @@ jobs:
           cache: pip
           cache-dependency-path: locat-ui-3.0/tools/matrix-test-requirements.txt
       - name: Install pinned browser homeserver test environment
+        id: browser_homeserver
         run: |
           python -m venv "$RUNNER_TEMP/locat-browser-matrix-python"
           "$RUNNER_TEMP/locat-browser-matrix-python/bin/pip" install -r tools/matrix-test-requirements.txt
+      - name: Development StrictMode Cinema acceptance
+        run: node tools/cinema-dev-acceptance.mjs
       - name: Built UI and browser storage foundation
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_media_tools.outcome == 'success' && steps.browser_homeserver.outcome == 'success' }}
         env:
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
         run: npm run test:browser
