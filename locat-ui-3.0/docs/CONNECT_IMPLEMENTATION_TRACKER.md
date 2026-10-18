@@ -234,3 +234,6 @@ Global-readiness checkpoint 2026-10-16: dd8e3fa / 38960012457 all green (9 Chrom
 ### 2026-10-18 stabilization checkpoint
 
 Cinema parallel-session seek/resume changes audited and corrected; Linux authorized-inode FFmpeg seeking, accurate decoded-scene regression, paused timeline replacement and worker cleanup implemented. Strict-CSP server-selection work reconciled. See SESSION_HANDOFF and CINEMA_QA_TRACKER 006–010 for exact evidence/open acceptance. Prior discovery CI38961804380 succeeded. Current candidate cross-platform/browser CI pending publication. Friend-scoped library ACLs, real long-media/device/network acceptance and guided server source setup remain open. Complete 49 requirements/A–AM ecosystem and E2EE/global/federation/TURN/native roadmap remain intact; no public exposure.
+
+
+2026-10-18 next audit batch: REMOTE-001 bounded status streaming/cancellation implemented in956821dde98b828616a7d393def8abfaf0bc02e6; six focused tests and full296frontend/131backend/type/lint/build pass. Existing-feature Firefox storage/Link/Photos/Sentinel4pass20.9s. Runtime435f223 CI39130199832 partial success (connector/Ubuntu/macOS); Windows/browser pending. See final handoff and ENGINEERING_BUG_REGISTER. Per-library friend access and real platform/network acceptance remain open; no public deployment.
