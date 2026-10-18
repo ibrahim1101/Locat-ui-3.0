@@ -13,6 +13,8 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   const inspectControl=useRef<AbortController|null>(null);
   useEffect(()=>()=>inspectControl.current?.abort(),[]);
   const [delivery, setDelivery] = useState<DeliveryMode>("direct");
+  const [startSeconds,setStartSeconds]=useState(0);
+  const startRef=useRef(0);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
   const [audioIndex, setAudioIndex] = useState<number | null>(null);
   const [probe, setProbe] = useState<MediaProbe | null>(null);
@@ -27,7 +29,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
     const element = video.current;
     return () => {
       if (!element) return;
-      if (Number.isFinite(element.duration)) void saveProgress.current({ ...latestItem.current, position: element.ended ? 0 : element.currentTime });
+      if (Number.isFinite(element.duration)) void saveProgress.current({ ...latestItem.current, position: element.ended ? 0 : element.currentTime + startRef.current });
       element.pause(); element.removeAttribute("src"); element.load();
     };
   }, []);
@@ -39,7 +41,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   const [state, setState] = useState<PlaybackView>({ state: "loading", positionSec: 0, durationSec: 1, bufferedSec: 0, rate: 1, muted: false, volume: 1, fit: "contain", subtitles: [], qualities: [{ id: "options", label: "Playback options" }], activeQuality: "options", pip: document.pictureInPictureEnabled ? "available" : "unsupported" });
   const set = (patch: Partial<PlaybackView>) => setState(old => ({ ...old, ...patch }));
   const direct = safeMediaUrl(item);
-  const deliverySource = deliveryUrl(item, delivery, audioIndex);
+  const deliverySource = deliveryUrl(item, delivery, audioIndex, startSeconds);
   useEffect(() => { if(deliverySource)return;const next = URL.createObjectURL(item.file); const timer = setTimeout(() => setUrl(next), 0); return () => { clearTimeout(timer); URL.revokeObjectURL(next); }; }, [item.file, deliverySource]);
   const metadata: VideoItemView = { id: item.id, title: item.name, source: item.source ?? "device", folder: item.album, durationSec: state.durationSec, sizeBytes: item.size, container: delivery!=="direct"?"MP4":probe?.container ?? item.name.split(".").at(-1) ?? "", videoCodec: delivery==="transcode"?"h264":probe?.videoCodec ?? undefined, audioCodec: delivery==="transcode"?"aac":probe?.audioCodec ?? undefined, width: nativeSize.width || (delivery!=="transcode"?probe?.width:undefined) || undefined, height: nativeSize.height || (delivery!=="transcode"?probe?.height:undefined) || undefined, posterHue: 0, delivery };
   async function perform(operation: () => Promise<void>) { try { await operation(); } catch (error) { set({ state: "error", error: { code: "unknown", message: error instanceof Error ? error.message : "Playback failed" } }); } }
@@ -57,10 +59,10 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   function selectDelivery(mode: DeliveryMode) {
     video.current?.pause();setNativeSize({width:0,height:0});playAfterLoad.current=true;
     const next=deliveryUrl(item,mode,mode==="direct"?null:selectedAudioIndex);if(video.current&&(next??url)===video.current.getAttribute("src"))video.current.load();
-    setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
-    set({ state: "loading", positionSec: 0, seekable: mode === "direct", error: undefined, activeQuality: "options" });
+    startRef.current=0;setStartSeconds(0);setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
+    set({ state: "loading", positionSec: 0, seekable: mode === "direct" || !!direct, error: undefined, activeQuality: "options" });
   }
-  function checkpoint() { const element = video.current; if (element && Number.isFinite(element.duration)) void update({ ...item, position: element.ended ? 0 : element.currentTime }); }
+  function checkpoint() { const element = video.current; if (element && Number.isFinite(element.duration)) void update({ ...item, position: element.ended ? 0 : element.currentTime + startRef.current }); }
   return <div ref={container} className="h-full min-h-[420px] bg-black">
     <input ref={subtitleInput} type="file" accept=".vtt,text/vtt" aria-label="Load WebVTT subtitles" className="sr-only" onChange={event => {
       const file = event.target.files?.[0]; event.target.value = "";
@@ -72,13 +74,13 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
       });
     }} />
     <PlayerChrome inspectionError={compatibilityError} onInspect={()=>void inspect(false)} onLoadSubtitle={() => subtitleInput.current?.click()} video={metadata} state={state} onClose={() => { checkpoint(); onClose(); }} surface={<video ref={video} src={deliverySource??(url || undefined)} className="h-full w-full" style={{ objectFit: state.fit }} playsInline
-      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
+      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: delivery !== "direct" && probe?.durationSeconds ? probe.durationSeconds : Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
       onLoadStart={()=>set({state:"loading",error:undefined})}
-      onTimeUpdate={event => { const element = event.currentTarget; set({ positionSec: element.currentTime, bufferedSec: element.buffered.length ? element.buffered.end(element.buffered.length - 1) : 0 }); }}
+      onTimeUpdate={event => { const element = event.currentTarget; set({ positionSec: element.currentTime + startRef.current, bufferedSec: element.buffered.length ? element.buffered.end(element.buffered.length - 1) + startRef.current : 0 }); }}
       onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { set({ state: "paused" }); checkpoint(); }} onEnded={() => { set({ state: "ended" }); checkpoint(); onEnded?.(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
       onError={event => { const mediaCode = event.currentTarget.error?.code ?? 0; const sourceKind = item.source === "server" ? "server" : "device"; const diagnostic = ` [Cinema diagnostic: source=${sourceKind}, mode=${delivery}, mediaError=${mediaCode || "unknown"}]`; set({ state: "error", error: { code: "codec", message: (delivery!=="direct" ? "Server conversion could not be played. Check FFmpeg/FFprobe, available conversion slots and source-file compatibility. Retry Playback options or preconvert an MP4/H.264/AAC copy on the host; progressive conversion cannot read every container." : "This browser could not play the original format. For server files, open Playback options and choose Convert to H.264/AAC. Remux does not change HEVC. Local files need a compatible MP4/H.264 copy or an authorized server media folder.") + diagnostic } }); }}>{subtitle && <track key={subtitle.url} src={subtitle.url} kind="subtitles" label={subtitle.name} default onLoad={() => { if (video.current?.textTracks[0]) video.current.textTracks[0].mode = "showing"; }} />}</video>}
       cb={{ onTogglePlay: () => { const element = video.current; if (element) { if (element.paused) void perform(() => element.play()); else element.pause(); } },
-        onSeek: sec => { if (delivery === "direct" && video.current) video.current.currentTime = Math.max(0, Math.min(sec, state.durationSec)); },
+        onSeek: sec => { const target=Math.max(0,Math.min(Math.floor(sec),Math.min(state.durationSec,86400)));if(delivery==="direct"){if(video.current)video.current.currentTime=target;return;}if(!direct)return;startRef.current=target;setStartSeconds(target);playAfterLoad.current=true;set({state:"loading",positionSec:target,bufferedSec:target,error:undefined}); },
         onRate: rate => { if (video.current) video.current.playbackRate = rate; set({ rate }); }, onFit: fit => set({ fit }), onSubtitle: id => { if (video.current?.textTracks[0]) video.current.textTracks[0].mode = id ? "showing" : "disabled"; set({ activeSubtitle: id }); }, onQuality: () => { void inspect(); },
         onPip: () => { if (video.current) void perform(async () => { if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await video.current!.requestPictureInPicture(); }); },
         onFullscreen: () => void perform(async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await container.current?.requestFullscreen(); }),
@@ -92,7 +94,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
         <Button block aria-pressed={delivery==="direct"} onClick={() => selectDelivery("direct")}>{direct ? "Direct playback · supports seeking" : "Retry direct playback · uses browser decoder"}</Button>
         {probe && probe.strategy !== "unsupported" && <><Button block disabledReason={!['direct', 'remux'].includes(probe.strategy)?"Remux cannot change HEVC or other unsupported codecs. Choose Convert to H.264/AAC.":undefined} onClick={() => selectDelivery("remux")}>Remux · copy streams into MP4</Button><Button block aria-pressed={delivery==="transcode"} onClick={() => selectDelivery("transcode")}>Convert to H.264/AAC · up to 1080p</Button></>}
         {probe && probe.audioTracks.length > 1 && <label className="block text-sm font-semibold">Audio for converted playback<select className="mt-2 w-full rounded-xl bg-s2 p-3 hairline" value={selectedAudioIndex ?? ""} onChange={event => setSelectedAudioIndex(event.target.value === "" ? null : Number(event.target.value))}><option value="">First audio track</option>{probe.audioTracks.map(track => <option key={track.index} value={track.index}>{track.title || `Track ${track.index}`} · {track.language} · {track.codec}</option>)}</select></label>}
-        <p className="text-xs text-ink-3">{direct ? "Remux and conversion restart from the beginning and cannot seek. They require FFmpeg on the host and share two conversion slots. Browser decoding and native-device compatibility still need verification." : "Opening a large video without copying avoids IndexedDB limits, but does not add HEVC support to Firefox. The original file is never modified by this player."}</p>
+        <p className="text-xs text-ink-3">{direct ? "Remux and conversion seek by restarting FFmpeg at the chosen time. Seeking may be slow and playback restarts; the host requires FFmpeg and shares two conversion slots." : "Opening a large video without copying avoids IndexedDB limits, but does not add HEVC support to Firefox. The original file is never modified by this player."}</p>
       </div>
     </Sheet>
   </div>;
