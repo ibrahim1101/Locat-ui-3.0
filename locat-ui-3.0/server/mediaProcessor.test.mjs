@@ -95,3 +95,11 @@ test('real 4K HEVC/AAC source probes correctly and converts to bounded H264/AAC 
   const result=JSON.parse((await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,width,height','-of','json',output])).stdout);assert.deepEqual(result.streams.find(stream=>stream.codec_type==='video'),{codec_name:'h264',codec_type:'video',width:1920,height:1080});assert.equal(result.streams.find(stream=>stream.codec_type==='audio').codec_name,'aac');assert.equal(processor.active,0);
  }finally{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await rm(dir,{recursive:true,force:true});}
 });
+
+test('conversion rejects invalid start positions before allocating a worker',async()=>{
+ const processor=createMediaProcessor({maximum:1});
+ for(const startSeconds of [-1,86401,1.5,NaN,Infinity]){
+  await assert.rejects(processor.stream(null,null,{startSeconds}),error=>error.status===400);
+ }
+ assert.equal(processor.active,0);
+});
