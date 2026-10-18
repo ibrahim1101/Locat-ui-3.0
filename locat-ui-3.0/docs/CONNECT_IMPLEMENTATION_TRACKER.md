@@ -254,3 +254,8 @@ Commit8c79940f5d0c715d3bbe70e49b70a02e47f7e0e4 (runtime `0be90a070ddfcee60b0ef72
 
 
 2026-10-18 CINEMA-012: rapid replacement seek playing intent fixed in9a6bd93c09aefd95c103e7cd2d77e28681369acc;299frontend/131backend/type/lint/build and6Firefox browser repetitions pass locally. Standard CI pending. Next library owner/friend authorization prerequisite; full49/A–AM preserved.
+
+
+### 2026-10-18 owner authorization foundation
+
+Runtimee403a466661752b769987d3a3e6f02f4c8de3fdb implements same-homeserver operator-owned library/configured accepted-friend access and live session/contact stream cancellation. Default owned mode denies unassigned roots; legacy all-account behavior requires explicit opt-in.299frontend/135backend/type/lint/build, actual reciprocal HTTP streaming/revocation/restart, four built Firefox cases21.5s and real Vite pass locally; standard candidate CI pending. Docker local-profile assertions deferred to CI. Rapid candidate011f352/workflow39134311702 all five green. Next audited durable owner grant/revoke UI/API; operator config is not that UI. Original movie/native/Pi/global/federation/TURN and BUILD001 remain open. All49/A–AM preserved; no deployment.
