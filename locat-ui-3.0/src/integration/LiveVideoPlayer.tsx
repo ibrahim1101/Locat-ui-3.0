@@ -15,6 +15,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   const [delivery, setDelivery] = useState<DeliveryMode>("direct");
   const [startSeconds,setStartSeconds]=useState(0);
   const switchingSource=useRef(false);
+  const loadedPosition=useRef(false);
   const startRef=useRef(0);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
   const [audioIndex, setAudioIndex] = useState<number | null>(null);
@@ -60,7 +61,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   function selectDelivery(mode: DeliveryMode) {
     switchingSource.current=true;video.current?.pause();setNativeSize({width:0,height:0});playAfterLoad.current=true;
     const next=deliveryUrl(item,mode,mode==="direct"?null:selectedAudioIndex);if(video.current&&(next??url)===video.current.getAttribute("src"))video.current.load();
-    startRef.current=0;setStartSeconds(0);setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
+    loadedPosition.current=false;startRef.current=0;setStartSeconds(0);setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
     set({ state: "loading", positionSec: 0, seekable: mode === "direct" || (!!direct && !!probe?.durationSeconds), error: undefined, activeQuality: "options" });
   }
   function checkpoint() { const element = video.current; if (element && Number.isFinite(element.duration)) void update({ ...item, position: element.ended ? 0 : element.currentTime + startRef.current }); }
@@ -75,7 +76,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
       });
     }} />
     <PlayerChrome inspectionError={compatibilityError} onInspect={()=>void inspect(false)} onLoadSubtitle={() => subtitleInput.current?.click()} video={metadata} state={state} onClose={() => { checkpoint(); onClose(); }} surface={<video ref={video} src={deliverySource??(url || undefined)} className="h-full w-full" style={{ objectFit: state.fit }} playsInline
-      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); switchingSource.current=false; if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", seekable: delivery === "direct" || (!!direct && !!probe?.durationSeconds), durationSec: delivery !== "direct" && probe?.durationSeconds ? probe.durationSeconds : Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
+      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); switchingSource.current=false; if (delivery === "direct" && !loadedPosition.current) { loadedPosition.current=true; element.currentTime = item.position < element.duration - 5 ? item.position : 0; } set({ state: "paused", seekable: delivery === "direct" || (!!direct && !!probe?.durationSeconds), durationSec: delivery !== "direct" && probe?.durationSeconds ? probe.durationSeconds : Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
       onLoadStart={()=>set({state:"loading",error:undefined})}
       onTimeUpdate={event => { const element = event.currentTarget; set({ positionSec: element.currentTime + startRef.current, bufferedSec: element.buffered.length ? element.buffered.end(element.buffered.length - 1) + startRef.current : 0 }); }}
       onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { if(!switchingSource.current){set({ state: "paused" }); checkpoint();} }} onEnded={() => { set({ state: "ended" }); checkpoint(); onEnded?.(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
