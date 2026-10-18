@@ -31,8 +31,9 @@ it('does not intercept native Space activation on modal buttons and reports insp
 });
 
 it('explains local HEVC limits without offering a nonfunctional server conversion',async()=>{
- const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:locat-test-video');
- const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+ const create=vi.fn(()=>'blob:locat-test-video');
+ const revoke=vi.fn();
+ vi.stubGlobal('URL',Object.assign(class extends URL {},{createObjectURL:create,revokeObjectURL:revoke}));
  const local:LocalMediaItem={...item,id:'local:video',source:'device',streamUrl:undefined,file:new Blob(['synthetic'],{type:'video/x-matroska'})};
  render(<LiveVideoPlayer item={local} onClose={()=>{}}/>);
  fireEvent.click(screen.getByRole('button',{name:'Playback options'}));
@@ -41,5 +42,17 @@ it('explains local HEVC limits without offering a nonfunctional server conversio
  expect(screen.getByRole('button',{name:/Retry direct playback/})).toBeEnabled();
  expect(screen.queryByRole('button',{name:/Convert to H.264/})).toBeNull();
  expect(fetch).not.toHaveBeenCalled();
- create.mockRestore();revoke.mockRestore();
+ expect(create).toHaveBeenCalled();
+});
+
+it('applies saved direct-playback position once and does not overwrite later seeks on metadata reload',()=>{
+ const resumed={...item,position:42};
+ const {container}=render(<LiveVideoPlayer item={resumed} onClose={()=>{}}/>);
+ const element=container.querySelector('video')!;
+ Object.defineProperty(element,'duration',{configurable:true,value:120});
+ fireEvent.loadedMetadata(element);
+ expect(element.currentTime).toBe(42);
+ element.currentTime=65;
+ fireEvent.loadedMetadata(element);
+ expect(element.currentTime).toBe(65);
 });
