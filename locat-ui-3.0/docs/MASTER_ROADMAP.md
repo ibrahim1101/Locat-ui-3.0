@@ -1701,3 +1701,8 @@ Cinema parallel-session seek/resume changes audited and corrected; Linux authori
 
 
 2026-10-18 accepted checkpoints:05ca36b/CI39131180505 andd29c68a/CI39131496255 all five jobs green (11Chromium/7Firefox/3storage,55 UI encrypted history messages preserved). CINEMA-011 StrictMode source lifecycle fixed in0be90a070ddfcee60b0ef72689646341a1c0f9d7;297frontend/131backend/type/lint/build plus actual Vite development and built Firefox pass; new CI pending. Next: explicit library ownership/friend ACLs and guided source setup; BUILD-001/native/Pi/long-file/federation/TURN acceptance open. All49/A–AM preserved.
+
+
+### Accepted 2026-10-18 checkpoint
+
+Commit8c79940f5d0c715d3bbe70e49b70a02e47f7e0e4 (runtime `0be90a070ddfcee60b0ef72689646341a1c0f9d7`), workflow 39132471838: all five jobs green, standard real Vite/StrictMode acceptance,11 Chromium 8.3m/7 Firefox 39.9s/3 storage 12.4s. Ubuntu297 frontend/131 backend and actual Synapse passed; Windows297 frontend/130 backend plus1 explicitUnix stalled-worker skip. CINEMA011/SERVER001/REMOTE001/MEDIA-REFRESH002 automated acceptance now observed, without closing physical/platform/global or full-roadmap requirements. Next: deterministic rapid active-seek burst/setup acceptance, then explicit library ownership/friend ACLs, guided source configuration and BUILD001 compatible tooling remediation. Cinema006/008/009/010 remaining limits unchanged; all 49 requirements / A–AM scope intact. See final SESSION_HANDOFF entry for exact evidence, previous failures and source boundaries. No deployment/public exposure.
