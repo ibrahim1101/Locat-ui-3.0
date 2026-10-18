@@ -68,7 +68,7 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
   }
   return {
     refresh,
-    async stream(req, res, id, { probeOnly = false, mode = "direct", audioIndex = null } = {}) {
+    async stream(req, res, id, { probeOnly = false, mode = "direct", audioIndex = null, startSeconds = 0 } = {}) {
       await refresh();
       const record = records.get(id);
       if (!record) throw problem(404, 'Media not found');
@@ -94,7 +94,7 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
           if (probe.strategy === 'unsupported') throw problem(415, 'No video stream detected');
           if (mode === 'remux' && !['direct', 'remux'].includes(probe.strategy)) throw problem(415, 'This file requires transcoding');
           if (audioIndex !== null && !probe.audioTracks.some(track => track.index === audioIndex)) throw problem(400, 'Audio track not found');
-          return await processor.stream(fd, res, { transcode: mode === 'transcode', audioIndex });
+          return await processor.stream(fd, res, { transcode: mode === 'transcode', audioIndex, startSeconds });
         }
         const range = parseMediaRange(req.headers.range ?? null, stat.size);
         const headers = { 'Accept-Ranges': 'bytes', 'Content-Type': record.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin', 'Content-Disposition': 'inline' };
