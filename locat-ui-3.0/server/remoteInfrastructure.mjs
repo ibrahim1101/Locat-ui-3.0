@@ -38,6 +38,24 @@ export function sanitizeRemoteStatus(payload) {
     diskUsedPercent: disk
   };
 }
+// Enforce the byte limit while consuming, including chunked/compressed responses.
+async function readStatus(response) {
+  if (!response.ok || Number(response.headers.get('content-length') || 0) > 65536) {
+    await response.body?.cancel();throw new Error('Upstream unavailable');
+  }
+  if (!response.body) throw new Error('Missing status');
+  const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});
+  let bytes=0,raw='';
+  try {
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      bytes+=value.byteLength;if(bytes>65536)throw new Error('Oversized status');
+      raw+=decoder.decode(value,{stream:true});
+    }
+    raw+=decoder.decode();return JSON.parse(raw);
+  }catch(error){await reader.cancel().catch(()=>{});throw error;}
+  finally{reader.releaseLock();}
+}
 export function createRemoteStatusHandler({ sessionUser, json, env = process.env, fetchImpl = fetch }) {
   const config = remoteStatusConfig(env);
   return async (req, res, url) => {
@@ -53,11 +71,7 @@ export function createRemoteStatusHandler({ sessionUser, json, env = process.env
         method: 'GET', redirect: 'error', signal: AbortSignal.timeout(2500),
         headers: { Accept: 'application/json' }
       });
-      if (!response.ok) throw new Error('Upstream unavailable');
-      if (Number(response.headers.get('content-length') || 0) > 65536) throw new Error('Oversized status');
-      const raw = await response.text();
-      if (raw.length > 65536) throw new Error('Oversized status');
-      json(res, 200, sanitizeRemoteStatus(JSON.parse(raw)));
+      json(res, 200, sanitizeRemoteStatus(await readStatus(response)));
     } catch {
       json(res, 503, { error: 'Remote infrastructure status unavailable' });
     }
