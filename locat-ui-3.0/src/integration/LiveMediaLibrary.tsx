@@ -69,7 +69,7 @@ export function LiveMediaLibrary({ kind }: { kind: LocalMediaKind }) {
       {source==="server"&&!user&&<p className="mb-4 text-ink-3">Sign in to load server media. Browser imports remain available under This device.</p>}
       {source!=="device"&&!timeline&&serverLoading&&<p role="status" className="mb-4 text-ink-3">Loading server library… Local files remain available.</p>}
       {source !== "device" && serverError && <p role="alert" className="mb-4 text-danger">{serverError}</p>}
-      {source === "server" && !serverLoading && !serverError && serverLibraries?.length === 0 && <p className="mb-4 text-ink-3">The host has not configured any shared media folders.</p>}
+      {source === "server" && !serverLoading && !serverError && serverLibraries?.length === 0 && <p className="mb-4 text-ink-3">No server libraries are available to this account. Ask the operator to configure a library or grant access.</p>}
       {source === "server" && serverLibraries?.some(library => !library.available) && <p className="mb-4 text-warn">One or more shared folders are unavailable.</p>}
       {playlistError && <p role="alert" className="mb-4 text-danger">{playlistError}</p>}
       {error && <p role="alert" className="mb-4 text-danger">{error}</p>}

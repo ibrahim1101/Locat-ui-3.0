@@ -34,7 +34,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
   const origin = "http://127.0.0.1:" + port;
   const child = spawn(process.execPath, ["server/index.mjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_PUBLIC_ORIGIN:origin, LOCAT_DATABASE_FILE: join(dir, "auth.sqlite"), LOCAT_MEDIA_AUTHORIZED_ROOTS: mediaDir },
+    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_PUBLIC_ORIGIN:origin, LOCAT_DATABASE_FILE: join(dir, "auth.sqlite"), LOCAT_MEDIA_ACCESS_MODE:'authenticated',LOCAT_MEDIA_AUTHORIZED_ROOTS: mediaDir },
     stdio: "ignore",
   });
   async function request(path, method = "GET", data, cookie, extraHeaders = {}) {

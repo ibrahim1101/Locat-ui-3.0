@@ -25,12 +25,12 @@ Open http://127.0.0.1:5173. Vite proxies /api to 127.0.0.1:8787. Run `npm run te
 | GET | /api/auth/me | Current authenticated account |
 | POST | /api/auth/logout | Revoke session |
 | GET | /api/users/search?q=username | Exact username lookup (authenticated) |
-| GET | /api/messages?after=0 | Read current user's encrypted envelopes |
-| POST | /api/messages | Submit encrypted envelope to recipient |
+| GET | /api/messages | Retired route: 501 |
+| POST | /api/messages | Retired route: 501; no plaintext fallback |
 
-Message submissions accept only `recipientId`, `ciphertext`, `nonce`, and `algorithm: "client-e2ee-v1"`. **This is a ciphertext transport contract, not E2EE implementation.** There is no client key exchange, key verification, message encryption/decryption, group messaging, or production message lifecycle. Do not submit real confidential messages or assume arbitrary ciphertext is secure.
+Messaging uses the managed Matrix gateway and reviewed Matrix/Rust SDK, with contact/device/session authorization. Legacy `/api/messages` is gated with 501. Actual browser/Synapse acceptance and limits are recorded in ../docs/SESSION_HANDOFF.md and E2EE_SECURITY_MODEL.md; neither a web build nor source CI certifies native or public-network deployment.
 
-Sessions are HttpOnly SameSite=Strict cookies. Mutating requests require a matching HTTP Origin. Data is stored in versioned transactional SQLite at `server/data/locat.sqlite` by default and is ignored by Git. Set `LOCAT_DATABASE_FILE` to select another SQLite file. The retired `LOCAT_DATA_FILE` variable fails startup rather than overwriting legacy JSON. Direct TLS serving is available; encrypted client-key management is not implemented. Keep HTTP development bound to loopback. For explicit same-LAN HTTPS configuration see ../docs/SELF_HOSTING.md; internet deployment is not validated.
+Sessions are HttpOnly SameSite=Strict cookies. Mutating requests require a matching HTTP Origin. Data is stored in versioned transactional SQLite at `server/data/locat.sqlite` by default and is ignored by Git. Set `LOCAT_DATABASE_FILE` to select another SQLite file. The retired `LOCAT_DATA_FILE` variable fails startup rather than overwriting legacy JSON. Direct TLS and reviewed SDK client-key management are implemented; native secure storage and full account recovery acceptance remain separate. Keep HTTP development bound to loopback. For explicit same-LAN HTTPS configuration see ../docs/SELF_HOSTING.md; internet deployment is not validated.
 
 The live UI is now the default entry and uses the UI 3.0 shell for account management, contacts, device media, search and account security events. Set VITE_LOCAT_LIVE=false only to open the explicitly separate preview. Unsupported live modules show notices instead of fixtures. Android, Windows native builds, and release packaging are not verified.
 
@@ -39,20 +39,20 @@ The live UI is now the default entry and uses the UI 3.0 shell for account manag
 1. Run `npm run check`, `npm run lint`, `npm run test:all`, and `npm run build`.
 2. Fix failing checks before integrating more features.
 3. Extend database migrations and exercise recovery before real use.
-4. Implement a reviewed authenticated E2EE protocol with verified device keys before enabling real messaging.
+4. Preserve reviewed Matrix SDK/device/session authorization and verified E2EE acceptance before enabling new messaging paths.
 5. Add authorization, quotas, rate limiting, backups, and native integration tests before production use.
 
 ## Account management
 
 Authenticated `GET /api/auth/sessions` lists only the current account's active sessions, identifying the current one. `POST /api/auth/sessions/revoke` accepts `{id}` and can only revoke a session owned by the caller. These IDs are token hashes, never bearer tokens.
 
-`POST /api/profile` accepts `{displayName}`. `POST /api/auth/password` accepts `{currentPassword,newPassword}`, verifies the current password and transactionally revokes all sessions. The live signed-in screen exposes these controls. Device names, avatars, LC codes, account deletion and settings sync remain unimplemented.
+`POST /api/profile` accepts `{displayName}`. `POST /api/auth/password` accepts `{currentPassword,newPassword}`, verifies the current password and transactionally revokes all sessions. The live signed-in screen exposes these controls. Current feature-specific status and native limitations are tracked in ../docs/SESSION_HANDOFF.md.
 
 ## Backup and recovery
 
 Run `npm run backup:server -- ./server/data/backups/manual.sqlite` from the app directory. Choose a new filename each time; existing backups are never overwritten. SQLite's online backup API creates a consistent snapshot even with WAL enabled. Backups contain password hashes, session hashes and ciphertext: restrict access just like the live database.
 
-Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Schemas v1–v4 are applied in transactions; newer unknown schemas fail closed.
+Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Supported additive migrations through schema 15 are applied in transactions; future unknown schemas fail closed.
 
 ## Live integration endpoints
 
@@ -104,3 +104,8 @@ Schema v7/v8 connects /api/link/register, challenge, prove, devices, heartbeat, 
 Schema v9 extends protected /api/link/remote routes with source-decided sessions and encrypted signaling. Account/session/device proof and verified pairs remain mandatory. Roles gate offers/answers, expiry/close/revocation purge signals, and no server capture/control endpoint exists. See docs/REMOTE_INTEGRATION.md for browser consent, direct connectivity and native limitations.
 
 Optional connection infrastructure: see ../docs/CONNECT_ARCHITECTURE.md and ../docs/CONNECT_NETWORK_TRAVERSAL.md for fixed-peer TLS proxying, health WebSockets and protected temporary TURN credentials. No discovery/relay service is enabled by default. Legacy /api/messages now returns an authenticated 501 security gate until reviewed messaging integration is accepted; existing database rows remain preserved.
+
+
+## Owned server media
+
+Media roots now default to fail-closed operator-assigned ownership and configured accepted friends. See ../docs/MEDIA_LIBRARY_ACCESS.md before upgrading an existing shared-root setup. All-account legacy behavior requires explicit LOCAT_MEDIA_ACCESS_MODE=authenticated; no media bytes are migrated or deleted. Dynamic grant UI and cross-homeserver media sharing remain roadmap work.

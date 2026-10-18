@@ -24,6 +24,7 @@ import { serveStatic } from "./static.mjs";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
 import { createMediaLibrary } from "./media.mjs";
+import {createMediaAccess} from "./mediaAccess.mjs";
 import { createRateLimiter } from "./rateLimit.mjs";
 import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
@@ -41,7 +42,8 @@ if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
-const mediaLibrary = createMediaLibrary();
+const mediaAccess=createMediaAccess(db);
+const mediaLibrary = createMediaLibrary(mediaAccess.roots,{authorize:mediaAccess.authorize});
 const authLimit = createRateLimiter();
 const mediaRefreshAccountLimit = createRateLimiter(6);
 const mediaRefreshGlobalLimit = createRateLimiter(30);
@@ -116,8 +118,10 @@ async function handle(req, res) {
   },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
-    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
-    const media = await mediaLibrary.refresh();
+    const user=sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const media = await mediaLibrary.refresh({userId:user.id});
+    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
     return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
   }
   if (url.pathname === "/api/media/refresh" && req.method === "POST") {
@@ -126,22 +130,28 @@ async function handle(req, res) {
     if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
     const retryAfter = mediaRefreshAccountLimit(user.id) || mediaRefreshGlobalLimit('shared-media-refresh');
     if (retryAfter) return json(res, 429, { error: 'Server media refresh is busy. Retry later.' }, { 'Retry-After': String(retryAfter) });
-    const result = await mediaLibrary.refresh({ force: true });
+    const result = await mediaLibrary.refresh({ force: true,userId:user.id });
+    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
     db.audit(user.id, "media.library.refreshed");
     return json(res, 200, result);
   }
   if (url.pathname === "/api/media" && req.method === "GET") {
-    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
-    return json(res, 200, await mediaLibrary.refresh());
+    const user=sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
+    const snapshot=await mediaLibrary.refresh({userId:user.id});
+    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
+    return json(res,200,snapshot);
   }
   if (url.pathname.startsWith("/api/media/probe/") && req.method === "GET") {
-    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    const user=sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
     const id = url.pathname.slice("/api/media/probe/".length);
     if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
-    return json(res, 200, await mediaLibrary.stream(req, res, id, { probeOnly: true }));
+    return json(res, 200, await mediaLibrary.stream(req, res, id, { probeOnly: true,userId:user.id,validSession:()=>sessionUser(req)?.id===user.id }));
   }
   if (url.pathname.startsWith("/api/media/stream/") && ["GET", "HEAD"].includes(req.method)) {
-    if (!sessionUser(req)) return json(res, 401, { error: "Not authenticated" });
+    const user=sessionUser(req);
+    if (!user) return json(res, 401, { error: "Not authenticated" });
     const id = url.pathname.slice("/api/media/stream/".length);
     if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
     const mode = url.searchParams.get("mode") ?? "direct";
@@ -151,7 +161,7 @@ async function handle(req, res) {
     if (start !== null && (!/^(0|[1-9]\d{0,4})$/.test(start) || Number(start) > 86400 || mode === "direct")) return json(res, 400, { error: "Invalid conversion start position" });
     if(mode==="remux"&&Number(start)>0)return json(res,400,{error:"Remux seeking requires H.264/AAC conversion"});
     if (!["direct", "remux", "transcode"].includes(mode) || (audio !== null && (!/^\d{1,3}$/.test(audio) || mode === "direct"))) return json(res, 400, { error: "Invalid playback mode or audio track" });
-    return mediaLibrary.stream(req, res, id, { mode, audioIndex: audio === null ? null : Number(audio), startSeconds: start === null ? 0 : Number(start) });
+    return mediaLibrary.stream(req, res, id, { userId:user.id,validSession:()=>sessionUser(req)?.id===user.id,mode, audioIndex: audio === null ? null : Number(audio), startSeconds: start === null ? 0 : Number(start) });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);

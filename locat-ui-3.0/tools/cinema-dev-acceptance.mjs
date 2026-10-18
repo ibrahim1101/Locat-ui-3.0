@@ -20,7 +20,7 @@ try{
  await exec('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=160x90:r=10:d=4','-f','lavfi','-i','sine=frequency=440:duration=4','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart','-y',join(media,'StrictMode.mp4')],{timeout:30000});
  const runtime=Object.fromEntries(['PATH','SystemRoot','WINDIR','TEMP','TMP','LANG'].filter(key=>process.env[key]!==undefined).map(key=>[key,process.env[key]]));
  function start(args,env){const child=spawn(process.execPath,args,{env,stdio:'ignore'});children.push(child);return child;}
- start(['server/index.mjs'],{...runtime,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:'8787',LOCAT_PUBLIC_ORIGIN:origin,LOCAT_DATABASE_FILE:join(dir,'synthetic.sqlite'),LOCAT_STATIC_DIR:dir,LOCAT_MEDIA_AUTHORIZED_ROOTS:media});
+ start(['server/index.mjs'],{...runtime,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:'8787',LOCAT_PUBLIC_ORIGIN:origin,LOCAT_DATABASE_FILE:join(dir,'synthetic.sqlite'),LOCAT_STATIC_DIR:dir,LOCAT_MEDIA_ACCESS_MODE:'authenticated',LOCAT_MEDIA_AUTHORIZED_ROOTS:media});
  start(['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5173','--strictPort'],runtime);
  const deadline=Date.now()+30000;
  while(true){

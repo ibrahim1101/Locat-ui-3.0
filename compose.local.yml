@@ -8,6 +8,8 @@ services:
       LOCAT_TLS_KEY: /certs/key.pem
       LOCAT_TLS_CERT: /certs/cert.pem
       LOCAT_MEDIA_AUTHORIZED_ROOTS: /media
+      LOCAT_MEDIA_ACCESS_MODE: ${LOCAT_MEDIA_ACCESS_MODE:-owned}
+      LOCAT_MEDIA_LIBRARY_ACCESS: ${LOCAT_MEDIA_LIBRARY_ACCESS:-[]}
     volumes:
       - locat_data:/data
       - ./certs:/certs:ro

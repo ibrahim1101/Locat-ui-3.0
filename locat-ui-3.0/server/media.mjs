@@ -14,7 +14,7 @@ const types = {
 };
 const inside = (root, file) => file.startsWith(root.endsWith(sep) ? root : root + sep);
 const problem = (status, message) => Object.assign(new Error(message), { status });
-export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_ROOTS ?? '').split(delimiter).filter(Boolean), { maxFiles = 3000, maxEntries = 20000, maxDepth = 6, cacheMs = 60000 } = {}) {
+export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_ROOTS ?? '').split(delimiter).filter(Boolean), { maxFiles = 3000, maxEntries = 20000, maxDepth = 6, cacheMs = 60000, authorize = () => false } = {}) {
   if (roots.length > 16) throw new Error('At most 16 media roots can be shared');
   roots = roots.map(root => resolve(root));
   const processor = createMediaProcessor();
@@ -28,7 +28,7 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
     let inspected = 0, capped = false;
     for (const [index, configured] of roots.entries()) {
       const root = await realpath(configured).catch(() => null);
-      const library = { name: basename(configured), available: !!root, count: 0 };
+      const library = { configured, name: basename(configured), available: !!root, count: 0 };
       status.push(library);
       if (!root) continue;
       const visited = new Set();
@@ -61,22 +61,26 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
     }
     records = next; libraries = status; truncated = capped; refreshedAt = Date.now();
   }
-  async function refresh({ force = false } = {}) {
+  async function refresh({ force = false, userId } = {}) {
     if (!pending && (force || !refreshedAt || Date.now() - refreshedAt >= cacheMs)) pending = scan().finally(() => { pending = undefined; });
     if (pending) await pending;
-    return { libraries, truncated, refreshedAt, items: [...records.values()].map(({ id, name, kind, size, addedAt, album }) => ({ id: 'server:' + id, name, kind, size, addedAt, album, source: 'server', favorite: false, position: 0, streamUrl: '/api/media/stream/' + id })) };
+    const allowedRoots=new Set(roots.filter(root=>authorize(root,userId)));
+    return { libraries: libraries.filter(library=>allowedRoots.has(library.configured)).map(library=>({name:library.name,available:library.available,count:library.count})), truncated, refreshedAt, items: [...records.values()].filter(record=>allowedRoots.has(record.configured)).map(({ id, name, kind, size, addedAt, album }) => ({ id: 'server:' + id, name, kind, size, addedAt, album, source: 'server', favorite: false, position: 0, streamUrl: '/api/media/stream/' + id })) };
   }
   return {
     refresh,
-    async stream(req, res, id, { probeOnly = false, mode = "direct", audioIndex = null, startSeconds = 0 } = {}) {
-      await refresh();
+    async stream(req, res, id, { probeOnly = false, mode = "direct", audioIndex = null, startSeconds = 0, userId, validSession = () => false } = {}) {
+      await refresh({userId});
       const record = records.get(id);
-      if (!record) throw problem(404, 'Media not found');
+      const allowed=()=>!!record&&!res.destroyed&&validSession()&&authorize(record.configured,userId);
+      const requireAccess=()=>{if(!allowed())throw problem(404,'Media not found');};
+      requireAccess();
       const root = await realpath(record.configured).catch(() => null);
       const file = await realpath(record.file).catch(() => null);
       if (root !== record.root || !file || !inside(root, file)) throw problem(404, 'Media no longer available');
       const fd = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0)).catch(() => null);
       if (!fd) throw problem(404, 'Media no longer available');
+      const watch=setInterval(()=>{try{if(!allowed())res.destroy();}catch{res.destroy();}},1000);watch.unref();
       try {
         // Bind containment to the opened inode on Linux, preventing directory-swap races.
         if (process.platform === 'linux') {
@@ -85,7 +89,7 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
         }
         const stat = await fd.stat();
         if (!stat.isFile()) throw problem(404, 'Media no longer available');
-        if (probeOnly) return await probeMedia(fd);
+        if (probeOnly) { const probe=await probeMedia(fd);requireAccess();return probe; }
         if (mode !== 'direct') {
           if (record.kind !== 'video') throw problem(415, 'Conversion is only available for video');
           if (req.method !== 'GET') throw problem(405, 'Conversion requires GET');
@@ -96,8 +100,10 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
           if (audioIndex !== null && !probe.audioTracks.some(track => track.index === audioIndex)) throw problem(400, 'Audio track not found');
           if(startSeconds && mode==='remux')throw problem(400,'Remux seeking cannot guarantee a decodable keyframe. Choose H.264/AAC conversion to seek.');
           if(startSeconds && (!probe.durationSeconds || startSeconds>=probe.durationSeconds))throw problem(416,'Conversion start is outside the known video duration');
+          requireAccess();
           return await processor.stream(fd, res, { transcode: mode === 'transcode', audioIndex, startSeconds });
         }
+        requireAccess();
         const range = parseMediaRange(req.headers.range ?? null, stat.size);
         const headers = { 'Accept-Ranges': 'bytes', 'Content-Type': record.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin', 'Content-Disposition': 'inline' };
         if (range.status === 416) { res.writeHead(416, { ...headers, 'Content-Range': `bytes */${stat.size}` }); res.end(); return; }
@@ -109,7 +115,7 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
         const abort = () => stream.destroy(); res.once('close', abort);
         try { await pipeline(stream, res); } catch (error) { if (!res.destroyed) throw error; }
         finally { res.off('close', abort); }
-      } finally { await fd.close(); }
+      } finally { clearInterval(watch);await fd.close(); }
     },
   };
 }

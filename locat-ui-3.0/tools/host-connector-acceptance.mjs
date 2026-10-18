@@ -23,6 +23,9 @@ try{
  const credentialFile=join(dir,'synthetic-credentials.json');await writeFile(credentialFile,'{}\n',{mode:0o600});
  const runtime=Object.fromEntries(['PATH','HOME','DOCKER_HOST','DOCKER_CONFIG','XDG_RUNTIME_DIR'].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
  if(!localOnly){
+ const mediaPolicy=JSON.stringify([{root:'/media',ownerId:'a'.repeat(32),friendIds:[]}]);
+ const localProfile=JSON.parse((await exec('docker',['compose','-f',join(root,'compose.local.yml'),'config','--format','json'],{env:{...runtime,LOCAT_PUBLIC_ORIGIN:'https://connector.locat.invalid',LOCAT_MEDIA_LIBRARY_ACCESS:mediaPolicy,LOCAT_SHARED_MEDIA_DIR:dir}})).stdout).services.locat;
+ assert.equal(localProfile.environment.LOCAT_MEDIA_ACCESS_MODE,'owned');assert.equal(localProfile.environment.LOCAT_MEDIA_LIBRARY_ACCESS,mediaPolicy);assert.equal(localProfile.volumes.find(volume=>volume.target==='/media').read_only,true);
  const rendered=JSON.parse((await exec('docker',['compose','-f',join(root,'compose.cloudflare-host.yml'),'--profile','prepared-host-connector','config','--format','json'],{env:{...runtime,CLOUDFLARED_IMAGE:image,LOCAT_HOST_CONNECTOR_CONFIG_FILE:prepared.configFile,LOCAT_TUNNEL_CREDENTIALS_FILE:credentialFile}})).stdout);
  assert.deepEqual(Object.keys(rendered.services),['cloudflared']);const connector=rendered.services.cloudflared;
  assert.equal(connector.network_mode,'host');assert.ok(!connector.ports?.length);assert.equal(connector.read_only,true);assert.ok(connector.cap_drop.includes('ALL'));assert.ok(connector.security_opt.includes('no-new-privileges:true'));
@@ -40,6 +43,9 @@ try{
  const deadline=Date.now()+20000;while(!await ready()){if(child.exitCode!==null||Date.now()>deadline)throw new Error('Isolated proxy gateway did not start');await new Promise(resolve=>setTimeout(resolve,100));}
  console.log((await exec(process.execPath,[fileURLToPath(new URL('./host-connector-client.mjs',import.meta.url)),String(port)],{cwd,timeout:30000})).stdout.trim());
  if(!localOnly){
+ const mediaPolicy=JSON.stringify([{root:'/media',ownerId:'a'.repeat(32),friendIds:[]}]);
+ const localProfile=JSON.parse((await exec('docker',['compose','-f',join(root,'compose.local.yml'),'config','--format','json'],{env:{...runtime,LOCAT_PUBLIC_ORIGIN:'https://connector.locat.invalid',LOCAT_MEDIA_LIBRARY_ACCESS:mediaPolicy,LOCAT_SHARED_MEDIA_DIR:dir}})).stdout).services.locat;
+ assert.equal(localProfile.environment.LOCAT_MEDIA_ACCESS_MODE,'owned');assert.equal(localProfile.environment.LOCAT_MEDIA_LIBRARY_ACCESS,mediaPolicy);assert.equal(localProfile.volumes.find(volume=>volume.target==='/media').read_only,true);
  const client=await readFile(new URL('./host-connector-client.mjs',import.meta.url),'utf8');
  const result=await exec('docker',['run','--rm','--network','host','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--user','65532:65532','node:24-bookworm-slim','node','--input-type=module','-e',client,String(port)],{timeout:120000});
  console.log(result.stdout.trim());console.log('Offline cloudflared ingress and Compose policy passed. No tunnel, DNS or public exposure activated.');

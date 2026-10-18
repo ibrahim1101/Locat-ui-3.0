@@ -139,7 +139,7 @@ jobs:
         env:
           LOCAT_BROWSER_ENGINE: firefox
           LOCAT_BROWSER_REPORT: test-results/cinema-firefox-results.json
-        run: npm run test:browser -- cinema.spec.mjs foundation.spec.mjs link.spec.mjs photos.spec.mjs sentinel.spec.mjs server-setup.spec.mjs
+        run: npm run test:browser -- cinema.spec.mjs foundation.spec.mjs link.spec.mjs photos.spec.mjs sentinel.spec.mjs server-setup.spec.mjs media-sharing.spec.mjs
       - name: Repeated private-store foreground acceptance
         env:
           LOCAT_BROWSER_REPORT: test-results/private-store-repeat-results.json
