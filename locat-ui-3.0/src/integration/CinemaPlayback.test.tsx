@@ -15,7 +15,7 @@ it('opens top options, explains HEVC remux refusal and changes the actual player
  fireEvent.click(screen.getByRole('button',{name:'Playback options'}));
  const convert=await screen.findByRole('button',{name:'Convert to H.264/AAC · up to 1080p'});
  expect(screen.getByRole('button',{name:'Remux · copy streams into MP4'})).toBeDisabled();expect(screen.getByText(/Remux keeps the original codec/)).toBeVisible();
- fireEvent.click(convert);await waitFor(()=>expect(video.getAttribute('src')).toContain('?mode=transcode'));expect(screen.queryByRole('dialog')).toBeNull();expect(screen.getByLabelText('Seek')).toBeDisabled();
+ fireEvent.click(convert);await waitFor(()=>expect(video.getAttribute('src')).toContain('?mode=transcode'));expect(screen.queryByRole('dialog')).toBeNull();expect(screen.getByLabelText('Seek')).not.toBeDisabled();
  fireEvent.error(video);expect(screen.getByTestId('player-error')).toHaveTextContent('Server conversion could not be played');
  fireEvent.click(screen.getByRole('button',{name:'Playback options'}));fireEvent.click(await screen.findByRole('button',{name:'Direct playback · supports seeking'}));await waitFor(()=>expect(video.getAttribute('src')).toBe(item.streamUrl));expect(screen.getByLabelText('Seek')).not.toBeDisabled();
  fireEvent.click(screen.getByRole('button',{name:'Playback options'}));fireEvent.click(await screen.findByRole('button',{name:'Direct playback · supports seeking'}));expect(HTMLMediaElement.prototype.load).toHaveBeenCalled();
