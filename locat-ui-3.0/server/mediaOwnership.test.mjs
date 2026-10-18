@@ -28,6 +28,7 @@ test('real API isolates owned media, authorizes reciprocal configured friends an
   async function login(username){const response=await request('/api/auth/login',undefined,{username,password});assert.equal(response.status,200);return response.headers.get('set-cookie').split(';')[0];}
   const alice=await login('alice'),eve=await login('eve');let bob=await login('bob');
   const snapshot=async cookie=>(await request('/api/media',cookie)).json();
+  const earlyShares=await (await request('/api/media/shares',alice)).json();assert.equal((await request('/api/media/shares',alice,{libraryId:earlyShares.libraries[0].id,friendId:b,allowed:true})).status,409);
   const mine=await snapshot(alice),his=await snapshot(bob);assert.equal(mine.items.length,2);assert.equal(his.items.length,1);assert.deepEqual((await snapshot(eve)).items,[]);assert.equal(mine.libraries.length,1);assert.ok(!JSON.stringify(mine).includes(dir));
   const movie=mine.items.find(item=>item.name==='Alice.mkv'),large=mine.items.find(item=>item.name==='Backpressure.mp4'),probe=movie.streamUrl.replace('/stream/','/probe/');
   async function denied(cookie){for(const [path,method] of [[movie.streamUrl,'GET'],[movie.streamUrl,'HEAD'],[probe,'GET'],[movie.streamUrl+'?mode=remux','GET'],[movie.streamUrl+'?mode=transcode','GET']])assert.equal((await request(path,cookie,undefined,method)).status,404,path);}
@@ -67,6 +68,7 @@ test('real API isolates owned media, authorizes reciprocal configured friends an
   assert.equal((await request(probe,bob)).status,200);
   assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:b,allowed:false})).status,200);
   await stop();await start([{...policy[0],friendIds:[]},policy[1]]);await denied(bob);assert.equal((await snapshot(bob)).items.length,1);
+  let throttled;for(let i=0;i<31;i++){throttled=await request('/api/media/shares',alice,{libraryId,friendId:b,allowed:false});if(throttled.status===429)break;}assert.equal(throttled.status,429);assert.ok(Number(throttled.headers.get('retry-after'))>0);
   await stop();await start([]);assert.deepEqual((await snapshot(alice)).items,[]);await denied(alice);
  }finally{active?.destroy();await stop();await rm(dir,{recursive:true,force:true});}
 });
