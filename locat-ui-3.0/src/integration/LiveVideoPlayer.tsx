@@ -14,6 +14,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
   useEffect(()=>()=>inspectControl.current?.abort(),[]);
   const [delivery, setDelivery] = useState<DeliveryMode>("direct");
   const [startSeconds,setStartSeconds]=useState(0);
+  const switchingSource=useRef(false);
   const startRef=useRef(0);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | null>(null);
   const [audioIndex, setAudioIndex] = useState<number | null>(null);
@@ -57,7 +58,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
     } catch (error) { if(!control.signal.aborted)setCompatibilityError(error instanceof Error ? error.message : "Inspection failed"); }
   }
   function selectDelivery(mode: DeliveryMode) {
-    video.current?.pause();setNativeSize({width:0,height:0});playAfterLoad.current=true;
+    switchingSource.current=true;video.current?.pause();setNativeSize({width:0,height:0});playAfterLoad.current=true;
     const next=deliveryUrl(item,mode,mode==="direct"?null:selectedAudioIndex);if(video.current&&(next??url)===video.current.getAttribute("src"))video.current.load();
     startRef.current=0;setStartSeconds(0);setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
     set({ state: "loading", positionSec: 0, seekable: mode === "direct" || !!direct, error: undefined, activeQuality: "options" });
@@ -74,13 +75,13 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
       });
     }} />
     <PlayerChrome inspectionError={compatibilityError} onInspect={()=>void inspect(false)} onLoadSubtitle={() => subtitleInput.current?.click()} video={metadata} state={state} onClose={() => { checkpoint(); onClose(); }} surface={<video ref={video} src={deliverySource??(url || undefined)} className="h-full w-full" style={{ objectFit: state.fit }} playsInline
-      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: delivery !== "direct" && probe?.durationSeconds ? probe.durationSeconds : Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
+      onLoadedMetadata={event => { const element = event.currentTarget;setNativeSize({width:element.videoWidth,height:element.videoHeight}); switchingSource.current=false; if (delivery === "direct") element.currentTime = item.position < element.duration - 5 ? item.position : 0; set({ state: "paused", durationSec: delivery !== "direct" && probe?.durationSeconds ? probe.durationSeconds : Number.isFinite(element.duration)&&element.duration>0 ? element.duration : probe?.durationSeconds ?? 1 }); if (autoStart||playAfterLoad.current) {playAfterLoad.current=false;void perform(() => element.play());} }}
       onLoadStart={()=>set({state:"loading",error:undefined})}
       onTimeUpdate={event => { const element = event.currentTarget; set({ positionSec: element.currentTime + startRef.current, bufferedSec: element.buffered.length ? element.buffered.end(element.buffered.length - 1) + startRef.current : 0 }); }}
-      onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { set({ state: "paused" }); checkpoint(); }} onEnded={() => { set({ state: "ended" }); checkpoint(); onEnded?.(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
+      onPlay={() => set({ state: "playing", error: undefined })} onPause={() => { if(!switchingSource.current){set({ state: "paused" }); checkpoint();} }} onEnded={() => { set({ state: "ended" }); checkpoint(); onEnded?.(); }} onWaiting={() => set({ state: "buffering" })} onPlaying={() => set({ state: "playing" })}
       onError={event => { const mediaCode = event.currentTarget.error?.code ?? 0; const sourceKind = item.source === "server" ? "server" : "device"; const diagnostic = ` [Cinema diagnostic: source=${sourceKind}, mode=${delivery}, mediaError=${mediaCode || "unknown"}]`; set({ state: "error", error: { code: "codec", message: (delivery!=="direct" ? "Server conversion could not be played. Check FFmpeg/FFprobe, available conversion slots and source-file compatibility. Retry Playback options or preconvert an MP4/H.264/AAC copy on the host; progressive conversion cannot read every container." : "This browser could not play the original format. For server files, open Playback options and choose Convert to H.264/AAC. Remux does not change HEVC. Local files need a compatible MP4/H.264 copy or an authorized server media folder.") + diagnostic } }); }}>{subtitle && <track key={subtitle.url} src={subtitle.url} kind="subtitles" label={subtitle.name} default onLoad={() => { if (video.current?.textTracks[0]) video.current.textTracks[0].mode = "showing"; }} />}</video>}
       cb={{ onTogglePlay: () => { const element = video.current; if (element) { if (element.paused) void perform(() => element.play()); else element.pause(); } },
-        onSeek: sec => { const target=Math.max(0,Math.min(Math.floor(sec),Math.min(state.durationSec,86400)));if(delivery==="direct"){if(video.current)video.current.currentTime=target;return;}if(!direct)return;startRef.current=target;setStartSeconds(target);playAfterLoad.current=true;set({state:"loading",positionSec:target,bufferedSec:target,error:undefined}); },
+        onSeek: sec => { const target=Math.max(0,Math.min(Math.floor(sec),Math.min(state.durationSec,86400)));if(delivery==="direct"){if(video.current)video.current.currentTime=Math.max(0,Math.min(sec,state.durationSec));return;}if(!direct)return;switchingSource.current=true;video.current?.pause();startRef.current=target;setStartSeconds(target);playAfterLoad.current=true;set({state:"loading",positionSec:target,bufferedSec:target,error:undefined}); },
         onRate: rate => { if (video.current) video.current.playbackRate = rate; set({ rate }); }, onFit: fit => set({ fit }), onSubtitle: id => { if (video.current?.textTracks[0]) video.current.textTracks[0].mode = id ? "showing" : "disabled"; set({ activeSubtitle: id }); }, onQuality: () => { void inspect(); },
         onPip: () => { if (video.current) void perform(async () => { if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await video.current!.requestPictureInPicture(); }); },
         onFullscreen: () => void perform(async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await container.current?.requestFullscreen(); }),
