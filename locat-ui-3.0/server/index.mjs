@@ -139,8 +139,10 @@ async function handle(req, res) {
     if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
     const mode = url.searchParams.get("mode") ?? "direct";
     const audio = url.searchParams.get("audio");
+    const start = url.searchParams.get("start");
+    if (start !== null && (!/^(0|[1-9]\\d{0,4})$/.test(start) || Number(start) > 86400 || mode === "direct")) return json(res, 400, { error: "Invalid conversion start position" });
     if (!["direct", "remux", "transcode"].includes(mode) || (audio !== null && (!/^\d{1,3}$/.test(audio) || mode === "direct"))) return json(res, 400, { error: "Invalid playback mode or audio track" });
-    return mediaLibrary.stream(req, res, id, { mode, audioIndex: audio === null ? null : Number(audio) });
+    return mediaLibrary.stream(req, res, id, { mode, audioIndex: audio === null ? null : Number(audio), startSeconds: start === null ? 0 : Number(start) });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);
