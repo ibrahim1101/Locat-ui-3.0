@@ -61,7 +61,7 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
     switchingSource.current=true;video.current?.pause();setNativeSize({width:0,height:0});playAfterLoad.current=true;
     const next=deliveryUrl(item,mode,mode==="direct"?null:selectedAudioIndex);if(video.current&&(next??url)===video.current.getAttribute("src"))video.current.load();
     startRef.current=0;setStartSeconds(0);setAudioIndex(mode === "direct" ? null : selectedAudioIndex); setDelivery(mode); setCompatibility(false);
-    set({ state: "loading", positionSec: 0, seekable: mode === "direct" || !!direct, error: undefined, activeQuality: "options" });
+    set({ state: "loading", positionSec: 0, seekable: mode === "direct" || (!!direct && !!probe?.durationSeconds), error: undefined, activeQuality: "options" });
   }
   function checkpoint() { const element = video.current; if (element && Number.isFinite(element.duration)) void update({ ...item, position: element.ended ? 0 : element.currentTime + startRef.current }); }
   return <div ref={container} className="h-full min-h-[420px] bg-black">
