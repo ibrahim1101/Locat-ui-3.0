@@ -6,6 +6,7 @@ export function deliveryUrl(item: LocalMediaItem, mode: DeliveryMode, audioIndex
   const direct = safeMediaUrl(item);
   if (!direct) return null;
   if (mode === "direct") return direct;
+  if(mode==="remux"&&startSeconds>0)throw new Error("Remux cannot seek; choose H.264/AAC conversion");
   if (!Number.isSafeInteger(startSeconds) || startSeconds < 0 || startSeconds > 86400) throw new Error("Invalid conversion start position");
   if (audioIndex !== null && (!Number.isSafeInteger(audioIndex) || audioIndex < 0 || audioIndex > 999)) throw new Error("Invalid audio track");
   return direct + `?mode=${mode}${audioIndex === null ? "" : `&audio=${audioIndex}`}${startSeconds ? `&start=${startSeconds}` : ""}`;

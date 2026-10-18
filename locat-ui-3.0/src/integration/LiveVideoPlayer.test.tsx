@@ -12,7 +12,7 @@ function setup(autoStart=false,onEnded=vi.fn()){
  vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:video');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
  vi.spyOn(HTMLMediaElement.prototype,'pause').mockImplementation(()=>{});vi.spyOn(HTMLMediaElement.prototype,'load').mockImplementation(()=>{});
  const result=render(<LiveVideoPlayer item={{id:'v',kind:'video',name:'video.mp4',file:new Blob(),position:15} as LocalMediaItem} autoStart={autoStart} onEnded={onEnded} onClose={()=>{}}/>);
- const video=result.container.querySelector('video')!;Object.defineProperty(video,'duration',{value:120});return {...result,video,onEnded};
+ const video=result.container.querySelector('video')!;Object.defineProperty(video,'duration',{value:120});Object.defineProperty(video,'readyState',{value:4});return {...result,video,onEnded};
 }
 it('resumes manually selected videos and advances only after an actual ended event',()=>{
  const play=vi.spyOn(HTMLMediaElement.prototype,'play').mockResolvedValue();const {video,onEnded,unmount}=setup();

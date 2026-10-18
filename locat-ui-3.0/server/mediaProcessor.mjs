@@ -63,20 +63,23 @@ export function createMediaProcessor({ maximum = 2, timeoutMs = 4 * 60 * 60 * 10
     get active() { return active; },
     async stream(fd, res, { transcode = false, audioIndex = null, startSeconds = 0 } = {}) {
       if (!Number.isSafeInteger(startSeconds) || startSeconds < 0 || startSeconds > 86400) throw Object.assign(new Error('Invalid conversion start position'), { status: 400 });
+      if(startSeconds&&!transcode)throw Object.assign(new Error('Remux seeking requires H.264/AAC conversion'),{status:400});
       if (active >= maximum) throw Object.assign(unavailable('Media conversion capacity reached'), { retryAfter: 10 });
       active++;
       let child, input, timer, killTimer;
       try {
-        const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '2', '-i', 'pipe:0', ...(startSeconds ? ['-ss', String(startSeconds)] : []), '-map', '0:v:0', '-map', audioIndex === null ? '0:a:0?' : `0:${audioIndex}`, ...(transcode ? ['-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-vf', "scale=w=\'min(1920,iw)\':h=\'min(1080,ih)\':force_original_aspect_ratio=decrease:force_divisible_by=2", '-c:a', 'aac', '-b:a', '160k'] : ['-c', 'copy']), '-sn', '-dn', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', 'pipe:1'];
-        child = spawn(executable, args, { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+        // Linux can seek the inherited, already-authorized inode, without reopening
+        // its original pathname. Other hosts retain bounded sequential pipe input.
+        const inherited=process.platform==='linux';
+        const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '2', ...(inherited&&startSeconds?['-ss',String(startSeconds)]:[]), '-i', inherited?'/proc/self/fd/3':'pipe:0', ...(!inherited&&startSeconds ? ['-ss', String(startSeconds)] : []), '-map', '0:v:0', '-map', audioIndex === null ? '0:a:0?' : `0:${audioIndex}`, ...(transcode ? ['-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-vf', "scale=w=\'min(1920,iw)\':h=\'min(1080,ih)\':force_original_aspect_ratio=decrease:force_divisible_by=2", '-c:a', 'aac', '-b:a', '160k'] : ['-c', 'copy']), '-sn', '-dn', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', 'pipe:1'];
+        child = spawn(executable, args, { shell: false, windowsHide: true, stdio: inherited?['ignore','pipe','pipe',fd.fd]:['pipe', 'pipe', 'pipe'] });
         const closed = new Promise(resolve => { child.once('error', () => resolve({ error: true })); child.once('close', code => resolve({ code })); });
         function cancel() { child.kill(); killTimer ??= setTimeout(() => child.kill('SIGKILL'), 1000); input?.destroy(); }
         timer = setTimeout(cancel, timeoutMs);
         res.once('close', cancel);
         try {
           await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', () => reject(unavailable('FFmpeg is unavailable'))); });
-          input = mediaInput(fd);
-          input.on('error', cancel); child.stdin.on('error', () => {}); input.pipe(child.stdin);
+          if(!inherited){input = mediaInput(fd);input.on('error', cancel); child.stdin.on('error', () => {}); input.pipe(child.stdin);}
           child.stderr.resume();
           // Do not commit HTTP 200 for a worker that exits before producing any MP4 bytes.
           const first=await new Promise((resolve,reject)=>{

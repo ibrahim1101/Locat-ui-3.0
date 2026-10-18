@@ -1,5 +1,5 @@
 export type ServerDiscovery = {app:'Locat';protocolVersion:1;serverId:string;origin:string;capabilities:{sameOriginApi:boolean;privateMessaging:boolean;federation:boolean;webSocket:boolean}};
-/** Origin-only browser navigation keeps cookies, private keys and data on their homeserver origin. */
+/** Validate navigation targets. App keys/data are origin-scoped; browser cookies are host-scoped. */
 export function homeserverOrigin(input:string):string {
   let url:URL;try{url=new URL(input.trim());}catch{throw new Error('Enter a complete HTTPS server address.');}
   if(url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('Use a server origin without credentials, paths or query parameters.');

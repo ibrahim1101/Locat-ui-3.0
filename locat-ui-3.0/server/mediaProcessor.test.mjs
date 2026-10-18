@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, open, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, open, readFile, writeFile, rm, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -102,4 +102,36 @@ test('conversion rejects invalid start positions before allocating a worker',asy
   await assert.rejects(processor.stream(null,null,{startSeconds}),error=>error.status===400);
  }
  assert.equal(processor.active,0);
+});
+
+test('accurate conversion seek decodes the requested scene from a long-GOP authorized inode',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-seek-'));let server;
+ try{
+  const source=join(dir,'scenes.mkv');
+  await exec('ffmpeg',['-v','error','-f','lavfi','-i','color=c=red:s=160x90:r=10:d=2','-f','lavfi','-i','color=c=blue:s=160x90:r=10:d=2','-f','lavfi','-i','sine=frequency=440:duration=4','-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0[v]','-map','[v]','-map','2:a','-c:v','libx264','-threads','1','-g','100','-sc_threshold','0','-c:a','aac','-y',source]);
+  const processor=createMediaProcessor();
+  server=createServer(async(req,res)=>{const fd=await open(source,'r');try{await probeMedia(fd);await processor.stream(fd,res,{transcode:true,startSeconds:2});}catch(error){if(!res.headersSent){res.writeHead(error.status??500);res.end();}else res.destroy();}finally{await fd.close();}});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const response=await fetch('http://127.0.0.1:'+server.address().port);assert.equal(response.status,200);
+  const output=join(dir,'seek.mp4');await writeFile(output,Buffer.from(await response.arrayBuffer()));
+  const pixel=(await exec('ffmpeg',['-v','error','-i',output,'-map','0:v:0','-frames:v','1','-vf','scale=1:1','-pix_fmt','rgb24','-f','rawvideo','pipe:1'],{encoding:'buffer'})).stdout;
+  assert.ok(pixel[2]>200&&pixel[0]<40&&pixel[1]<40,'first decoded frame must be the blue scene after the requested offset');assert.equal(processor.active,0);
+  const fd=await open(source,'r');try{await assert.rejects(processor.stream(fd,null,{startSeconds:2}),error=>error.status===400&&/Remux/.test(error.message));assert.equal(processor.active,0);}finally{await fd.close();}
+ }finally{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('stalled workers release capacity after timeout and client cancellation', {skip:process.platform==='win32'}, async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-worker-stop-'));let fd;
+ try{
+  const executable=join(dir,'stall');await writeFile(executable,'#!/bin/sh\nexec sleep 30\n');await chmod(executable,0o700);
+  const source=join(dir,'source');await writeFile(source,'synthetic');fd=await open(source,'r');
+  for(const disconnect of [false,true]){
+   const processor=createMediaProcessor({maximum:1,timeoutMs:disconnect?5000:50,executable});let headers=false;
+   const response=new Writable({write(_chunk,_encoding,done){done();}});response.writeHead=()=>{headers=true;};
+   const pending=processor.stream(fd,response);assert.equal(processor.active,1);
+   const timer=disconnect?setTimeout(()=>response.destroy(),50):null;
+   try{await assert.rejects(pending,error=>error.status===503);}finally{if(timer)clearTimeout(timer);}
+   assert.equal(headers,false);assert.equal(processor.active,0);
+  }
+ }finally{await fd?.close();await rm(dir,{recursive:true,force:true});}
 });

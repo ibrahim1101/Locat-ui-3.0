@@ -11,7 +11,8 @@ import {fileURLToPath} from 'node:url';
 import {openDatabase} from '../server/database.mjs';
 import {startBrowserSynapse} from './browser-synapse-fixture.mjs';
 const exec=promisify(execFile),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-export async function startBrowserFixture({matrix=false,media=false}={}){
+export async function startBrowserFixture({matrix=false,media=false,hostname='127.0.0.1'}={}){
+ if(!['127.0.0.1','localhost'].includes(hostname))throw new Error('Only isolated loopback fixture hostnames are allowed');
  const dir=await mkdtemp(join(tmpdir(),'locat-browser-')),cwd=fileURLToPath(new URL('../',import.meta.url));let child,synapse;
  async function stopGateway(){
   if(child?.pid&&child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGTERM');const timer=setTimeout(()=>child.kill('SIGKILL'),3000);try{await exited;}finally{clearTimeout(timer);}}
@@ -21,8 +22,8 @@ export async function startBrowserFixture({matrix=false,media=false}={}){
  try{
   const reservation=createServer();await new Promise((resolve,reject)=>reservation.once('error',reject).listen(0,'127.0.0.1',resolve));
   const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
-  const origin='https://127.0.0.1:'+port,key=join(dir,'fixture.key'),cert=join(dir,'fixture.crt');
-  await exec('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1']);await chmod(key,0o600);
+  const origin='https://'+hostname+':'+port,key=join(dir,'fixture.key'),cert=join(dir,'fixture.crt');
+  await exec('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1,DNS:localhost']);await chmod(key,0o600);
   const ca=await readFile(cert),runtime=Object.fromEntries(['PATH','SystemRoot','WINDIR','TEMP','TMP','LANG'].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   if(matrix){const db=openDatabase(join(dir,'fixture.sqlite'));let serverId;try{serverId=db.serverId;}finally{db.close();}synapse=await startBrowserSynapse(dir,serverId);}
   let mediaFiles;
@@ -33,7 +34,9 @@ export async function startBrowserFixture({matrix=false,media=false}={}){
     await exec('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:size='+size+':rate=2','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1','-c:v',codec,'-threads','1','-preset','ultrafast','-pix_fmt','yuv420p',...(codec==='libx265'?['-x265-params','pools=1:frame-threads=1:log-level=error']:[]),'-c:a','aac','-y',file],{timeout:30000});
    }
    const sparse=await open(large,'wx');try{await sparse.truncate(13191223154);}finally{await sparse.close();}
-   mediaFiles={root,h264,hevc,large};
+   const seek=join(root,'Browser-Seek.mkv');
+   await exec('ffmpeg',['-v','error','-f','lavfi','-i','color=c=red:s=160x90:r=10:d=2','-f','lavfi','-i','color=c=blue:s=160x90:r=10:d=2','-f','lavfi','-i','sine=frequency=440:duration=4','-filter_complex','[0:v][1:v]concat=n=2:v=1:a=0[v]','-map','[v]','-map','2:a','-c:v','libx264','-threads','1','-g','100','-sc_threshold','0','-c:a','aac','-y',seek],{timeout:30000});
+   mediaFiles={root,h264,hevc,large,seek};
   }
   let diagnostic='',startupError;
   const startGateway=()=>{startupError=undefined;child=spawn(process.execPath,['server/index.mjs'],{cwd,env:{...runtime,...synapse?.environment,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_PUBLIC_ORIGIN:origin,LOCAT_TLS_KEY:key,LOCAT_TLS_CERT:cert,LOCAT_DATABASE_FILE:join(dir,'fixture.sqlite'),LOCAT_STATIC_DIR:join(cwd,'dist'),...(mediaFiles?{LOCAT_MEDIA_AUTHORIZED_ROOTS:mediaFiles.root}:{})},stdio:['ignore','ignore','pipe']});

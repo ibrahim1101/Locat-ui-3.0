@@ -143,7 +143,9 @@ async function handle(req, res) {
     const mode = url.searchParams.get("mode") ?? "direct";
     const audio = url.searchParams.get("audio");
     const start = url.searchParams.get("start");
-    if (start !== null && (!/^(0|[1-9]\\d{0,4})$/.test(start) || Number(start) > 86400 || mode === "direct")) return json(res, 400, { error: "Invalid conversion start position" });
+    if ([...url.searchParams.keys()].some(key => !['mode','audio','start'].includes(key) || url.searchParams.getAll(key).length !== 1)) return json(res,400,{error:'Invalid playback query'});
+    if (start !== null && (!/^(0|[1-9]\d{0,4})$/.test(start) || Number(start) > 86400 || mode === "direct")) return json(res, 400, { error: "Invalid conversion start position" });
+    if(mode==="remux"&&Number(start)>0)return json(res,400,{error:"Remux seeking requires H.264/AAC conversion"});
     if (!["direct", "remux", "transcode"].includes(mode) || (audio !== null && (!/^\d{1,3}$/.test(audio) || mode === "direct"))) return json(res, 400, { error: "Invalid playback mode or audio track" });
     return mediaLibrary.stream(req, res, id, { mode, audioIndex: audio === null ? null : Number(audio), startSeconds: start === null ? 0 : Number(start) });
   }

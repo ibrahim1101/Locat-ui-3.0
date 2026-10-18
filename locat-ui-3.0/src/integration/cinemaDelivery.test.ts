@@ -7,7 +7,8 @@ it("builds only authenticated media delivery URLs and bounded audio indices", ()
   expect(deliveryUrl(item, "remux", 2)).toBe(item.streamUrl + "?mode=remux&audio=2");
   expect(deliveryUrl(item, "transcode", null)).toBe(item.streamUrl + "?mode=transcode");
   expect(deliveryUrl(item, "transcode", 2, 75)).toBe(item.streamUrl + "?mode=transcode&audio=2&start=75");
-  expect(deliveryUrl(item, "remux", null, 86400)).toBe(item.streamUrl + "?mode=remux&start=86400");
+  expect(deliveryUrl(item, "transcode", null, 86400)).toBe(item.streamUrl + "?mode=transcode&start=86400");
+  expect(()=>deliveryUrl(item,"remux",null,2)).toThrow("Remux cannot seek");
   expect(() => deliveryUrl(item, "transcode", null, -1)).toThrow("start position");
   expect(() => deliveryUrl(item, "transcode", null, 86401)).toThrow("start position");
   expect(() => deliveryUrl(item, "transcode", null, 1.5)).toThrow("start position");

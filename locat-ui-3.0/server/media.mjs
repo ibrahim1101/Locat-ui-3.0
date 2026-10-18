@@ -94,6 +94,8 @@ export function createMediaLibrary(roots = (process.env.LOCAT_MEDIA_AUTHORIZED_R
           if (probe.strategy === 'unsupported') throw problem(415, 'No video stream detected');
           if (mode === 'remux' && !['direct', 'remux'].includes(probe.strategy)) throw problem(415, 'This file requires transcoding');
           if (audioIndex !== null && !probe.audioTracks.some(track => track.index === audioIndex)) throw problem(400, 'Audio track not found');
+          if(startSeconds && mode==='remux')throw problem(400,'Remux seeking cannot guarantee a decodable keyframe. Choose H.264/AAC conversion to seek.');
+          if(startSeconds && (!probe.durationSeconds || startSeconds>=probe.durationSeconds))throw problem(416,'Conversion start is outside the known video duration');
           return await processor.stream(fd, res, { transcode: mode === 'transcode', audioIndex, startSeconds });
         }
         const range = parseMediaRange(req.headers.range ?? null, stat.size);

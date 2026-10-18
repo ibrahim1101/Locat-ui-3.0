@@ -102,6 +102,9 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request(movie.streamUrl + '?audio=2', 'GET', undefined, aliceCookie)).status, 400);
     assert.equal((await request(movie.streamUrl + '?mode=remux', 'HEAD', undefined, aliceCookie)).status, 405);
     assert.equal((await request(movie.streamUrl + '?mode=remux', 'GET', undefined, aliceCookie, { Range: 'bytes=5-' })).status, 416);
+    for(const query of ['mode=transcode&start=-1','mode=transcode&start=1.5','mode=transcode&start=86401','mode=transcode&start=2&start=3','mode=transcode&unknown=1','start=1'])assert.equal((await request(movie.streamUrl+'?'+query,'GET',undefined,aliceCookie)).status,400);
+    // The fixture is deliberately not video: a valid timestamp must reach inspection (503), not be rejected as malformed (400).
+    for(const start of [0,1,12,86400])assert.equal((await request(movie.streamUrl+'?mode=transcode&start='+start,'GET',undefined,aliceCookie)).status,503);
     const invalidProbe = await request(probeUrl, 'GET', undefined, aliceCookie);
     assert.equal(invalidProbe.status, 503); assert.ok(!(await invalidProbe.text()).includes(mediaDir));
     if (supportsSymlinks) {
