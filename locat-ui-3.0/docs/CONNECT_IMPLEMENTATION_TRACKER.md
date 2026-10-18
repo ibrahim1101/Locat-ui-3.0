@@ -240,3 +240,6 @@ Cinema parallel-session seek/resume changes audited and corrected; Linux authori
 
 
 2026-10-18 acceptance follow-up: standard Chromium11passed7.8m on435f223; Firefox paused-seek test failed readyState4 versus3. Stronger decoded-scene/paused-intent/actual Play progression regression passes three local Firefox repetitions (6tests33.2s); standard CI remains required. Production runtime956821 unchanged. Real isolated Synapse/HTTPS passed; production dependency audit0, full audit5high dev nodes/unpatched braces (BUILD-001 open). See final handoff; all49/A–AM remain.
+
+
+2026-10-18 next boundary: MEDIA-REFRESH-002 fixed in3ca4f01df3f575f6f91fd8e3c2274fbd7b153a50; authenticated forced scans bounded6/account/minute and30/process/minute withRetry-After. Actual HTTP regression/full296frontend131backend/type/lint/build pass. Candidate CI pending; corrected paused-scene05ca36b workflow39131180505 in progress. BUILD-001 and Cinema006/008/009/010 remaining acceptance/permissions tracked; all49/A–AM preserved.

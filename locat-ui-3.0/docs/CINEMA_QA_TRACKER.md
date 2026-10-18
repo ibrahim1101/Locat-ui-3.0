@@ -82,3 +82,16 @@ Additional evidence: LOCAT_TEST_SYNAPSE_PYTHON=/workspace/scratch/8b3ebd8f9a46/s
 Preserved server-selection stash is fully reconciled into published435f223; retained as backup only, do not reapply it. All49/A–AM and complete roadmap intact. Next: standard Firefox/Chromium acceptance for this stronger regression, then compatibility-tested build-tool advisory resolution and Cinema010 owner/friend permission prerequisites. Physical originalmovie/Windows/Android/Pi and actual international/federation/TURN remain unverified. No deployment/DNS/publicrelease/unrelated infrastructure action occurred.
 
 Paused-scene regression batch: npm run check; npm run lint; npm run test:all (296frontend/131backend); npm run build all pass; git diff --check passes. Runtime unchanged; standard candidate CI pending publication.
+
+
+## 2026-10-18 — Forced media refresh resource boundary
+
+Start published05ca36baeae46980860db703a39aba99adf1092d. End runtime source3ca4f01df3f575f6f91fd8e3c2274fbd7b153a50 (local1b451460e759f81aac0dcfa21b4e41bed73d0136, tree6292325c8306066a9d5c05533a5d67b137ca2f9e); following commit records this checkpoint.
+
+MEDIA-REFRESH-002: authenticated sequential forced rescans bypassed scan cache without abuse budgets. Added six/account/minute and thirty/process/minute limits before scan/audit work;429 withRetry-After. GET cache access and each account's budget stay independent. Existing origin/session guards and scanner bounds/coalescing remain. Files server/index.mjs,server/api.test.mjs,ENGINEERING_BUG_REGISTER. Actual HTTP test exercises401,403, added/removed files, sixth allowed/seventh429, cachedGET200 and independent other-account200. No filesystem picker, unbounded upload, public media source or permission-sharing claim added.
+
+Commands: node --test server/api.test.mjs (passed); npm run check; npm run lint; npm run test:all (**296frontend/131backend**); npm run build (all passed, existing bundle warning); git diff --check passed. Process-local budgets are not distributed/durable quotas; real Pi workload remains open.
+
+Observed prior fee7c58 CI39130538724: all OS and connector jobs passed; browser117684611216 failed the same pre-correction Firefox paused-readyState assertion (11Chromium passed7.9m,6Firefox passed/1failed47.7s). Stronger test commit05ca36b CI39131180505 now running: Ubuntu117686502142,macOS117686502264 and connector117686502234 succeeded at observation; Windows117686501939/browser117686502176 pending. Current refresh-source CI pending publication. No failed CI is hidden or called accepted.
+
+Next: observe/fix exact candidate CI, preserve verified E2EE regressions, resolve BUILD-001 tooling prerequisite with theme parity, then guided source ownership/per-library friend ACLs and removal/revocation negative acceptance. All49/A–AM/full roadmap retained; full original movie/physical platforms/Pi/publicnetwork/federation/TURN remain open. No production/DNS/main/release/unrelated infrastructure changes.
