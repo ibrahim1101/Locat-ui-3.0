@@ -1698,3 +1698,6 @@ Cinema parallel-session seek/resume changes audited and corrected; Linux authori
 
 
 2026-10-18 next boundary: MEDIA-REFRESH-002 fixed in3ca4f01df3f575f6f91fd8e3c2274fbd7b153a50; authenticated forced scans bounded6/account/minute and30/process/minute withRetry-After. Actual HTTP regression/full296frontend131backend/type/lint/build pass. Candidate CI pending; corrected paused-scene05ca36b workflow39131180505 in progress. BUILD-001 and Cinema006/008/009/010 remaining acceptance/permissions tracked; all49/A–AM preserved.
+
+
+2026-10-18 accepted checkpoints:05ca36b/CI39131180505 andd29c68a/CI39131496255 all five jobs green (11Chromium/7Firefox/3storage,55 UI encrypted history messages preserved). CINEMA-011 StrictMode source lifecycle fixed in0be90a070ddfcee60b0ef72689646341a1c0f9d7;297frontend/131backend/type/lint/build plus actual Vite development and built Firefox pass; new CI pending. Next: explicit library ownership/friend ACLs and guided source setup; BUILD-001/native/Pi/long-file/federation/TURN acceptance open. All49/A–AM preserved.

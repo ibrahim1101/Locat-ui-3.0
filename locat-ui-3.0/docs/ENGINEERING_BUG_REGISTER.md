@@ -50,3 +50,14 @@ Cinema-001–010 remain in CINEMA_QA_TRACKER.md, including unresolved guided ser
 - Change: six forced requests/account/minute and thirty across the process/minute; 429 includes Retry-After before scanning. Cached GET, stream and other accounts' budget stay independent. Existing bounded/coalesced scanner retained.
 - Verification: actual HTTP API regression proves unauthenticated401/wrong-origin403, forced addition/removal visibility, seventh same-account request429 with bounded Retry-After, cached GET200 and another account's independent200. Full batch296frontend/131backend/type/lint/build passes as recorded in handoff.
 - Limits: process-local fixed-window budgets reset on restart, not a distributed quota; per-library ownership/friend ACLs and real Pi load acceptance remain open.
+
+
+## CINEMA-011 — Development StrictMode removes the live video source
+
+- Severity: medium; Vite development Cinema cannot load server video.
+- Reproduction: run the React development build under its existing StrictMode and open a server video.
+- Observed versus expected: video element loses src during ref replay and remains loading; it must retain the same source through replay while real replacement/unmount still cancel it.
+- Root cause: synchronous null-ref cleanup removed src before React immediately reattached the same element. Component and actual Vite/Firefox before-fix regressions both failed with missing src.
+- Change: one-microtask confirmation cancels genuinely obsolete elements only; stale event and progress guards retained. Source0be90a070ddfcee60b0ef72689646341a1c0f9d7.
+- Verification: component regression passes and still checks real unmount cleanup; actual development direct/transcode playback advances; full297frontend/131backend/type/lint/build and three built Firefox scenarios pass. New standard CI pending at entry.
+- Limits: local scoped sandbox restrictions disabled; not physical/native/original movie acceptance. Production builds do not replay refs this way, but replacement/unmount behavior is tested in built UI too.
