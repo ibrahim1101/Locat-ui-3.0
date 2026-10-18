@@ -39,3 +39,14 @@ Cinema-001–010 remain in CINEMA_QA_TRACKER.md, including unresolved guided ser
 - Root cause per advisory: recursive AST walkers lack depth guards and can exhaust the stack on crafted patterns. A simple local deeply nested pattern did not reproduce RangeError under Node24; a10001-character case hit its existing length guard. Do not claim a demonstrated application exploit or a fixed dependency.
 - Status: OPEN. Advisory lists no patched release. npm suggests a Tailwind4 major migration; no force upgrade, advisory suppression, custom crypto or unreviewed package fork added.
 - Next: compatibility-tested tooling migration/removal or reviewed upstream fix, with theme/CSS parity and complete source/browser checks. Keep high development advisory visible until an audited resolution. Production audit zero does not close the full build dependency finding.
+
+
+## MEDIA-REFRESH-002 — Unbounded forced host scans
+
+- Module: Cinema/server media refresh. Severity: medium, authenticated resource abuse on large/slow host libraries.
+- Reproduction: repeatedly POST authenticated same-origin /api/media/refresh after each prior scan completes.
+- Observed/expected: pending scans coalesce, but sequential forced requests bypass the normal one-minute scan cache without a request budget; expensive scans and audit writes should be bounded.
+- Root cause: forced-refresh route had authorization/origin guards but no account/shared limiter.
+- Change: six forced requests/account/minute and thirty across the process/minute; 429 includes Retry-After before scanning. Cached GET, stream and other accounts' budget stay independent. Existing bounded/coalesced scanner retained.
+- Verification: actual HTTP API regression proves unauthenticated401/wrong-origin403, forced addition/removal visibility, seventh same-account request429 with bounded Retry-After, cached GET200 and another account's independent200. Full batch296frontend/131backend/type/lint/build passes as recorded in handoff.
+- Limits: process-local fixed-window budgets reset on restart, not a distributed quota; per-library ownership/friend ACLs and real Pi load acceptance remain open.

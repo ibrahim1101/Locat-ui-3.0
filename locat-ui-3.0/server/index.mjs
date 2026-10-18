@@ -43,6 +43,8 @@ const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.mat
 const { host, port } = config;
 const mediaLibrary = createMediaLibrary();
 const authLimit = createRateLimiter();
+const mediaRefreshAccountLimit = createRateLimiter(6);
+const mediaRefreshGlobalLimit = createRateLimiter(30);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -122,6 +124,8 @@ async function handle(req, res) {
     const user = sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
     if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
+    const retryAfter = mediaRefreshAccountLimit(user.id) || mediaRefreshGlobalLimit('shared-media-refresh');
+    if (retryAfter) return json(res, 429, { error: 'Server media refresh is busy. Retry later.' }, { 'Retry-After': String(retryAfter) });
     const result = await mediaLibrary.refresh({ force: true });
     db.audit(user.id, "media.library.refreshed");
     return json(res, 200, result);

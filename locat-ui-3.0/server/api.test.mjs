@@ -82,6 +82,16 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const media = await (await request("/api/media", "GET", undefined, aliceCookie)).json();
     assert.equal(media.items.length, 2);
     assert.ok(!JSON.stringify(media).includes(mediaDir), "absolute host paths must not escape");
+    assert.equal((await request('/api/media/refresh','POST')).status,401);
+    assert.equal((await request('/api/media/refresh','POST',{},aliceCookie,{Origin:'https://wrong.invalid'})).status,403);
+    await writeFile(join(mediaDir,'added.png'),'photo-fixture');
+    const rescanned=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(rescanned.status,200);assert.equal((await rescanned.json()).items.length,3);
+    await rm(join(mediaDir,'added.png'));
+    const removed=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(removed.status,200);assert.equal((await removed.json()).items.length,2);
+    for(let count=0;count<4;count++)assert.equal((await request('/api/media/refresh','POST',{},aliceCookie)).status,200);
+    const throttled=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(throttled.status,429);assert.ok(Number(throttled.headers.get('retry-after'))>0);assert.ok(Number(throttled.headers.get('retry-after'))<=60);
+    assert.equal((await request('/api/media','GET',undefined,aliceCookie)).status,200,'cached library remains readable while refresh is throttled');
+    assert.equal((await request('/api/media/refresh','POST',{},bobCookie)).status,200,'another account retains its own refresh budget');
     const movie = media.items.find(item => item.name === "movie.mp4");
     const whole = await request(movie.streamUrl, "GET", undefined, aliceCookie);
     assert.equal(whole.status, 200); assert.equal(await whole.text(), "0123456789");
