@@ -30,3 +30,12 @@ This register supplements CINEMA_QA_TRACKER.md; it does not replace the 49-requi
 - Fix/evidence: wait for the actual replacement fetch before asserting cancellation. Retains latest-result, obsolete-response and unmount abort assertions; full frontend suite passes. No production provider behavior weakened.
 
 Cinema-001–010 remain in CINEMA_QA_TRACKER.md, including unresolved guided server-source setup, friend-scoped library ACLs, real long-file/device acceptance and hardware performance. The current authenticated global-root media behavior is not permission-based friend sharing.
+
+
+## BUILD-001 — Unpatched braces development-tool advisory
+
+- Module: Tailwind3 build tool dependency tree. Severity: high according to npm audit; development dependency, not present in the production dependency audit.
+- Reproduction/evidence: npm audit --json reports five affected nodes (braces3.0.3, chokidar3.6.0, fast-glob3.3.3, micromatch4.0.8 and tailwindcss3.4.19) from one reviewed advisory [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm). npm audit --omit=dev --json reports zero. npm view braces version engines --json reports latest3.0.3; npm ls confirms only Tailwind's development tree.
+- Root cause per advisory: recursive AST walkers lack depth guards and can exhaust the stack on crafted patterns. A simple local deeply nested pattern did not reproduce RangeError under Node24; a10001-character case hit its existing length guard. Do not claim a demonstrated application exploit or a fixed dependency.
+- Status: OPEN. Advisory lists no patched release. npm suggests a Tailwind4 major migration; no force upgrade, advisory suppression, custom crypto or unreviewed package fork added.
+- Next: compatibility-tested tooling migration/removal or reviewed upstream fix, with theme/CSS parity and complete source/browser checks. Keep high development advisory visible until an audited resolution. Production audit zero does not close the full build dependency finding.

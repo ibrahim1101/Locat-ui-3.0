@@ -44,11 +44,13 @@ test('Cinema converted timeline restarts at the requested scene and preserves pa
   await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState)).toBe(4);
   await page.locator('video').evaluate(v=>v.pause());
   const seek=page.getByLabel('Seek',{exact:true});await seek.focus();await page.keyboard.press('Home');
-  await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState)).toBe(4);
-  await seek.focus();await page.keyboard.press('ArrowRight');await expect(page.locator('video')).toHaveAttribute('src',/start=1/);await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState)).toBe(4);
-  await seek.focus();await page.keyboard.press('ArrowRight');await expect(page.locator('video')).toHaveAttribute('src',/start=2/);await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState)).toBe(4);
+  await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState>=2&&v.videoWidth===160&&v.videoHeight===90)).toBe(true);
+  await seek.focus();await page.keyboard.press('ArrowRight');await expect(page.locator('video')).toHaveAttribute('src',/start=1/);await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState>=2&&v.videoWidth===160&&v.videoHeight===90)).toBe(true);
+  const red=await page.locator('video').evaluate(v=>{const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.drawImage(v,0,0,1,1);return [...x.getImageData(0,0,1,1).data];});expect(red[0]).toBeGreaterThan(200);expect(red[2]).toBeLessThan(40);
+  await seek.focus();await page.keyboard.press('ArrowRight');await expect(page.locator('video')).toHaveAttribute('src',/start=2/);await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState>=2&&v.videoWidth===160&&v.videoHeight===90)).toBe(true);
   const frame=await page.locator('video').evaluate(v=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(v,0,0,1,1);return {paused:v.paused,time:v.currentTime,pixel:[...ctx.getImageData(0,0,1,1).data]};});
   expect(frame.paused).toBe(true);expect(frame.time).toBeLessThan(0.5);expect(frame.pixel[2]).toBeGreaterThan(200);expect(frame.pixel[0]).toBeLessThan(40);
+  await page.getByTestId('video-player').hover();await page.getByTestId('player-play-toggle').click();await expect.poll(()=>page.locator('video').evaluate(v=>v.currentTime)).toBeGreaterThan(0.25);
   await expect(page.getByTestId('player-error')).toHaveCount(0);
  }finally{await context.close();}
 });

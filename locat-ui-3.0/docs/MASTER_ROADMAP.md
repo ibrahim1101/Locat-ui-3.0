@@ -1692,3 +1692,6 @@ Cinema parallel-session seek/resume changes audited and corrected; Linux authori
 
 
 2026-10-18 next audit batch: REMOTE-001 bounded status streaming/cancellation implemented in956821dde98b828616a7d393def8abfaf0bc02e6; six focused tests and full296frontend/131backend/type/lint/build pass. Existing-feature Firefox storage/Link/Photos/Sentinel4pass20.9s. Runtime435f223 CI39130199832 partial success (connector/Ubuntu/macOS); Windows/browser pending. See final handoff and ENGINEERING_BUG_REGISTER. Per-library friend access and real platform/network acceptance remain open; no public deployment.
+
+
+2026-10-18 acceptance follow-up: standard Chromium11passed7.8m on435f223; Firefox paused-seek test failed readyState4 versus3. Stronger decoded-scene/paused-intent/actual Play progression regression passes three local Firefox repetitions (6tests33.2s); standard CI remains required. Production runtime956821 unchanged. Real isolated Synapse/HTTPS passed; production dependency audit0, full audit5high dev nodes/unpatched braces (BUILD-001 open). See final handoff; all49/A–AM remain.
