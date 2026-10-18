@@ -51,6 +51,17 @@ test('Cinema converted timeline restarts at the requested scene and preserves pa
   const frame=await page.locator('video').evaluate(v=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(v,0,0,1,1);return {paused:v.paused,time:v.currentTime,pixel:[...ctx.getImageData(0,0,1,1).data]};});
   expect(frame.paused).toBe(true);expect(frame.time).toBeLessThan(0.5);expect(frame.pixel[2]).toBeGreaterThan(200);expect(frame.pixel[0]).toBeLessThan(40);
   await page.getByTestId('video-player').hover();await page.getByTestId('player-play-toggle').click();await expect.poll(()=>page.locator('video').evaluate(v=>v.currentTime)).toBeGreaterThan(0.25);
+  let release;const gate=new Promise(resolve=>{release=resolve;}),held=[];
+  await page.route('**/api/media/stream/*',async route=>{
+   const url=new URL(route.request().url());if(url.searchParams.get('mode')!=='transcode')return route.continue();
+   held.push(url);await gate;
+   try{if(url.searchParams.get('start')==='2')await route.continue();else await route.abort();}catch{/* Replaced media requests can already be cancelled by the browser. */}
+  });
+  await seek.focus();await page.keyboard.press('Home');await expect.poll(()=>held.length).toBeGreaterThan(0);
+  await seek.focus();await page.keyboard.press('ArrowRight');await expect.poll(()=>held.some(url=>url.searchParams.get('start')==='1')).toBe(true);
+  await seek.focus();await page.keyboard.press('ArrowRight');await expect.poll(()=>held.some(url=>url.searchParams.get('start')==='2')).toBe(true);
+  release();await expect.poll(()=>page.locator('video').evaluate(v=>v.readyState>=2&&!v.paused&&v.currentTime>0.25)).toBe(true);
+  await expect(page.locator('video')).toHaveAttribute('src',/start=2/);
   await expect(page.getByTestId('player-error')).toHaveCount(0);
  }finally{await context.close();}
 });

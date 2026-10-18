@@ -99,7 +99,8 @@ export function LiveVideoPlayer({ item, onClose, onEnded, autoStart = false }: {
           if(delivery==='direct'){if(element){element.currentTime=Math.max(0,Math.min(sec,state.durationSec));lastProgress.current=element.currentTime;}return;}
           if(delivery!=='transcode'||!direct||knownDuration===null)return;
           const target=Math.max(0,Math.min(Math.floor(sec),Math.floor(knownDuration-1),86400));
-          playAfterLoad.current=!!element&&!element.paused&&!element.ended;
+          // A pending replacement is naturally paused; retain the original user intent.
+          if(!switchingSource.current)playAfterLoad.current=!!element&&!element.paused&&!element.ended;
           switchingSource.current=true;element?.pause();loadedPlayback.current=false;startRef.current=target;setStartSeconds(target);setSourceVersion(value=>value+1);
           set({state:'loading',positionSec:target,bufferedSec:target,error:undefined});
         },

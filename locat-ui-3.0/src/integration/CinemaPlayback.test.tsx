@@ -76,3 +76,16 @@ it('disables remux seeking and rejects unavailable converted duration at the rea
  render(<LiveVideoPlayer item={item} onClose={()=>{}}/>);fireEvent.click(screen.getByRole('button',{name:'Playback options'}));fireEvent.click(await screen.findByRole('button',{name:'Remux · copy streams into MP4'}));expect(screen.getByLabelText('Seek')).toBeDisabled();
  fireEvent.click(screen.getByRole('button',{name:'Playback options'}));fireEvent.click(await screen.findByRole('button',{name:'Convert to H.264/AAC · up to 1080p'}));expect(screen.getByLabelText('Seek')).toBeDisabled();
 });
+
+it.each([true,false])('preserves playing=%s across consecutive seeks before replacement metadata arrives',async playing=>{
+ const {container}=render(<LiveVideoPlayer item={item} onClose={()=>{}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Playback options'}));fireEvent.click(await screen.findByRole('button',{name:'Convert to H.264/AAC · up to 1080p'}));
+ let element=container.querySelector('video')!;Object.defineProperties(element,{duration:{configurable:true,value:120},readyState:{configurable:true,value:4},paused:{configurable:true,value:!playing}});fireEvent.loadedMetadata(element);
+ const before=vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
+ fireEvent.change(screen.getByLabelText('Seek'),{target:{value:'10'}});
+ const first=container.querySelector('video')!;expect(first).not.toBe(element);
+ fireEvent.change(screen.getByLabelText('Seek'),{target:{value:'20'}});
+ element=container.querySelector('video')!;expect(element).not.toBe(first);expect(element.src).toContain('start=20');
+ Object.defineProperties(element,{duration:{configurable:true,value:100},readyState:{configurable:true,value:4},paused:{configurable:true,value:true}});fireEvent.loadedMetadata(element);
+ expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(before+(playing?1:0));
+});
