@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+import {basename} from 'node:path';
 import {resolve,delimiter} from 'node:path';
 const accountId=/^[a-f0-9]{32}$/;
 /** Operator policy only. No browser request can add a root or assign an owner. */
@@ -16,12 +18,17 @@ export function createMediaAccess(store,env=process.env){
   if(!policy||typeof policy!=='object'||Array.isArray(policy)||Object.keys(policy).some(key=>!['root','ownerId','friendIds'].includes(key))||typeof policy.root!=='string'||!policy.root.trim()||policy.root.includes('\0')||!accountId.test(policy.ownerId??'')||!store.userById(policy.ownerId))throw new Error('Invalid media owner policy');
   const root=resolve(policy.root),friends=policy.friendIds??[];
   if(!roots.includes(root)||owned.has(root)||!Array.isArray(friends)||friends.length>64||friends.some(id=>typeof id!=='string'||!accountId.test(id)||id===policy.ownerId)||new Set(friends).size!==friends.length)throw new Error('Invalid media friend policy');
-  owned.set(root,{ownerId:policy.ownerId,friends:new Set(friends)});
+  owned.set(root,{id:createHash('sha256').update(JSON.stringify([root,policy.ownerId])).digest('hex'),ownerId:policy.ownerId,friends:new Set(friends)});
  }
- return {roots,mode,authorize(root,userId){
+ function effective(policy,friendId){return store.mediaShares?.decision(policy.id,policy.ownerId,friendId)??policy.friends.has(friendId);}
+ function ownedPolicy(userId,id){const policy=[...owned.values()].find(policy=>policy.id===id&&policy.ownerId===userId);if(!policy)throw Object.assign(new Error('Library not found'),{status:404});return policy;}
+ return {roots,mode,
+  ownedLibraries(userId){return [...owned].filter(([,policy])=>policy.ownerId===userId).map(([root,policy])=>{const friends=new Map([...policy.friends].map(friendId=>[friendId,true]));for(const row of store.mediaShares?.list(policy.id,userId)??[])friends.set(row.friendId,row.allowed);return {id:policy.id,name:basename(root),friendIds:[...friends].filter(([,allowed])=>allowed).map(([id])=>id)};});},
+  setShare(userId,id,friendId,allowed){const policy=ownedPolicy(userId,id);if(typeof friendId!=='string'||!accountId.test(friendId)||friendId===userId||typeof allowed!=='boolean'||!store.userById(friendId))throw Object.assign(new Error('Invalid sharing decision'),{status:400});if(allowed&&(!store.userById(friendId)||!store.acceptedContact(userId,friendId)||store.blocked(userId,friendId)))throw Object.assign(new Error('Sharing requires an accepted, unblocked contact'),{status:409});if(!store.mediaShares)throw new Error('Durable media sharing unavailable');store.mediaShares.set(policy.id,userId,friendId,allowed);},
+  authorize(root,userId){
   if(!roots.includes(root)||typeof userId!=='string'||!store.userById(userId))return false;
   if(mode==='authenticated')return true; // Explicit compatibility opt-in; never the default.
   const policy=owned.get(root);if(!policy)return false;
-  return userId===policy.ownerId||(policy.friends.has(userId)&&store.acceptedContact(policy.ownerId,userId)&&!store.blocked(policy.ownerId,userId));
+  return userId===policy.ownerId||(effective(policy,userId)&&store.acceptedContact(policy.ownerId,userId)&&!store.blocked(policy.ownerId,userId));
  }};
 }

@@ -126,7 +126,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 15); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 16); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/sentinel/incidents')).status, 401);
     const createdToken = await request('/api/sentinel/tokens', 'POST', {name:'Monitor'}, aliceCookie);

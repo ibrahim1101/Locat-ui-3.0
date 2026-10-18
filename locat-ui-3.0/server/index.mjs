@@ -42,6 +42,7 @@ if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
+const mediaShareLimit=createRateLimiter(30,60000);
 const mediaAccess=createMediaAccess(db);
 const mediaLibrary = createMediaLibrary(mediaAccess.roots,{authorize:mediaAccess.authorize});
 const authLimit = createRateLimiter();
@@ -123,6 +124,16 @@ async function handle(req, res) {
     const media = await mediaLibrary.refresh({userId:user.id});
     if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
     return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
+  }
+  if(url.pathname==='/api/media/shares'&&['GET','POST'].includes(req.method)){
+    const user=sessionUser(req);if(!user)return json(res,401,{error:'Not authenticated'});
+    if(req.method==='GET')return json(res,200,{libraries:mediaAccess.ownedLibraries(user.id)});
+    if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});
+    const retryAfter=mediaShareLimit(user.id);if(retryAfter)return json(res,429,{error:'Too many sharing changes. Retry later.'},{'Retry-After':String(retryAfter)});
+    const input=await authenticatedBody(req,user,1024);
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!['libraryId','friendId','allowed'].includes(key)))return json(res,400,{error:'Invalid sharing decision'});
+    mediaAccess.setShare(user.id,input.libraryId,input.friendId,input.allowed);
+    return json(res,200,{libraries:mediaAccess.ownedLibraries(user.id)});
   }
   if (url.pathname === "/api/media/refresh" && req.method === "POST") {
     const user = sessionUser(req);

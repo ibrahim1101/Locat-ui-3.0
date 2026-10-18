@@ -1,3 +1,4 @@
+import {mediaShareStore} from './mediaShares.mjs';
 import {matrixConversationStore} from './matrixConversations.mjs';
 import {auditEventPage} from './auditEvents.mjs';
 import {managedMatrixDeviceStore} from './matrixManagedDevices.mjs';
@@ -12,7 +13,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=15;
+export const DATABASE_SCHEMA_VERSION=16;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -122,6 +123,9 @@ export function openDatabase(filename) {
   if(version<15)sql.exec(`BEGIN IMMEDIATE;
     CREATE TABLE matrixConversations(lowId TEXT NOT NULL REFERENCES users(id),highId TEXT NOT NULL REFERENCES users(id),operationId TEXT NOT NULL UNIQUE,status TEXT NOT NULL CHECK(status IN ('pending','ready')),roomId TEXT UNIQUE,createdAt INTEGER NOT NULL,PRIMARY KEY(lowId,highId),CHECK(lowId<highId));
     PRAGMA user_version=15;COMMIT;`);
+  if(version<16)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE mediaShareOverrides(libraryId TEXT NOT NULL,ownerId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),allowed INTEGER NOT NULL CHECK(allowed IN (0,1)),updatedAt INTEGER NOT NULL,PRIMARY KEY(libraryId,ownerId,friendId),CHECK(ownerId!=friendId));
+    PRAGMA user_version=16;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
@@ -129,6 +133,7 @@ export function openDatabase(filename) {
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
+    mediaShares:mediaShareStore(sql),
     serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
     link,
     matrixRevocations,

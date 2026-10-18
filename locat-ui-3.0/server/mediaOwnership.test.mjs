@@ -51,6 +51,21 @@ test('real API isolates owned media, authorizes reciprocal configured friends an
   active=await new Promise((resolve,reject)=>{const req=get(origin+large.streamUrl,{headers:{Cookie:bob}},resolve);req.once('error',reject);});active.pause();const signedOut=new Promise(resolve=>active.once('aborted',resolve));
   assert.equal((await request('/api/auth/logout',bob,{})).status,200);assert.equal((await request(movie.streamUrl,bob)).status,401);
   await pause(1200);active.resume();try{await Promise.race([signedOut,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Signed-out stream was not aborted')),3000);})]);}finally{clearTimeout(timer);active.destroy();active=null;}bob=await login('bob');
+  const owned=await (await request('/api/media/shares',alice)).json(),libraryId=owned.libraries[0].id;
+  assert.equal((await request('/api/media/shares',bob,{libraryId,friendId:e,allowed:true})).status,404);
+  assert.equal((await fetch(origin+'/api/media/shares',{method:'POST',headers:{Cookie:alice,Origin:'https://untrusted.invalid','Content-Type':'application/json'},body:JSON.stringify({libraryId,friendId:e,allowed:true})})).status,403);
+  assert.equal((await fetch(origin+'/api/media/shares',{headers:{Cookie:alice,'X-Locat-Account':b}})).status,403);
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:e,allowed:true,root:roots[0]})).status,400);
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:e,allowed:true})).status,200);assert.equal((await request(probe,eve)).status,200);
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:e,allowed:false})).status,200);await denied(eve);
+
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:b,allowed:false})).status,200);await denied(bob);
+  await stop();await start(policy);await denied(bob); // Unchanged operator seeds cannot undo a revocation.
+  assert.equal((await request('/api/contacts/remove',alice,{userId:b})).status,200);
+  assert.equal((await request('/api/contacts/request',alice,{userId:b})).status,200);assert.equal((await request('/api/contacts/respond',bob,{userId:a,accept:true})).status,200);await denied(bob);
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:b,allowed:true})).status,200);
+  assert.equal((await request(probe,bob)).status,200);
+  assert.equal((await request('/api/media/shares',alice,{libraryId,friendId:b,allowed:false})).status,200);
   await stop();await start([{...policy[0],friendIds:[]},policy[1]]);await denied(bob);assert.equal((await snapshot(bob)).items.length,1);
   await stop();await start([]);assert.deepEqual((await snapshot(alice)).items,[]);await denied(alice);
  }finally{active?.destroy();await stop();await rm(dir,{recursive:true,force:true});}

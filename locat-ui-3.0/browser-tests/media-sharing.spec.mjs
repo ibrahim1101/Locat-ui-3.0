@@ -19,6 +19,14 @@ test('owned Cinema library requires a configured accepted friend and disappears 
   await expect.poll(()=>friend.locator('video').evaluate(v=>v.readyState>=2&&v.videoWidth===160&&v.currentTime>0.1)).toBe(true);
   const blue=await friend.locator('video').evaluate(v=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const ctx=canvas.getContext('2d');ctx.drawImage(v,0,0,1,1);return ctx.getImageData(0,0,1,1).data[2];});expect(blue).toBeGreaterThan(200);
   await friend.getByRole('button',{name:'Close player'}).click();
+  await owner.getByRole('button',{name:'Library sharing',exact:true}).click();
+  const sharing=owner.getByRole('dialog',{name:'Library sharing'});
+  await sharing.getByRole('button',{name:/Revoke access/}).click();
+  await expect(sharing.getByText(/Library access revoked/)).toBeVisible();
+  expect((await api(friend,movie.streamUrl.replace('/stream/','/probe/'))).status).toBe(404);
+  await sharing.getByRole('button',{name:/Grant access/}).click();
+  await expect(sharing.getByText('Library access granted.')).toBeVisible();
+  expect((await api(friend,movie.streamUrl.replace('/stream/','/probe/'))).status).toBe(200);
   expect((await api(owner,'/api/contacts/remove',{userId:fixture.mediaAccounts[1].id})).status).toBe(200);
   await friend.reload();await expect(friend.getByRole('button').filter({hasText:'Browser-H264.mkv'})).toHaveCount(0);expect((await api(friend,movie.streamUrl.replace('/stream/','/probe/'))).status).toBe(404);
   expect((await api(outsider,'/api/media')).data.items).toEqual([]);
