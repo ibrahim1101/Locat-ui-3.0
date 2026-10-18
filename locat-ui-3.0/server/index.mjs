@@ -1,3 +1,4 @@
+import {createRemoteStatusHandler} from './remoteInfrastructure.mjs';
 import {parseAuditQuery} from './auditEvents.mjs';
 import {createSessionSecurityHandler} from './sessionSecurity.mjs';
 import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
@@ -92,6 +93,7 @@ const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provid
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
 const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,sessionToken:cookie,body,json});
+const remoteStatusHandler = createRemoteStatusHandler({sessionUser,json});
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
@@ -105,6 +107,7 @@ async function handle(req, res) {
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (await sentinelHandler(req,res,url,trustedOrigin)) return;
+  if (await remoteStatusHandler(req,res,url)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
     capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true},
