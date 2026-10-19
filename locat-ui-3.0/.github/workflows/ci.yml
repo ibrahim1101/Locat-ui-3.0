@@ -1,0 +1,34 @@
+name: Locat UI3 checks
+
+on:
+  push:
+    branches:
+      - integration/locat-core
+      - rework/locat-core-scope
+  pull_request:
+    branches:
+      - integration/locat-core
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: locat-ui-3.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: locat-ui-3.0/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run test:all
+      - run: npm run build
