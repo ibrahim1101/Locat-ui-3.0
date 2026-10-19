@@ -107,7 +107,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
    expect(ciphertext).toBeTruthy();expect(ciphertext.equals(plain)).toBe(false);expect(ciphertext.includes(plain)).toBe(false);
    const aliceLog=alice.page.getByRole('log',{name:'Messages',exact:true}),bobLog=bob.page.getByRole('log',{name:'Messages',exact:true});
    await expect(aliceLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});await expect(bobLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});
-   const download=bob.page.waitForEvent('download');await bobLog.getByRole('button',{name:'Download '+name,exact:true}).click();const saved=await download;
+   const mediaResponses=[];bob.page.on('response',response=>{if(new URL(response.url()).pathname.includes('/_matrix/media/'))mediaResponses.push(response);});const download=bob.page.waitForEvent('download',{timeout:15000}).catch(()=>null);await bobLog.getByRole('button',{name:'Download '+name,exact:true}).click();const saved=await download;if(!saved){const alerts=await bob.page.getByRole('alert').allTextContents(),details=await Promise.all(mediaResponses.map(async response=>({path:new URL(response.url()).pathname,status:response.status(),body:response.ok()?'':await response.text()})));throw new Error('Encrypted download did not start: '+JSON.stringify({alerts,details}));}
    expect(saved.suggestedFilename()).toBe(name);const downloaded=await readFile(await saved.path());expect(downloaded.equals(plain)).toBe(true);
    expect(wire.some(body=>body.includes(secret))).toBe(false);await fixture.assertNoMessagePlaintext([secret]);
   });
