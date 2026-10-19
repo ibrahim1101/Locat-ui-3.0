@@ -31,7 +31,7 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
   const transport=client.getSyncState()??'connecting',roomReady=room?.getMyMembership()==='join'&&room?.getMember(state.peer?.matrixUserId??'')?.membership==='join'&&room?.currentState.getStateEvents('m.room.encryption','')?.getContent().algorithm==='m.megolm.v1.aes-sha2';if(JSON.stringify(unique)!==JSON.stringify(state.messages)||transport!==state.transport||roomReady!==state.roomReady||historyAvailable!==state.historyAvailable)publish({messages:unique,transport,roomReady,historyAvailable});
  }
  const timer=setInterval(project,300);
- async function refreshPending(){if(!outbox)return;let pending=await outbox.load();if(pending&&!pending.body){await outbox.complete(pending.transaction);if(retry?.transaction===pending.transaction)retry=null;pending=undefined;}publish({pendingSend:pending});}
+ async function refreshPending(){if(!outbox)return;let pending=await outbox.load();if(pending&&!pending.body&&pending.kind!=='attachment'){await outbox.complete(pending.transaction);if(retry?.transaction===pending.transaction)retry=null;pending=undefined;}publish({pendingSend:pending});}
  async function guard(epoch:number){
   const selected=state.peer,roomId=state.roomId;if(!selected||!roomId)throw new Error('Open a contact conversation first.');
   const peer=await resolvePeer(selected.accountId);requireCurrent(epoch);if(peer.matrixUserId!==selected.matrixUserId||!peer.devices.length)throw new Error('Contact or device authorization changed.');
@@ -78,14 +78,14 @@ export function createMatrixConversationSession(client:MatrixClient,resolvePeer:
    if(typeof uploaded.content_uri!=='string'||!/^mxc:\/\/[^/]+\/.+/.test(uploaded.content_uri))throw new Error('Encrypted file upload returned an invalid media URL.');
    // Revalidate authorization after the upload wait, rotate Megolm, then persist before sending.
    await crypto.forceDiscardSession(roomId);requireCurrent(epoch);const checked=await guard(epoch);if(checked.devices!==devices)throw new Error('Contact devices changed while encrypting the file.');
-   const transaction='locat_'+globalThis.crypto.randomUUID(),createdAt=Date.now();await outbox.prepare({peerId:state.peer!.accountId,roomId,transaction,devices,createdAt});requireCurrent(epoch);
+   const transaction='locat_'+globalThis.crypto.randomUUID(),createdAt=Date.now();await outbox.prepare({peerId:state.peer!.accountId,roomId,transaction,devices,createdAt,kind:'attachment'});requireCurrent(epoch);
    const event={msgtype:'m.file',body:file.name||'Encrypted file',filename:file.name||'Encrypted file',file:{...encrypted.file,url:uploaded.content_uri},info:{mimetype:file.type||'application/octet-stream',size:file.size}};
    const result=await client.sendEvent(roomId,EventType.RoomMessage,event as import('matrix-js-sdk/lib/@types/events').RoomMessageEventContent,transaction);if(!result.event_id?.startsWith('$'))throw new Error('Encrypted attachment was not acknowledged.');
    await outbox.complete(transaction);requireCurrent(epoch);publish({pendingSend:undefined});project();return {eventId:result.event_id};
   }catch(reason){if(outbox&&!closed)await refreshPending().catch(()=>{});if(!closed&&version===epoch)publish({error:'Encrypted attachment was not confirmed. Check the conversation before retrying. '+(reason instanceof Error?reason.message:'Encryption or upload failed.')});throw reason;}finally{busy=false;if(!closed&&version===epoch)publish({busy:false});}});},
   recoverPending(){return track(async()=>{if(!outbox||closed||busy)throw new Error('Wait for the current messaging operation.');busy=true;const epoch=version;publish({busy:true,error:undefined});try{
    if(!['PREPARED','SYNCING'].includes(client.getSyncState()??''))throw new Error('Wait for messaging to reconnect.');
-   const pending=await outbox.load();requireCurrent(epoch);if(!pending?.body||pending.peerId!==state.peer?.accountId||pending.roomId!==state.roomId)throw new Error('Open the original pending conversation.');
+   const pending=await outbox.load();requireCurrent(epoch);if(pending?.kind==='attachment')throw new Error('The file send may already have arrived. Inspect conversation history, then forget this retry record before composing again. The original file is not retained for safe replay.');if(!pending?.body||pending.peerId!==state.peer?.accountId||pending.roomId!==state.roomId)throw new Error('Open the original pending conversation.');
    const checked=await guard(epoch);if(checked.devices!==pending.devices)throw new Error('Contact devices changed. Pending ciphertext was not resent.');
    const room=client.getRoom(pending.roomId)!,wire=JSON.parse(pending.body) as Record<string,string>;
    const acknowledged=(event:MatrixEvent)=>event.getId()?.startsWith('$')&&event.getSender()===client.getUserId()&&event.getRoomId()===pending.roomId&&event.getWireType()==='m.room.encrypted'&&(event.getTxnId()===pending.transaction||event.getUnsigned().transaction_id===pending.transaction)&&Object.keys(event.getWireContent()).length===Object.keys(wire).length&&Object.keys(wire).every(key=>event.getWireContent()[key]===wire[key]);

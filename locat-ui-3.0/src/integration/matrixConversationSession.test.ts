@@ -5,13 +5,13 @@ import {createMatrixConversationSession,type MatrixConversationSession,type Conv
 import {encryptMatrixAttachment} from './matrixEncryptedAttachment';
 vi.mock('./matrixTrackedPeer.mjs',()=>({trackAuthorizedMatrixPeer:vi.fn(async()=>{})}));
 const peer={accountId:'b'.repeat(32),matrixUserId:'@bob:test',devices:[{deviceId:'BOB'}]};
-let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,sendEvent:ReturnType<typeof vi.fn>,upload:ReturnType<typeof vi.fn>,mediaUrl:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,decrypt:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
-beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});decrypt=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
+let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],pendingRecord:unknown,resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,sendEvent:ReturnType<typeof vi.fn>,upload:ReturnType<typeof vi.fn>,mediaUrl:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,decrypt:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
+beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];pendingRecord=undefined;resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});decrypt=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
  const room={oldState:pagination,getPendingEvents:()=>pendingEvents,getLiveTimeline:()=>({getEvents:()=>events}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})},getMembers:()=>members.map(userId=>({userId,membership:'join'})),getMyMembership:()=> 'join',getMember:()=>({membership:'join'})};
  const crypto={getUserDeviceInfo:vi.fn(async()=>new Map([[peer.matrixUserId,new Map([['BOB',{}]])]])),getDeviceVerificationStatus:vi.fn(async()=>({isVerified:()=>verified})),isEncryptionEnabledInRoom:vi.fn(async()=>true),forceDiscardSession:discard};
  sendEvent=vi.fn(async()=>({event_id:'$file'}));upload=vi.fn(async()=>({content_uri:'mxc://media.test/file-id'}));
  mediaUrl=vi.fn();const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,sendEvent,uploadContent:upload,mxcUrlToHttp:mediaUrl,getHomeserverUrl:()=> 'https://matrix.test',resendEvent:resend,scrollback,decryptEventIfNeeded:decrypt};
- const outbox={load:vi.fn(async()=>undefined),prepare:vi.fn(async()=>{}),beforeSend:vi.fn(async()=>{}),complete:vi.fn(async()=>{}),check:vi.fn()};
+ const outbox={load:vi.fn(async()=>pendingRecord),prepare:vi.fn(async(value:{peerId:string;roomId:string;transaction:string;devices:string;createdAt:number;kind?:'attachment'})=>{if(value.kind==='attachment')pendingRecord={...value,attempts:0};}),beforeSend:vi.fn(async()=>{}),complete:vi.fn(async()=>{pendingRecord=undefined;}),check:vi.fn()};
  session=createMatrixConversationSession(client as unknown as MatrixClient,resolve,async()=>({roomId:'!room:test'}),async()=>{},outbox as never);
 });
 afterEach(async()=>{await session.close();});
@@ -34,6 +34,14 @@ it('uploads ciphertext and sends only an encrypted Matrix file event after devic
  await expect(session.sendAttachment(file)).resolves.toEqual({eventId:'$file'});
  const uploaded=upload.mock.calls[0][0] as Uint8Array;expect(uploaded).not.toEqual(plain);expect(upload.mock.calls[0][1]).toMatchObject({type:'application/octet-stream'});
  expect(sendEvent).toHaveBeenCalledOnce();const event=sendEvent.mock.calls[0][2];expect(event).toMatchObject({msgtype:'m.file',body:'private.png',info:{mimetype:'image/png',size:plain.length},file:{url:'mxc://media.test/file-id',v:'v2',key:{alg:'A256CTR'}}});expect(JSON.stringify(event)).not.toContain('a confidential original photo');expect(discard).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();
+});
+
+it('keeps an attachment acknowledgement uncertainty durable and blocks duplicate composition',async()=>{
+ vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);sendEvent.mockRejectedValueOnce(new Error('Connection interrupted after upload'));
+ const file=new File([new TextEncoder().encode('private file')],'private.txt',{type:'text/plain'});let snapshot:ConversationSnapshot|undefined;session.subscribe(value=>{snapshot=value;});
+ await expect(session.sendAttachment(file)).rejects.toThrow('Connection interrupted');expect(snapshot?.pendingSend).toMatchObject({kind:'attachment',peerId:peer.accountId,roomId:'!room:test'});
+ await expect(session.send('another message')).rejects.toThrow('Review the pending encrypted send');await expect(session.recoverPending()).rejects.toThrow('file send may already have arrived');
+ expect(sendEvent).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();expect(resend).not.toHaveBeenCalled();
 });
 
 it('projects encrypted file events and verifies downloaded ciphertext before returning the original bytes',async()=>{

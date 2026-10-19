@@ -1,10 +1,10 @@
 /** One uncertain transaction per exclusively owned account/device store. Never stores SDK events or drafts. */
-export type PendingMatrixSend={peerId:string;roomId:string;transaction:string;devices:string;createdAt:number;attempts:number;body?:string};
+export type PendingMatrixSend={peerId:string;roomId:string;transaction:string;devices:string;createdAt:number;attempts:number;body?:string;kind?:'attachment'};
 export type MatrixOutbox=ReturnType<typeof createMatrixOutbox>;
 export function createMatrixOutbox(scope:string,deviceId:string,senderKey:string){
  const name='locat-ui3-matrix-outbox:'+scope;
  function validate(row:PendingMatrixSend){
-  if(!row||Object.keys(row).some(key=>!['peerId','roomId','transaction','devices','createdAt','attempts','body'].includes(key))||!/^[a-f0-9]{32}$/.test(row.peerId)||!/^![^\s/]{1,510}$/.test(row.roomId)||!/^locat_[a-f0-9-]{36}$/.test(row.transaction)||typeof row.devices!=='string'||row.devices.length>16384||!Number.isSafeInteger(row.createdAt)||row.createdAt<=0||!Number.isInteger(row.attempts)||row.attempts<0||row.attempts>3)throw new Error('Invalid encrypted retry record.');
+  if(!row||Object.keys(row).some(key=>!['peerId','roomId','transaction','devices','createdAt','attempts','body','kind'].includes(key))||(row.kind!==undefined&&row.kind!=='attachment')||(row.kind==='attachment'&&row.body!==undefined)||!/^[a-f0-9]{32}$/.test(row.peerId)||!/^![^\s/]{1,510}$/.test(row.roomId)||!/^locat_[a-f0-9-]{36}$/.test(row.transaction)||typeof row.devices!=='string'||row.devices.length>16384||!Number.isSafeInteger(row.createdAt)||row.createdAt<=0||!Number.isInteger(row.attempts)||row.attempts<0||row.attempts>3)throw new Error('Invalid encrypted retry record.');
   const devices:unknown=JSON.parse(row.devices);if(!Array.isArray(devices)||!devices.length||devices.length>100||devices.some(id=>typeof id!=='string'||!id||id.length>255))throw new Error('Invalid encrypted retry device scope.');
   if(row.body!==undefined)validateBody(row.body);
   return row;
@@ -15,7 +15,7 @@ export function createMatrixOutbox(scope:string,deviceId:string,senderKey:string
   for(const key of ['sender_key','session_id','ciphertext'])if(typeof value[key]!=='string'||!value[key]||value[key].length>(key==='ciphertext'?65536:255)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value[key]))throw new Error('Invalid encrypted retry encoding.');
  }
  async function access<T>(write:boolean,operation:(current:PendingMatrixSend|undefined,store:IDBObjectStore)=>T):Promise<T>{
-  const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open(name,1);request.onupgradeneeded=()=>request.result.createObjectStore('pending');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('Close other Locat tabs before opening encrypted retry storage.'));});
+  const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open(name,2);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('pending'))request.result.createObjectStore('pending');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('Close other Locat tabs before opening encrypted retry storage.'));});
   try{return await new Promise<T>((resolve,reject)=>{const tx=db.transaction('pending',write?'readwrite':'readonly',write?{durability:'strict'}:undefined),store=tx.objectStore('pending'),request=store.get('current');let result:T,reason:unknown;request.onsuccess=()=>{try{result=operation(request.result===undefined?undefined:validate(request.result),store);}catch(error){reason=error;tx.abort();}};tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(reason??tx.error??new Error('Encrypted retry storage failed.'));tx.onerror=()=>reject(reason??tx.error);});}finally{db.close();}
  }
  function current(row:PendingMatrixSend|undefined,transaction:string){if(!row||row.transaction!==transaction)throw new Error('Encrypted retry transaction changed.');return row;}

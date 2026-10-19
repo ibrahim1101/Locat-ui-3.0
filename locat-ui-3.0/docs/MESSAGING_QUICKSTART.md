@@ -14,7 +14,13 @@ Use a secure browser origin, persistent IndexedDB and Web Locks. Real clients mu
 2. Each user opens Settings → Set up messaging device → Create and bind managed session. Existing browser keys must match the stored device pins; setup never silently replaces them.
 3. Both enable device verification, select each other's contact and choose the real device. Request/accept verification. Compare every displayed number or emoji over an independently trusted channel, then confirm on both screens. Names and device labels alone do not establish identity.
 4. Each chooses **Keep messaging active**. Navigate through the sidebar to Messages and choose **Open encrypted conversation**. Both users must open it so their membership is joined and the room synchronizes.
-5. Compose text and Send. Every active contact device must be locally verified. An extra unverified device blocks sending; verify it or revoke that device intentionally. Calls/attachments and unsupported controls stay unavailable.
+5. Compose text and Send. Every active contact device must be locally verified. An extra unverified device blocks sending; verify it or revoke that device intentionally. From **Attach**, choose **Photo (original quality)** or **Document or file** to send a file up to 2.9 MB. Voice/video calls and other unsupported controls stay unavailable.
+
+## Encrypted file attachments
+
+Photos and documents use the same verified private conversation. Locat encrypts file bytes on the sending device before upload; the homeserver stores ciphertext. The room-encrypted file event carries the decryption metadata. The receiving device downloads only from that room's configured homeserver, checks the attachment SHA-256 integrity value, and decrypts locally before saving. The browser test sends a private synthetic file between two real accounts, confirms the upload body differs from the plaintext, and compares the downloaded bytes with the original. This is bounded to 2.9 MB per file; it is not a claim of native storage protection or physical-device acceptance.
+
+If the file event has no confirmed server acknowledgement, Locat keeps a durable device-scoped marker and blocks another send. Because it does not retain the original file or its decryption metadata for replay, inspect the conversation first, then use **Forget pending retry** if the event is absent. Forgetting cannot recall a file the server already accepted. Do not simply select the same file again while that marker is present.
 
 Closing Settings after explicit adoption preserves the account's crypto/store lock. **Stop active messaging** waits for store release. Another tab sharing the same browser crypto store cannot become a second writer. Account change/sign-out closes the owner. Reload requires explicit managed rebind/adoption of the same persisted keys; it is not complete account/identity recovery.
 
