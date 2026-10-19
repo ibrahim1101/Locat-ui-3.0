@@ -4,11 +4,11 @@
 
 The active source of truth for current product scope is [`REWORK_SCOPE.md`](REWORK_SCOPE.md). The user authorized continued development and branch publication on `rework/locat-core-scope`; do not deploy or merge to `main`. The former integration/media roadmap entries below are historical records, not current priorities. Continue retained Locat work without restoring Cinema, Music, Photos library/editor, Remote, Sentinel, or their external integrations.
 
-### Trusted-proxy authentication abuse limits — locally verified, awaiting publication — 2026-10-19
+### Trusted-proxy authentication abuse limits — published and CI passed — 2026-10-19
 
 Added optional canonical client-IP attribution for authentication attempts behind an explicitly trusted TLS proxy. It requires both the existing exact `LOCAT_PROXY_PEERS` gate and an operator-selected `LOCAT_PROXY_CLIENT_IP_HEADER` (`cf-connecting-ip` or `x-forwarded-for`). Only a single valid IP is accepted; missing, invalid or multi-value headers fall back to the proxy peer. Auth attempts use a 20/minute client bucket plus a 1200/minute proxy-peer ceiling. Headers still do not affect Host/Origin. Verified real HTTP through proxy mode: client A reaches 429 after 20 failures while client B remains able to register. These counters are process-local, not shared across workers.
 
-Local validation: `npm run check`, `npm run lint`, `npm run test:all` (212 frontend /104 server tests), `npm run build`; focused real proxy, config and rate-limit tests (9 passed). An initial peer-ceiling unit expectation was off by one because rejected client attempts still count toward the aggregate proxy ceiling; the assertion was corrected and tests pass. Latest GitHub CI **39328089097** passed the previous 212/101 tree; this proxy change awaits publication and its own CI run. No proxy deployment, DNS change or public service was activated.
+Local validation: `npm run check`, `npm run lint`, `npm run test:all` (212 frontend /104 server tests), `npm run build`; focused real proxy, config and rate-limit tests (9 passed). An initial peer-ceiling unit expectation was off by one because rejected client attempts still count toward the aggregate proxy ceiling; the assertion was corrected and tests pass. Published as **bbec0eb76508e266ed0dbb3d6c013730bda4dc3a** (tree **7091ea7e1b9c7aee5be6506f5828c468dfabdb96**). GitHub Actions run **39328645385** passed install, typecheck, lint, frontend/server tests and build. No proxy deployment, DNS change or public service was activated.
 
 ### Link resumable encrypted file uploads — published — 2026-10-19
 
