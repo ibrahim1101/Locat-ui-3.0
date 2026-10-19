@@ -69,6 +69,15 @@ test('schema v1 upgrades preserve accounts and reject unknown future versions', 
   } finally { db?.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
+test('schema v16 adds shared Link proof indexes without changing identities or account data',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-link-proof-upgrade-')),file=join(dir,'app.sqlite');let db;
+ try{db=openDatabase(file);db.addUser({id:'alice',username:'alice',displayName:'Alice',salt:'s',hash:'h'});const key=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']),publicKey=Buffer.from(await crypto.subtle.exportKey('spki',key.publicKey)).toString('base64'),device=db.link.register('alice','Browser','web',publicKey).id;db.savePreferences('alice',{theme:'ember'});db.close();db=null;
+  const raw=new DatabaseSync(file);raw.exec('DROP TABLE linkProofTokens;DROP TABLE linkProofChallenges;PRAGMA user_version=16;');raw.close();db=openDatabase(file);
+  assert.equal(db.health().schemaVersion,17);assert.equal(db.userById('alice').username,'alice');assert.equal(db.preferences('alice').theme,'ember');assert.equal(db.link.owned('alice',device).publicKey,publicKey);
+  const check=new DatabaseSync(file,{readOnly:true}),tables=new Set(check.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all().map(row=>row.name));check.close();assert.ok(tables.has('linkProofChallenges'));assert.ok(tables.has('linkProofTokens'));
+ }finally{db?.close();await rm(dir,{recursive:true,force:true});}
+});
+
  test('concurrent backup publication never overwrites a destination and removes staging files', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'locat-backup-race-'));
   const db = openDatabase(join(dir, 'source.sqlite'));

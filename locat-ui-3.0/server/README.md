@@ -52,7 +52,7 @@ Authenticated `GET /api/auth/sessions` lists only the current account's active s
 
 Run `npm run backup:server -- ./server/data/backups/manual.sqlite` from the app directory. Choose a new filename each time; existing backups are never overwritten. SQLite's online backup API creates a consistent snapshot even with WAL enabled. Backups contain password hashes, session hashes and ciphertext: restrict access just like the live database.
 
-Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Supported additive migrations through schema 16 are applied in transactions; future unknown schemas fail closed.
+Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Supported additive migrations through schema 17 are applied in transactions; future unknown schemas fail closed.
 
 ## Live integration endpoints
 
@@ -71,6 +71,6 @@ The active app scope is Chat, Link, Files & Vault, account settings, and the sur
 
 Standalone Cinema/video playback, Music/audio libraries, Photos library, media-library streaming and sharing, remote control, and Sentinel/vendor alert integrations are retired from the UI and server routes. Their API paths are unavailable. Ordinary image, voice, and file attachments in Chat remain part of messaging. Link's verified device pairing and encrypted file/text transfers remain active.
 
-**Existing data is preserved.** No media, Sentinel, remote-session, account, message, Link, Vault, or Secrets records are deleted or rewritten by this scope change. SQLite schema remains at version 16; legacy tables stay in place for existing installations and backups. New requests to retired endpoints return not-found and do not expose those records. Account activity remains available within Settings → Security.
+**Existing data is preserved.** No media, Sentinel, remote-session, account, message, Link, Vault, or Secrets records are deleted or rewritten by this scope change. Legacy tables stay in place for existing installations and backups. The current development schema is version 17, adding only expiring Link proof state for workers sharing the same SQLite file; it does not change existing account or content rows. New requests to retired endpoints return not-found and do not expose those records. Account activity remains available within Settings → Security.
 
 Diagnostics report connection, TLS, runtime, database and messaging state only. They do not scan or index host media folders. Legacy historical implementation notes elsewhere in this repository describe prior behavior and are not active endpoint guidance; see [REWORK_SCOPE.md](../docs/REWORK_SCOPE.md) for the current scope and [ENGINEERING_HISTORY.md](../docs/ENGINEERING_HISTORY.md) for provenance.

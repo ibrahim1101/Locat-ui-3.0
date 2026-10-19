@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=16;
+export const DATABASE_SCHEMA_VERSION=17;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -124,6 +124,13 @@ export function openDatabase(filename) {
   if(version<16)sql.exec(`BEGIN IMMEDIATE;
     CREATE TABLE mediaShareOverrides(libraryId TEXT NOT NULL,ownerId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),allowed INTEGER NOT NULL CHECK(allowed IN (0,1)),updatedAt INTEGER NOT NULL,PRIMARY KEY(libraryId,ownerId,friendId),CHECK(ownerId!=friendId));
     PRAGMA user_version=16;COMMIT;`);
+  if(version<17)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE linkProofChallenges(id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,deviceId INTEGER NOT NULL REFERENCES linkDevices(id) ON DELETE CASCADE,sessionHash TEXT NOT NULL,secret BLOB NOT NULL CHECK(length(secret)=32),expiresAt INTEGER NOT NULL);
+    CREATE INDEX link_proof_challenge_expiry ON linkProofChallenges(expiresAt);
+    CREATE TABLE linkProofTokens(tokenHash TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,deviceId INTEGER NOT NULL REFERENCES linkDevices(id) ON DELETE CASCADE,sessionHash TEXT NOT NULL,expiresAt INTEGER NOT NULL);
+    CREATE INDEX link_proof_token_expiry ON linkProofTokens(expiresAt);
+    CREATE INDEX link_proof_token_device ON linkProofTokens(userId,deviceId);
+    PRAGMA user_version=17;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);

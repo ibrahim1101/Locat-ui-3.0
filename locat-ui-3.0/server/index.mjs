@@ -4,7 +4,6 @@ import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
 import {loadMatrixAppserviceFile} from './matrixAppserviceFile.mjs';
 import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
 import { createMatrixGateway } from './matrixGateway.mjs';
-import { verifyLinkProof } from './linkProof.mjs';
 import { matrixProvider, createMatrixBindingHandler } from './matrixBinding.mjs';
 import { iceConfiguration } from './ice.mjs';
 import { accountIdentity, localDiscoveryQuery } from './globalIdentity.mjs';
@@ -84,7 +83,7 @@ function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
 const sessionSecurity=createSessionSecurityHandler({db,sessionUser,sessionToken:cookie,body,json,scrypt,serialized});
-const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,conversations:db.matrixConversations,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=verifyLinkProof(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
+const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,conversations:db.matrixConversations,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=db.link.proofs.verify(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,conversations:db.matrixConversations,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});

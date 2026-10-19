@@ -6,18 +6,17 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openDatabase} from './database.mjs';
 import {createLinkHandler} from './link.mjs';
-import {issueLinkChallenge,answerLinkChallenge,revokeLinkProofs} from './linkProof.mjs';
 async function identity(){const keys=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);return {...keys,publicKeyB64:Buffer.from(await crypto.subtle.exportKey('spki',keys.publicKey)).toString('base64')};}
-async function proof(identity,userId,deviceId,session){
- const challenge=await issueLinkChallenge(userId,deviceId,session,identity.publicKeyB64);
+async function proof(store,identity,userId,deviceId,session){
+ const challenge=await store.issueChallenge(userId,deviceId,session,identity.publicKeyB64);
  const publicKey=await crypto.subtle.importKey('spki',Buffer.from(challenge.publicKey,'base64'),{name:'ECDH',namedCurve:'P-256'},false,[]);
  const bits=await crypto.subtle.deriveBits({name:'ECDH',public:publicKey},identity.privateKey,256),base=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);
  const context=new TextEncoder().encode(`locat-link-device-proof:ui3-v1:${userId}:${deviceId}:${challenge.id}`);
  const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:context,info:new TextEncoder().encode('challenge-response')},base,{name:'AES-GCM',length:256},false,['decrypt']);
  const answer=Buffer.from(await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(challenge.iv,'base64'),additionalData:context},key,Buffer.from(challenge.data,'base64'))).toString('base64');
- return answerLinkChallenge(userId,session,challenge.id,answer).token;
+ return store.answerChallenge(userId,session,challenge.id,answer).token;
 }
-async function fixture(run){const dir=await mkdtemp(join(tmpdir(),'locat-link-auth-'));let db;try{db=openDatabase(join(dir,'db.sqlite'));db.addUser({id:'a',username:'owner',displayName:'Owner',salt:'s',hash:'h'});const session='synthetic-link-session',hash=createHash('sha256').update(session).digest('hex');db.addSession(hash,'a',Date.now()+60000);const keys=await Promise.all([identity(),identity()]),ids=keys.map((key,index)=>db.link.register('a','Device '+index,'web',key.publicKeyB64).id),token=await proof(keys[0],'a',ids[0],session);await run({db,session,hash,ids,token});}finally{db?.close();await rm(dir,{recursive:true,force:true});}}
+async function fixture(run){const dir=await mkdtemp(join(tmpdir(),'locat-link-auth-'));let db;try{db=openDatabase(join(dir,'db.sqlite'));db.addUser({id:'a',username:'owner',displayName:'Owner',salt:'s',hash:'h'});const session='synthetic-link-session',hash=createHash('sha256').update(session).digest('hex');db.addSession(hash,'a',Date.now()+60000);const keys=await Promise.all([identity(),identity()]),ids=keys.map((key,index)=>db.link.register('a','Device '+index,'web',key.publicKeyB64).id),token=await proof(db.link.proofs,keys[0],'a',ids[0],session);await run({db,session,hash,ids,token});}finally{db?.close();await rm(dir,{recursive:true,force:true});}}
 async function paused({db,session,hash,token},action,input,change){
  let release,entered;const gate=new Promise(resolve=>{release=resolve;}),reading=new Promise(resolve=>{entered=resolve;});let responded=false;
  const handler=createLinkHandler({store:db.link,sessionUser:()=>db.sessionUser(hash,Date.now()),sessionToken:()=>session,body:async()=>{entered();await gate;return input;},json(){responded=true;},audit(){}});
@@ -38,7 +37,7 @@ test('Link payload bodies retain the fresh session check',async()=>{
 });
 test('an independently revoked proof or device cannot rename after a paused body',async()=>{
  for(const revokeDevice of [false,true])await fixture(async value=>{
-  await paused(value,'rename',{name:'Late name'},()=>revokeDevice?value.db.link.revoke('a',value.ids[1],value.ids[0]):revokeLinkProofs('a',value.ids[0]));assert.equal(value.db.link.list('a',value.ids[1]).devices.find(row=>row.id===value.ids[0]).name,'Device 0');
+  await paused(value,'rename',{name:'Late name'},()=>revokeDevice?value.db.link.revoke('a',value.ids[1],value.ids[0]):value.db.link.proofs.revoke('a',value.ids[0]));assert.equal(value.db.link.list('a',value.ids[1]).devices.find(row=>row.id===value.ids[0]).name,'Device 0');
  });
 });
 

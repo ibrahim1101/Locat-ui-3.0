@@ -1,15 +1,23 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
-import {openDatabase} from './database.mjs';import {validateLinkPublicKey,issueLinkChallenge,answerLinkChallenge,verifyLinkProof,revokeLinkProofs} from './linkProof.mjs';
+import {openDatabase} from './database.mjs';import {validateLinkPublicKey} from './linkProof.mjs';
 async function identity(){const keys=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},false,['deriveBits']);return {...keys,publicKeyB64:Buffer.from(await crypto.subtle.exportKey('spki',keys.publicKey)).toString('base64')};}
 export async function solve(identity,challenge){const pub=await crypto.subtle.importKey('spki',Buffer.from(challenge.publicKey,'base64'),{name:'ECDH',namedCurve:'P-256'},false,[]);const bits=await crypto.subtle.deriveBits({name:'ECDH',public:pub},identity.privateKey,256);const base=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);const context=new TextEncoder().encode(`locat-link-device-proof:ui3-v1:${challenge.userId}:${challenge.deviceId}:${challenge.id}`);const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:context,info:new TextEncoder().encode('challenge-response')},base,{name:'AES-GCM',length:256},false,['decrypt']);return Buffer.from(await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(challenge.iv,'base64'),additionalData:context},key,Buffer.from(challenge.data,'base64'))).toString('base64');}
 test('Link proofs require actual key possession, exact account/session, reject replay/expiry and canonical-key aliases',async()=>{
- const owner=await identity(),attacker=await identity();await validateLinkPublicKey(owner.publicKeyB64);await assert.rejects(validateLinkPublicKey(' '+owner.publicKeyB64));
- const challenge=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64);await assert.rejects(solve(attacker,challenge));await assert.rejects(solve(owner,{...challenge,deviceId:2}));
- const answer=await solve(owner,challenge);const proof=answerLinkChallenge('owner','session',challenge.id,answer);assert.equal(verifyLinkProof('owner','session',proof.token),1);
- assert.throws(()=>verifyLinkProof('other','session',proof.token));assert.throws(()=>verifyLinkProof('owner','other-session',proof.token));assert.throws(()=>answerLinkChallenge('owner','session',challenge.id,answer));
- revokeLinkProofs('owner',1);assert.throws(()=>verifyLinkProof('owner','session',proof.token));
- const expired=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64,1000);assert.throws(()=>answerLinkChallenge('owner','session',expired.id,answer,62000));
- const failed=await issueLinkChallenge('owner',1,'session',owner.publicKeyB64);assert.throws(()=>answerLinkChallenge('owner','bad-session',failed.id,'AAAA'));assert.throws(()=>answerLinkChallenge('owner','session',failed.id,answer));
+ const dir=await mkdtemp(join(tmpdir(),'locat-link-proof-'));let db;try{db=openDatabase(join(dir,'db.sqlite'));db.addUser({id:'owner',username:'owner',displayName:'Owner',salt:'s',hash:'h'});const owner=await identity(),attacker=await identity(),deviceId=db.link.register('owner','Browser','web',owner.publicKeyB64).id,proofs=db.link.proofs;await validateLinkPublicKey(owner.publicKeyB64);await assert.rejects(validateLinkPublicKey(' '+owner.publicKeyB64));
+ const challenge=await proofs.issueChallenge('owner',deviceId,'session',owner.publicKeyB64);await assert.rejects(solve(attacker,challenge));await assert.rejects(solve(owner,{...challenge,deviceId:deviceId+1}));
+ const answer=await solve(owner,challenge);const proof=proofs.answerChallenge('owner','session',challenge.id,answer);assert.equal(proofs.verify('owner','session',proof.token),deviceId);
+ assert.throws(()=>proofs.verify('other','session',proof.token));assert.throws(()=>proofs.verify('owner','other-session',proof.token));assert.throws(()=>proofs.answerChallenge('owner','session',challenge.id,answer));
+ proofs.revoke('owner',deviceId);assert.throws(()=>proofs.verify('owner','session',proof.token));
+ const expired=await proofs.issueChallenge('owner',deviceId,'session',owner.publicKeyB64,1000);assert.throws(()=>proofs.answerChallenge('owner','session',expired.id,answer,62000));
+ const failed=await proofs.issueChallenge('owner',deviceId,'session',owner.publicKeyB64);assert.throws(()=>proofs.answerChallenge('owner','bad-session',failed.id,'AAAA'));assert.throws(()=>proofs.answerChallenge('owner','session',failed.id,answer));
+ }finally{db?.close();await rm(dir,{recursive:true,force:true});}
+});
+test('independent SQLite connections share Link challenges and proofs and observe revocation immediately',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'locat-link-multiworker-'));let first,second;try{const file=join(dir,'db.sqlite');first=openDatabase(file);first.addUser({id:'owner',username:'owner',displayName:'Owner',salt:'s',hash:'h'});const key=await identity(),id=first.link.register('owner','Browser','web',key.publicKeyB64).id;second=openDatabase(file);
+  const challenge=await first.link.proofs.issueChallenge('owner',id,'shared-session',key.publicKeyB64),answer=await solve(key,challenge),proof=second.link.proofs.answerChallenge('owner','shared-session',challenge.id,answer);
+  assert.equal(first.link.proofs.verify('owner','shared-session',proof.token),id);second.close();second=openDatabase(file);assert.equal(second.link.proofs.verify('owner','shared-session',proof.token),id);
+  first.link.revoke('owner',id,id);assert.throws(()=>second.link.proofs.verify('owner','shared-session',proof.token));
+ }finally{second?.close();first?.close();await rm(dir,{recursive:true,force:true});}
 });
 test('Link pairing requires both actors; foreign devices, revocation and key reuse fail closed',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'locat-link-'));const file=join(dir,'db.sqlite');let db;

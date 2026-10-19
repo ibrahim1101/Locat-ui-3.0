@@ -8,9 +8,10 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DATABASE_SCHEMA_VERSION} from './database.mjs';
 const MAX_BYTES=2*1024*1024*1024;
-const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides']];
+const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides'],['linkProofChallenges','linkProofTokens']];
 const columns={
  mediaShareOverrides:['libraryId','ownerId','friendId','allowed','updatedAt'],
+ linkProofChallenges:['id','userId','deviceId','sessionHash','secret','expiresAt'],linkProofTokens:['tokenHash','userId','deviceId','sessionHash','expiresAt'],
  matrixConversations:['lowId','highId','operationId','status','roomId','createdAt'],
  users:['id','username','displayName','salt','hash'],sessions:['hash','userId','expiresAt'],envelopes:['sequence','id','senderId','recipientId','ciphertext','nonce','algorithm','createdAt'],
  preferences:['userId','value'],audit:['id','userId','event','severity','createdAt'],contacts:['lowId','highId','requesterId','status'],blocks:['blockerId','blockedId'],

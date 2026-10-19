@@ -19,7 +19,7 @@ The Search view scopes app destinations. Chat supports ordinary encrypted file a
 
 ## Data and endpoint behavior
 
-No database rows, media files, backup files, or user content are removed or rewritten for this rework. The SQLite schema stays at version 16. Legacy media, remote-session, and Sentinel tables remain in place so an upgrade does not destroy existing data. Their handlers and store integrations are no longer loaded, and retired endpoints return not-found. Diagnostics no longer scans or reports media-library state.
+No account, media file, backup, or user content is removed or rewritten for this rework. Legacy media, remote-session, and Sentinel tables remain in place so an upgrade does not destroy existing data. Their handlers and store integrations are no longer loaded, and retired endpoints return not-found. Diagnostics no longer scans or reports media-library state. A separate retained Link improvement adds an additive schema 16 → 17 migration for shared, expiring device-proof rows; it preserves existing account and Link records. This migration has not been deployed to a user database.
 
 This is a code and interface scope change. It does not deploy, publish, migrate user data, or modify a live database.
 
