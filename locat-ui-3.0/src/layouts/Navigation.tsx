@@ -1,10 +1,10 @@
 import { NavLink, useLocation, useNavigate } from "react-router";
-import { ChevronsLeft, Command, Home, LayoutGrid, MessageCircle, Clapperboard, Smartphone } from "lucide-react";
+import { ChevronsLeft, Command, Home, LayoutGrid, MessageCircle, Smartphone, Vault } from "lucide-react";
 import { CATEGORY_LABEL, MODULES, type ModuleCategory, type ModuleDef } from "@/app/registry";
 import { useSession } from "@/app/session";
 import { AvailabilityBadge, Avatar, Kbd, LocatMark, LocatWordmark, cn } from "@/ui";
 
-const ORDER: ModuleCategory[] = ["core", "media", "connect", "protect", "organize", "system"];
+const ORDER: ModuleCategory[] = ["core", "connect", "protect", "organize", "system"];
 const HIDDEN_FROM_SIDEBAR = new Set(["profile", "modules", "settings"]);
 
 function SideItem({ m, rail }: { m: ModuleDef; rail: boolean }) {
@@ -60,17 +60,16 @@ export function Sidebar({ rail, onToggle, onCommand }: { rail: boolean; onToggle
   );
 }
 
-const MEDIA = ["/cinema", "/music", "/photos"];
 /** Android / phone bottom navigation: 5 destinations, 64px + system inset. */
-export function MobileNav({ lastMedia }: { lastMedia: string }) {
+export function MobileNav() {
   const { pathname } = useLocation();
   const { connection } = useSession();
   const items = [
-    { to: "/messages", label: "Chats", icon: MessageCircle, match: (p: string) => p.startsWith("/messages") },
-    { to: lastMedia, label: "Media", icon: Clapperboard, match: (p: string) => MEDIA.some((m) => p.startsWith(m)) },
+    { to: "/messages", label: "Chat", icon: MessageCircle, match: (p: string) => p.startsWith("/messages") },
     { to: "/home", label: "Home", icon: Home, match: (p: string) => p === "/home" },
-    { to: "/devices", label: "Devices", icon: Smartphone, match: (p: string) => p.startsWith("/devices") },
-    { to: "/modules", label: "More", icon: LayoutGrid, match: (p: string) => !["/messages", "/home", "/devices", ...MEDIA].some((m) => p.startsWith(m)) },
+    { to: "/devices", label: "Link", icon: Smartphone, match: (p: string) => p.startsWith("/devices") },
+    { to: "/files", label: "Files", icon: Vault, match: (p: string) => p.startsWith("/files") },
+    { to: "/modules", label: "More", icon: LayoutGrid, match: (p: string) => !["/messages", "/home", "/devices", "/files"].some((m) => p.startsWith(m)) },
   ];
   return (
     <nav aria-label="Primary" className="shrink-0 border-t border-line bg-canvas/95 pb-safe backdrop-blur-xl">
@@ -81,7 +80,7 @@ export function MobileNav({ lastMedia }: { lastMedia: string }) {
             <NavLink key={it.label} to={it.to} data-testid={`tab-${it.label.toLowerCase()}`} aria-current={on ? "page" : undefined} className="flex flex-1 flex-col items-center justify-center gap-1">
               <span className={cn("relative grid h-8 w-14 place-items-center rounded-full transition-colors duration-200", on ? "bg-ember/15 text-ember" : "text-ink-3")}>
                 <I className="size-[22px]" aria-hidden />
-                {it.label === "Chats" && connection.pendingOutbox > 0 && <span className="absolute right-2.5 top-0.5 size-2 rounded-full bg-warn ring-2 ring-canvas" aria-label="Pending messages" />}
+                {it.label === "Chat" && connection.pendingOutbox > 0 && <span className="absolute right-2.5 top-0.5 size-2 rounded-full bg-warn ring-2 ring-canvas" aria-label="Pending messages" />}
               </span>
               <span className={cn("text-[11px] font-semibold", on ? "text-ink" : "text-ink-3")}>{it.label}</span>
             </NavLink>

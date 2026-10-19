@@ -31,9 +31,9 @@ test('Link registration and device mutations recheck a session revoked during bo
   await paused(value,action,input,()=>db.revokeSession(hash));assert.deepEqual(db.link.list('a',ids[0]).devices,initial.devices);assert.deepEqual(db.link.list('a',ids[0]).pairs,initial.pairs);
  });
 });
-test('Link payload and Remote bodies retain the fresh session check',async()=>{
- for(const action of ['payload/create','payload/chunk','payload/finish','remote/create','remote/decide','remote/signal','remote/close'])await fixture(async value=>{
-  await paused(value,action,{},()=>value.db.revokeSession(value.hash));assert.equal(value.db.link.payloads.list('a',value.ids[0]).length,0);assert.equal(value.db.link.remote.list('a',value.ids[0]).length,0);
+test('Link payload bodies retain the fresh session check',async()=>{
+ for(const action of ['payload/create','payload/chunk','payload/finish'])await fixture(async value=>{
+  await paused(value,action,{},()=>value.db.revokeSession(value.hash));assert.equal(value.db.link.payloads.list('a',value.ids[0]).length,0);
  });
 });
 test('an independently revoked proof or device cannot rename after a paused body',async()=>{
@@ -46,7 +46,7 @@ test('an old tab expected-account guard rejects a new cookie owner before regist
  await fixture(async({db,session,hash,ids,token})=>{
   let read=false,response;
   const handler=createLinkHandler({store:db.link,sessionUser:()=>db.sessionUser(hash,Date.now()),sessionToken:()=>session,body:async()=>{read=true;return {};},json(_res,status,value){response={status,value};},audit(){}});
-  for(const action of ['register','challenge','prove','rename','payload/create','remote/create']){
+  for(const action of ['register','challenge','prove','rename','payload/create']){
    await assert.rejects(handler({method:'POST',headers:{origin:'https://locat.test','x-locat-account':'another-owner','x-locat-device-proof':token}},{},new URL('https://locat.test/api/link/'+action),'https://locat.test'),error=>error.status===403&&/account changed/.test(error.message));
   }
   assert.equal(read,false);assert.equal(db.link.list('a',ids[0]).devices.length,2);

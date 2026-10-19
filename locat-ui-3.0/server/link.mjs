@@ -1,6 +1,5 @@
 import {isMatrixCleanupAction} from '../shared/matrixCleanupProfile.mjs';
 import {linkPayloadStore,handleLinkPayload} from './linkPayloads.mjs';
-import {remoteStore,handleRemote} from './remote.mjs';
 import {randomUUID} from 'node:crypto';
 import {issueLinkChallenge,answerLinkChallenge,verifyLinkProof,validateLinkPublicKey,revokeLinkProofs} from './linkProof.mjs';
 import {createRateLimiter} from './rateLimit.mjs';
@@ -24,7 +23,7 @@ export function linkStore(sql,matrixRevocations){
  confirm(userId,actor,id,approved){const current=pair(userId,actor,id);if(current.status==='rejected')fail(409,'Pairing rejected; start a new request');const a=approved?Number(current.confirmedA||actor===current.deviceA):0,b=approved?Number(current.confirmedB||actor===current.deviceB):0;sql.exec('BEGIN IMMEDIATE');try{sql.prepare('UPDATE linkPairs SET status=?,confirmedA=?,confirmedB=?,updatedAt=? WHERE userId=? AND id=?').run(approved?(a&&b?'verified':'pending'):'rejected',a,b,Date.now(),userId,id);if(!approved){sql.prepare('DELETE FROM remoteSignals WHERE sessionId IN (SELECT id FROM remoteSessions WHERE userId=? AND pairId=?)').run(userId,id);sql.prepare("UPDATE remoteSessions SET status='closed' WHERE userId=? AND pairId=? AND status IN ('pending','active')").run(userId,id);sql.prepare('DELETE FROM linkPayloadChunks WHERE payloadId IN (SELECT id FROM linkPayloads WHERE userId=? AND pairId=?)').run(userId,id);sql.prepare("UPDATE linkPayloads SET status='cancelled',updatedAt=? WHERE userId=? AND pairId=? AND status IN ('uploading','queued')").run(Date.now(),userId,id);}sql.exec('COMMIT');}catch(error){sql.exec('ROLLBACK');throw error;}return {verified:!!(approved&&a&&b)};},
  revoke(userId,actor,id){owned(userId,actor);owned(userId,id);sql.exec('BEGIN IMMEDIATE');try{sql.prepare('UPDATE linkDevices SET revokedAt=? WHERE userId=? AND id=?').run(Date.now(),userId,id);sql.prepare("UPDATE linkPairs SET status='rejected',confirmedA=0,confirmedB=0,updatedAt=? WHERE userId=? AND (deviceA=? OR deviceB=?)").run(Date.now(),userId,id,id);sql.prepare('DELETE FROM remoteSignals WHERE sessionId IN (SELECT id FROM remoteSessions WHERE userId=? AND (viewer=? OR host=?))').run(userId,id,id);sql.prepare("UPDATE remoteSessions SET status='closed' WHERE userId=? AND (viewer=? OR host=?) AND status IN ('pending','active')").run(userId,id,id);sql.prepare("DELETE FROM linkPayloadChunks WHERE payloadId IN (SELECT id FROM linkPayloads WHERE userId=? AND (fromDevice=? OR toDevice=?))").run(userId,id,id);sql.prepare("UPDATE linkPayloads SET status='cancelled',updatedAt=? WHERE userId=? AND (fromDevice=? OR toDevice=?) AND status IN ('uploading','queued')").run(Date.now(),userId,id,id);matrixRevocations.enqueue(userId,id);sql.prepare('UPDATE matrixBindings SET expiresAt=0 WHERE userId=? AND linkDeviceId=?').run(userId,id);sql.exec('COMMIT');}catch(error){sql.exec('ROLLBACK');throw error;}revokeLinkProofs(userId,id);},
  };
- store.payloads=linkPayloadStore(sql,store);store.remote=remoteStore(sql,store);return store;
+ store.payloads=linkPayloadStore(sql,store);return store;
 }
 export function createLinkHandler({store,sessionUser,sessionToken,body,json,audit,connectivity,matrixBinding}){
  const limit=createRateLimiter(60),cleanupLimit=createRateLimiter(30),chunkLimit=createRateLimiter(4000),iceLimit=createRateLimiter(30);return async(req,res,url,origin)=>{
@@ -42,7 +41,7 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  };
  const readBody=async(request,maximum)=>{const input=await body(request,maximum);recheck();return input;};
  const action=url.pathname.slice('/api/link/'.length);
- if(req.method==='POST'){if(req.headers.origin!==origin)fail(403,'Origin mismatch');const retryAfter=(action==='payload/chunk'||action==='remote/signal'?chunkLimit:action==='revoke'||action.startsWith('matrix/')&&isMatrixCleanupAction(action.slice('matrix/'.length))?cleanupLimit:limit)(user.id);if(retryAfter)throw Object.assign(new Error('Device command rate limit exceeded'),{status:429,retryAfter});}
+ if(req.method==='POST'){if(req.headers.origin!==origin)fail(403,'Origin mismatch');const retryAfter=(action==='payload/chunk'?chunkLimit:action==='revoke'||action.startsWith('matrix/')&&isMatrixCleanupAction(action.slice('matrix/'.length))?cleanupLimit:limit)(user.id);if(retryAfter)throw Object.assign(new Error('Device command rate limit exceeded'),{status:429,retryAfter});}
  if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed');
  if(req.method==='POST'&&['register','challenge','prove'].includes(action)){
  const input=await readBody(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');
@@ -54,7 +53,6 @@ export function createLinkHandler({store,sessionUser,sessionToken,body,json,audi
  actor=verifyLinkProof(user.id,session,req.headers['x-locat-device-proof']);store.owned(user.id,actor);
  if(action.startsWith('matrix/')&&matrixBinding)return matrixBinding({req,res,url,userId:user.id,actor,session,recheck:()=>{if(req.aborted||res.destroyed)fail(401,'Messaging request disconnected');if(sessionUser(req)?.id!==user.id||verifyLinkProof(user.id,session,req.headers['x-locat-device-proof'])!==actor)fail(401,'Locat session changed during Matrix validation');store.owned(user.id,actor);}});
  if(action==='connectivity'&&req.method==='GET'){const retryAfter=iceLimit(user.id);if(retryAfter)throw Object.assign(new Error('Connectivity request rate limit exceeded'),{status:429,retryAfter});json(res,200,connectivity?.issue()??{iceServers:[],expiresAt:null,hasRelay:false});return true;}
- if(action.startsWith('remote/'))return handleRemote({req,res,url,store:store.remote,userId:user.id,actor,body:readBody,json});
  if(action.startsWith('payload'))return handleLinkPayload({req,res,url,store:store.payloads,userId:user.id,actor,body:readBody,json});
  if(req.method==='GET'&&action==='devices'){json(res,200,{...store.list(user.id,actor),currentDeviceId:actor});return true;}
  if(req.method!=='POST')fail(404,'Not found');const input=await readBody(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid command');

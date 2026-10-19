@@ -1,3 +1,11 @@
+## 2026-10-19 — Product scope and navigation rework
+
+The current app is centered on Chat, Link, Files & Vault, and the Locat workspace. Standalone Cinema/video, Music/audio, Photos, media-library server routes, Link remote-control signaling, and Sentinel/vendor alert integration have been removed from active UI and handlers. Chat attachments, encrypted Link transfers, and account activity in Settings remain. Files and settings now use nested destinations and focused sections under the existing Obsidian Ember theme.
+
+This is non-destructive: SQLite remains at schema version 16, legacy feature tables are retained, and no user records or media files are removed. Older entries below document prior behavior and are retained as history; current scope is defined by `REWORK_SCOPE.md`.
+
+Validation: `npm run check`, `npm run lint`, `npm run test:all` (203 frontend and 99 server tests), and `npm run build` pass. An obsolete API test was replaced with explicit retired-route 404 checks. The production build retains the existing large Matrix crypto chunk advisory; no deployment or live database operation was performed.
+
 ## 2026-10-16 — Check bounded history pages rather than assuming one-page exhaustion
 
 Starting published 944753443bdc660e995a34e1018c46b71b4ca5db. Workflow 38884136009 / browser 116917673373 passed seven scenarios; messaging passed actual sender acknowledgement, room/retry/isolation, offline restart/reload/reply and the first real HTTP 200 history page, then failed because the test assumed the older-history button must disable after one page. Synapse may return a further cursor/nonempty older chunk; the implementation intentionally allows up to three pages. This is not evidence that the three-page budget failed.

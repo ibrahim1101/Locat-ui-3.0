@@ -21,25 +21,6 @@ export interface LinkAdapter {
   sendClipboard(deviceId: Id, text: string, kind: "clipboard" | "text" | "url"): Promise<OperationResult>;
 }
 
-/* ── Remote ──────────────────────────────────────────────────────── */
-export type RemoteHostView = { id: Id; name: string; os: "windows" | "linux" | "macos"; approved: boolean; inputSupported: boolean; reachable: boolean };
-export type RemoteSessionView = {
-  state: "idle" | "awaiting-consent" | "connecting" | "streaming" | "reconnecting" | "failed" | "ended";
-  inputEnabled: boolean; stats?: { fps: number; bitrateKbps: number; rttMs: number; packetLossPct: number; codec: string; resolution: string };
-};
-export interface RemoteAdapter { connect(hostId: Id): Promise<OperationResult>; disconnect(): Promise<OperationResult>; setInput(enabled: boolean): Promise<OperationResult> }
-
-/* ── Sentinel (M1) ───────────────────────────────────────────────── */
-export type Severity = "critical" | "high" | "medium" | "low" | "info";
-export type AlertView = { id: Id; title: string; source: string; severity: Severity; state: "open" | "acknowledged" | "resolved"; at: Timestamp; summary: string; fields: Record<string, string> };
-export type SentinelTokenView = { id: Id; label: string; scope: string; createdAt: Timestamp; lastUsedAt?: Timestamp; revoked: boolean; prefix: string };
-export type SentinelSourceView = { id: Id; name: string; kind: "nScout" | "PipelineGuard" | "generic-webhook"; health: "receiving" | "silent" | "never-connected" | "error"; lastEventAt?: Timestamp };
-export interface SentinelAdapter {
-  setAlertState(id: Id, state: "acknowledged" | "resolved"): Promise<OperationResult>;
-  createToken(label: string, scope: string): Promise<OperationResult<{ secretShownOnce: string }>>;
-  revokeToken(id: Id): Promise<OperationResult>;
-}
-
 /* ── Vault (M3) & Secrets (M6): shared privateStore ──────────────── */
 export type PrivateStoreKind = "vault" | "secrets";
 export type PrivateStoreState = { kind: PrivateStoreKind; lock: "uninitialized" | "locked" | "unlocking" | "unlocked" | "wrong-passphrase" | "integrity-error"; autoLockMin: number };
@@ -70,5 +51,5 @@ export interface AdminAdapter {
 }
 
 /* ── Search (M4) ─────────────────────────────────────────────────── */
-export type SearchScope = "messages" | "attachments" | "contacts" | "modules" | "media" | "settings";
+export type SearchScope = "messages" | "attachments" | "contacts" | "modules" | "settings";
 export type SearchResultView = { id: Id; scope: SearchScope; title: string; subtitle: string; route: string };

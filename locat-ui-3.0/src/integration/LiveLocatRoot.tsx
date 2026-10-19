@@ -2,11 +2,9 @@ import {MatrixOwnerProvider} from './matrixOwner';
 import { connectRealtime } from './realtimeConnection';
 import { monitorConnection } from './connectionMonitor';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LiveMediaProvider } from "./LiveMediaProvider";
 import { useNavigate } from "react-router";
 import { App } from "../App";
 import { SessionProvider, type LiveSessionSnapshot } from "../app/SessionProvider";
-import { PlayerProvider } from "../app/PlayerProvider";
 import { previewAdapter } from "../fixtures/previewAdapter";
 import { liveAuthApi, type AuthenticatedAccount } from "./liveAuthApi";
 import { liveModuleAvailability } from "./liveModuleAvailability";
@@ -68,13 +66,11 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     ...previewAdapter,
     mode: "live",
     moduleAvailability: (id, ctx) => {
-      if (ctx.connection.mode === "local-only") return ["home", "cinema", "music", "photos", "search", "modules", "settings", "offline", "diagnostics"].includes(id) ? { availability: "available" } : { availability: "offline", reason: "Requires an authenticated account and live backend integration" };
-      if (id === "remote") return { availability: "experimental", reason: "Consented browser screen viewing; native control and connectivity acceptance pending" };
+      if (ctx.connection.mode === "local-only") return ["home", "search", "modules", "settings", "offline", "diagnostics"].includes(id) ? { availability: "available" } : { availability: "offline", reason: "Requires an authenticated account and live backend integration" };
       if (id === "devices") return { availability: "beta", reason: "Browser key proof, pairing and encrypted Link payloads; native acceptance pending" };
       if (id === "messages") return { availability: "beta", reason: "Live contacts; private messaging awaits verified E2EE" };
-      if (["vault", "secrets"].includes(id)) return { availability: "beta", reason: "Experimental client-encrypted private storage; native storage and independent review pending" };
-      if (id === "sentinel") return { availability: "beta", reason: "Owned incidents, webhook adapters and account audit; device monitoring pending" };
-      if (["cinema", "music", "photos", "search", "modules", "diagnostics", "offline"].includes(id)) return { availability: "available" };
+      if (id === "files") return { availability: "beta", reason: "Experimental client-encrypted private storage; native storage and independent review pending" };
+      if (["search", "modules", "diagnostics", "offline"].includes(id)) return { availability: "available" };
       if (id !== "settings" && id !== "profile" && id !== "home") return { availability: "planned", reason: "Live backend module not yet implemented" };
       return liveModuleAvailability(id, ctx);
     },
@@ -112,6 +108,6 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
   }), [nav, refresh]);
 
   return <SessionProvider key={session.authStatus === "local" ? "local-device" : session.user?.id ?? "signed-out"} adapter={adapter} initialUser={null} initialConnection={disconnected} platform={platform} liveSession={session}>
-    <MatrixOwnerProvider accountId={session.user?.id??''}><LiveMediaProvider key={session.user?.id ?? (session.authStatus === "local" ? "local-device" : "signed-out")}><PlayerProvider><App /></PlayerProvider></LiveMediaProvider></MatrixOwnerProvider>
+    <MatrixOwnerProvider accountId={session.user?.id??''}><App /></MatrixOwnerProvider>
   </SessionProvider>;
 }

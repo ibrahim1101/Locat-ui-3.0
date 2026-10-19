@@ -1,4 +1,3 @@
-import {createRemoteStatusHandler} from './remoteInfrastructure.mjs';
 import {parseAuditQuery} from './auditEvents.mjs';
 import {createSessionSecurityHandler} from './sessionSecurity.mjs';
 import {createMatrixRevocationWorker} from './matrixRevocation.mjs';
@@ -23,12 +22,9 @@ import { serverConfig, requestOrigin } from "./config.mjs";
 import { serveStatic } from "./static.mjs";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
-import { createMediaLibrary } from "./media.mjs";
-import {createMediaAccess} from "./mediaAccess.mjs";
 import { createRateLimiter } from "./rateLimit.mjs";
 import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
-import { createSentinelHandler } from "./sentinel.mjs";
 import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
@@ -42,12 +38,7 @@ if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
-const mediaShareLimit=createRateLimiter(30,60000);
-const mediaAccess=createMediaAccess(db);
-const mediaLibrary = createMediaLibrary(mediaAccess.roots,{authorize:mediaAccess.authorize});
 const authLimit = createRateLimiter();
-const mediaRefreshAccountLimit = createRateLimiter(6);
-const mediaRefreshGlobalLimit = createRateLimiter(30);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -97,8 +88,6 @@ const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindin
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,conversations:db.matrixConversations,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
-const sentinelHandler = createSentinelHandler({store:db.sentinel,sessionUser,sessionToken:cookie,body,json});
-const remoteStatusHandler = createRemoteStatusHandler({sessionUser,json});
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
@@ -111,8 +100,6 @@ async function handle(req, res) {
   if (await matrixGateway(req,res,url,trustedOrigin)) return;
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
-  if (await sentinelHandler(req,res,url,trustedOrigin)) return;
-  if (await remoteStatusHandler(req,res,url)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
     capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true},
@@ -121,58 +108,7 @@ async function handle(req, res) {
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {
     const user=sessionUser(req);
     if (!user) return json(res, 401, { error: "Not authenticated" });
-    const media = await mediaLibrary.refresh({userId:user.id});
-    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
-    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, media: { libraries: media.libraries, itemCount: media.items.length, truncated: media.truncated, refreshedAt: media.refreshedAt }, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
-  }
-  if(url.pathname==='/api/media/shares'&&['GET','POST'].includes(req.method)){
-    const user=sessionUser(req);if(!user)return json(res,401,{error:'Not authenticated'});
-    if(req.method==='GET')return json(res,200,{libraries:mediaAccess.ownedLibraries(user.id)});
-    if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});
-    const retryAfter=mediaShareLimit(user.id);if(retryAfter)return json(res,429,{error:'Too many sharing changes. Retry later.'},{'Retry-After':String(retryAfter)});
-    const input=await authenticatedBody(req,user,1024);
-    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!['libraryId','friendId','allowed'].includes(key)))return json(res,400,{error:'Invalid sharing decision'});
-    mediaAccess.setShare(user.id,input.libraryId,input.friendId,input.allowed);
-    return json(res,200,{libraries:mediaAccess.ownedLibraries(user.id)});
-  }
-  if (url.pathname === "/api/media/refresh" && req.method === "POST") {
-    const user = sessionUser(req);
-    if (!user) return json(res, 401, { error: "Not authenticated" });
-    if (req.headers.origin !== trustedOrigin) return json(res, 403, { error: "Origin mismatch" });
-    const retryAfter = mediaRefreshAccountLimit(user.id) || mediaRefreshGlobalLimit('shared-media-refresh');
-    if (retryAfter) return json(res, 429, { error: 'Server media refresh is busy. Retry later.' }, { 'Retry-After': String(retryAfter) });
-    const result = await mediaLibrary.refresh({ force: true,userId:user.id });
-    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
-    db.audit(user.id, "media.library.refreshed");
-    return json(res, 200, result);
-  }
-  if (url.pathname === "/api/media" && req.method === "GET") {
-    const user=sessionUser(req);
-    if (!user) return json(res, 401, { error: "Not authenticated" });
-    const snapshot=await mediaLibrary.refresh({userId:user.id});
-    if(sessionUser(req)?.id!==user.id)return json(res,401,{error:"Session changed during media scan"});
-    return json(res,200,snapshot);
-  }
-  if (url.pathname.startsWith("/api/media/probe/") && req.method === "GET") {
-    const user=sessionUser(req);
-    if (!user) return json(res, 401, { error: "Not authenticated" });
-    const id = url.pathname.slice("/api/media/probe/".length);
-    if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
-    return json(res, 200, await mediaLibrary.stream(req, res, id, { probeOnly: true,userId:user.id,validSession:()=>sessionUser(req)?.id===user.id }));
-  }
-  if (url.pathname.startsWith("/api/media/stream/") && ["GET", "HEAD"].includes(req.method)) {
-    const user=sessionUser(req);
-    if (!user) return json(res, 401, { error: "Not authenticated" });
-    const id = url.pathname.slice("/api/media/stream/".length);
-    if (!/^[a-f0-9]{64}$/.test(id)) return json(res, 400, { error: "Invalid media ID" });
-    const mode = url.searchParams.get("mode") ?? "direct";
-    const audio = url.searchParams.get("audio");
-    const start = url.searchParams.get("start");
-    if ([...url.searchParams.keys()].some(key => !['mode','audio','start'].includes(key) || url.searchParams.getAll(key).length !== 1)) return json(res,400,{error:'Invalid playback query'});
-    if (start !== null && (!/^(0|[1-9]\d{0,4})$/.test(start) || Number(start) > 86400 || mode === "direct")) return json(res, 400, { error: "Invalid conversion start position" });
-    if(mode==="remux"&&Number(start)>0)return json(res,400,{error:"Remux seeking requires H.264/AAC conversion"});
-    if (!["direct", "remux", "transcode"].includes(mode) || (audio !== null && (!/^\d{1,3}$/.test(audio) || mode === "direct"))) return json(res, 400, { error: "Invalid playback mode or audio track" });
-    return mediaLibrary.stream(req, res, id, { userId:user.id,validSession:()=>sessionUser(req)?.id===user.id,mode, audioIndex: audio === null ? null : Number(audio), startSeconds: start === null ? 0 : Number(start) });
+    return json(res, 200, { app: "Locat", runtime: process.version, uptimeSeconds: Math.floor(process.uptime()), database: db.health(), tls: config.secure, tlsTermination: config.proxy ? "proxy" : config.tls ? "direct" : "none", serverId: db.serverId, origin: trustedOrigin, privateMessaging: matrix ? "configured; device verification required" : "not-enabled", nativeClients: "not-verified" });
   }
   if (req.method === "GET" && url.pathname === "/api/auth/me") {
     const user = sessionUser(req);

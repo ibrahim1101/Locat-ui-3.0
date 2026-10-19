@@ -7,9 +7,9 @@ import { Badge, Banner, Button, ListRow, Section, relTime, cn } from "@/ui";
 export default function Offline() {
   const { connection, setStage } = useSession();
   const modes = [
-    { id: "server", icon: Wifi, t: "Server connected", d: "Messages, Link, Vault and server media available", on: connection.mode === "server" && connection.server === "connected" },
+    { id: "server", icon: Wifi, t: "Server connected", d: "Chat, Link, Files, Vault and Secrets available", on: connection.mode === "server" && connection.server === "connected" },
     { id: "disc", icon: CloudOff, t: "Server disconnected", d: "Read local history; new messages wait encrypted in the outbox", on: connection.mode === "server" && connection.server !== "connected" },
-    { id: "local", icon: HardDrive, t: "Local device mode", d: "No account. Device media, Photos, Remote viewer only", on: connection.mode === "local-only" },
+    { id: "local", icon: HardDrive, t: "Local device mode", d: "No account. App appearance, accessibility and browser diagnostics are available.", on: connection.mode === "local-only" },
   ];
   return (
     <Screen title="Offline & LAN" subtitle="How this device reaches Locat" testId="offline-screen">

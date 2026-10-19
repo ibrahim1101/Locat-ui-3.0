@@ -4,7 +4,7 @@ import { computeRange } from "@/ui/virtualRange";
 import { placeMenu, useContextMenu, type MenuItem } from "@/ui/ContextMenu";
 import { ContextMenuProvider } from "@/ui/ContextMenuProvider";
 import { triageFiles } from "@/app/drop";
-import { LARGE, makeMessages, makePhotos, makeTracks } from "@/fixtures/large";
+import { LARGE, makeMessages } from "@/fixtures/large";
 
 describe("virtualization", () => {
   const offsets = Array.from({ length: 10001 }, (_, i) => i * 50); // 10k rows × 50px
@@ -19,8 +19,6 @@ describe("virtualization", () => {
   });
   it("stress fixtures are deterministic and sized", () => {
     expect(makeMessages("c", LARGE.messages)).toHaveLength(5000);
-    expect(makeTracks(3)[0].title).toBe(makeTracks(3)[0].title);
-    expect(new Set(makePhotos(500).map((p) => p.id)).size).toBe(500);
   });
 });
 

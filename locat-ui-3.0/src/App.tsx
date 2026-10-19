@@ -10,22 +10,15 @@ import { DropProvider } from "./app/DropProvider";
 import { LiveDiagnostics } from "./integration/LiveDiagnostics";
 import { LiveContacts } from "./integration/LiveContacts";
 import { LiveOverview } from "./integration/LiveOverview";
-import { LiveRemote } from "./integration/LiveRemote";
 import { LiveDevices } from "./integration/LiveDevices";
 import { LivePrivateStore } from "./integration/LivePrivateStore";
-import { LiveSentinel } from "./integration/LiveSentinel";
-import { LiveMediaLibrary } from "./integration/LiveMediaLibrary";
 import { LiveModuleNotice } from "./integration/LiveModuleNotice";
+import { FilesLayout } from "./screens/private/FilesLayout";
 
 const Home = lazy(() => import("./screens/home/Home"));
 const Modules = lazy(() => import("./screens/home/Modules"));
 const Messages = lazy(() => import("./screens/messages/Messages"));
-const Cinema = lazy(() => import("./screens/cinema/Cinema"));
-const Music = lazy(() => import("./screens/music/Music"));
-const Photos = lazy(() => import("./screens/photos/Photos"));
 const Devices = lazy(() => import("./screens/devices/Devices"));
-const Remote = lazy(() => import("./screens/remote/Remote"));
-const Sentinel = lazy(() => import("./screens/sentinel/Sentinel"));
 const PrivateStore = lazy(() => import("./screens/private/PrivateStore"));
 const Search = lazy(() => import("./screens/search/Search"));
 const Hub = lazy(() => import("./screens/hub/Hub"));
@@ -59,14 +52,12 @@ export function App() {
             <Route path="home" element={live ? <LiveOverview kind="home" /> : <Home />} />
             <Route path="modules" element={live ? <LiveOverview kind="modules" /> : <Modules />} />
             <Route path="messages/*" element={live ? <LiveContacts /> : <Messages />} />
-            <Route path="cinema/*" element={live ? <LiveMediaLibrary kind="video" /> : <Cinema />} />
-            <Route path="music" element={live ? <LiveMediaLibrary kind="audio" /> : <Music />} />
-            <Route path="photos/*" element={live ? <LiveMediaLibrary kind="photo" /> : <Photos />} />
             <Route path="devices" element={live ? <LiveDevices /> : <Devices />} />
-            <Route path="remote/*" element={live ? <LiveRemote /> : <Remote />} />
-            <Route path="sentinel" element={live ? <LiveSentinel /> : <Sentinel />} />
-            <Route path="vault" element={live ? <LivePrivateStore key="vault" kind="vault" /> : <PrivateStore kind="vault" />} />
-            <Route path="secrets" element={live ? <LivePrivateStore key="secrets" kind="secrets" /> : <PrivateStore kind="secrets" />} />
+            <Route path="files" element={<FilesLayout />}>
+              <Route index element={<Navigate to="vault" replace />} />
+              <Route path="vault" element={live ? <LivePrivateStore key="vault" kind="vault" /> : <PrivateStore kind="vault" />} />
+              <Route path="secrets" element={live ? <LivePrivateStore key="secrets" kind="secrets" /> : <PrivateStore kind="secrets" />} />
+            </Route>
             <Route path="search" element={live ? <LiveOverview kind="search" /> : <Search />} />
             <Route path="hub" element={live ? <LiveModuleNotice title="Hub" /> : <Hub />} />
             <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />

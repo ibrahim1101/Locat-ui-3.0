@@ -36,7 +36,7 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     let ready = false;
     for (let i = 0; i < 60; i++) { try { if ((await request('/api/ready')).status === 200) { ready = true; break; } } catch {} if (child.exitCode !== null) throw new Error('TLS server exited'); await new Promise(resolve => setTimeout(resolve, 50)); }
     assert.ok(ready);
-    const shell = await request('/cinema'); assert.equal(shell.status, 200); assert.match(shell.body, /Locat test shell/); assert.match(shell.headers['content-security-policy'], /frame-ancestors 'none'/);
+    const shell = await request('/files/secrets'); assert.equal(shell.status, 200); assert.match(shell.body, /Locat test shell/); assert.match(shell.headers['content-security-policy'], /frame-ancestors 'none'/);
     const wasm=await request('/assets/crypto.wasm');assert.equal(wasm.status,200);assert.equal(wasm.headers['content-type'],'application/wasm');assert.ok(shell.headers['content-security-policy'].includes("'wasm-unsafe-eval'"));assert.ok(!shell.headers['content-security-policy'].includes("'unsafe-eval'"));
     assert.equal((await request('/assets/app.js')).status, 200);
     assert.equal((await request('/assets/app.js', 'HEAD')).body, '');

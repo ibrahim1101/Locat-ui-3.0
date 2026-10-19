@@ -18,6 +18,6 @@ export function ModuleGate({ id, children }: { id: ModuleId; children: ReactNode
   if (a.availability === "admin-only")
     return <StateView kind="unauthorized" title={`${m.name} is for administrators`} body="Your account doesn't have server administrator access. Ask the person who runs your Locat server." action={<Button onClick={() => nav("/home")}>Go home</Button>} />;
   if (a.availability === "offline")
-    return <StateView kind="offline" title={`${m.name} needs your Locat server`} body={`${a.reason}. Local tools like Cinema, Music, Photos and Remote keep working.`} action={<Button variant="primary" onClick={() => nav("/offline")}>Connection details</Button>} secondary={<Button onClick={() => nav("/home")}>Home</Button>} />;
+    return <StateView kind="offline" title={`${m.name} needs your Locat server`} body={`${a.reason}. App preferences and device diagnostics remain available here.`} action={<Button variant="primary" onClick={() => nav("/offline")}>Connection details</Button>} secondary={<Button onClick={() => nav("/home")}>Home</Button>} />;
   return <>{children}</>;
 }

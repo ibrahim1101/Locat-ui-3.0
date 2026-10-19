@@ -1,19 +1,18 @@
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { CloudOff, HardDrive, Pause, Play, ShieldAlert, SkipForward, X } from "lucide-react";
+import { CloudOff, HardDrive, ShieldAlert } from "lucide-react";
 import { useSession, useViewport } from "@/app/session";
-import { usePlayer } from "@/app/player";
 import { moduleForPath } from "@/app/registry";
-import { Button, IconButton, Kbd, Sheet, Skeleton, cn, hueGradient } from "@/ui";
+import { Button, Kbd, Sheet, Skeleton, cn } from "@/ui";
 
-const SHORTCUTS = [["Ctrl K", "Jump to module or action"], ["Ctrl ,", "Settings"], ["Alt 1–5", "Home · Messages · Cinema · Music · Devices"], ["↑ ↓ Home End", "Move through any list"], ["Shift F10", "Context menu for focused item"], ["Enter", "Send message / open"], ["Esc", "Close menu or sheet"], ["Space · ← → · F · M", "Player: play · seek · fullscreen · mute"], ["?", "This sheet"]];
+const SHORTCUTS = [["Ctrl K", "Jump to module or action"], ["Ctrl ,", "Settings"], ["Alt 1–4", "Home · Chat · Link · Files"], ["↑ ↓ Home End", "Move through any list"], ["Shift F10", "Context menu for focused item"], ["Enter", "Send message / open"], ["Esc", "Close menu or sheet"], ["?", "This sheet"]];
 import { MobileNav, Sidebar } from "./Navigation";
 import { CommandPalette } from "./CommandPalette";
 import { PreviewLab } from "./PreviewLab";
 import { ModuleGate } from "@/screens/shared/ModuleGate";
 
 /** Screens that own the full viewport on phones (bottom nav hidden). */
-const IMMERSIVE = [/^\/messages\/.+/, /^\/cinema\/play\/.+/, /^\/photos\/.+/, /^\/remote\/session/];
+const IMMERSIVE = [/^\/messages\/.+/];
 
 function ConnectionStrip() {
   const { connection } = useSession();
@@ -33,24 +32,6 @@ function Strip({ icon: I, text, tone, action }: { icon: typeof CloudOff; text: s
   );
 }
 
-function MiniPlayer() {
-  const p = usePlayer();
-  const nav = useNavigate();
-  if (!p.current) return null;
-  const t = p.current;
-  return (
-    <div data-testid="mini-player" className="mx-2 mb-2 flex shrink-0 items-center gap-3 rounded-2xl bg-s2 p-2 pr-1 shadow-lift hairline md:mx-3">
-      <button onClick={() => nav("/music?now=1")} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Now playing ${t.title}. Open player`}>
-        <span className="size-11 shrink-0 rounded-xl" style={{ background: hueGradient(t.hue) }} />
-        <span className="min-w-0"><span className="block truncate text-sm font-bold">{t.title}</span><span className="block truncate text-xs text-ink-3">{t.artist} · Preview playhead</span></span>
-      </button>
-      <IconButton icon={p.playing ? Pause : Play} label={p.playing ? "Pause" : "Play"} onClick={p.toggle} data-testid="mini-player-toggle" />
-      <IconButton icon={SkipForward} label="Next" onClick={p.next} className="hidden sm:grid" />
-      <IconButton icon={X} label="Close player" onClick={p.close} size="sm" />
-    </div>
-  );
-}
-
 const Loading = () => <div className="space-y-3 p-6" role="status" aria-label="Loading"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>;
 
 export function AppShell() {
@@ -60,10 +41,7 @@ export function AppShell() {
   const [cmd, setCmd] = useState(false);
   const [keys, setKeys] = useState(false);
   const { prefs } = useSession();
-  const [lastMedia, setLastMedia] = useState("/cinema");
   const nav = useNavigate();
-  const mediaRoute = /^\/(cinema|music|photos)/.test(pathname) ? "/" + pathname.split("/")[1] : null;
-  if (mediaRoute && mediaRoute !== lastMedia) setLastMedia(mediaRoute);
   const rail = railPref ?? medium;
   const immersive = compact && IMMERSIVE.some((r) => r.test(pathname));
   const mod = moduleForPath(pathname);
@@ -75,7 +53,7 @@ export function AppShell() {
       if (mod && e.key === ",") { e.preventDefault(); nav("/settings"); }
       const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
       if (!typing && e.key === "?") { e.preventDefault(); setKeys(true); }
-      if (e.altKey && /^[1-5]$/.test(e.key)) { e.preventDefault(); nav(["/home", "/messages", "/cinema", "/music", "/devices"][Number(e.key) - 1]); }
+      if (e.altKey && /^[1-4]$/.test(e.key)) { e.preventDefault(); nav(["/home", "/messages", "/devices", "/files"][Number(e.key) - 1]); }
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
@@ -92,8 +70,7 @@ export function AppShell() {
             {mod ? <ModuleGate id={mod.id}><Outlet /></ModuleGate> : <Outlet />}
           </Suspense>
         </main>
-        {!immersive && <MiniPlayer />}
-        {compact && !immersive && <MobileNav lastMedia={lastMedia} />}
+        {compact && !immersive && <MobileNav />}
       </div>
       <CommandPalette open={cmd} onClose={() => setCmd(false)} />
       <PreviewLab />

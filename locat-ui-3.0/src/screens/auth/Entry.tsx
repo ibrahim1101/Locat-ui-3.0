@@ -15,8 +15,8 @@ function Frame({ children, onBack, step }: { children: ReactNode; onBack?: () =>
         <div className="absolute -bottom-40 -left-40 size-[520px] rounded-full bg-ember/20 blur-[120px]" aria-hidden />
         <div className="relative flex items-center gap-3"><LocatMark size={40} /><span className="text-xl font-extrabold tracking-tight">Locat</span></div>
         <div className="relative">
-          <p className="text-[40px] font-extrabold leading-[1.05] tracking-tight">Your messages, media and devices.<br /><span className="text-ember">On a server you own.</span></p>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-2">A self-hosted home for messages, media and devices. Features become available as their secure integrations are completed.</p>
+          <p className="text-[40px] font-extrabold leading-[1.05] tracking-tight">Your chats, files and devices.<br /><span className="text-ember">On a server you own.</span></p>
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-2">A self-hosted home for private conversations, trusted device links, and files you keep close.</p>
         </div>
         <ul className="relative grid grid-cols-3 gap-3 text-xs text-ink-2">
           {[[ShieldCheck, "Private tools, explicit permissions"], [Network, "Same-LAN first, Tailscale optional"], [HardDrive, "Local tools work offline"]].map(([I, t], i) => {
@@ -58,7 +58,7 @@ function Welcome({ go }: { go(s: "login" | "register" | "local-intro" | "server"
         <Button variant="primary" size="lg" block icon={LogIn} onClick={() => go("login")} data-testid="welcome-signin">Sign in</Button>
         <Button size="lg" block icon={UserPlus} onClick={() => go("register")} data-testid="welcome-register">Create an account</Button>
         {<button onClick={() => go("local-intro")} data-testid="welcome-local" className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-4 text-left hover:bg-s1">
-          <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Device media players and Photos</span></span><ArrowRight className="size-4 text-ink-3" />
+          <HardDrive className="size-5 text-ink-3" /><span className="flex-1"><span className="block text-sm font-semibold">Use without a server</span><span className="block text-xs text-ink-3">Local preferences and chat attachment previews</span></span><ArrowRight className="size-4 text-ink-3" />
         </button>}
       </div>
       {<button onClick={() => go("server")} className="mt-8 flex w-full items-center gap-3 rounded-xl bg-s1 p-3.5 text-left hairline hover:bg-s2" data-testid="welcome-server">
@@ -93,7 +93,7 @@ function ServerSetup({ back }: { back(): void }) {
       </div>
       <div className="mt-8 grid gap-2 text-[13px] text-ink-2">
         <p className="flex gap-2.5"><Wifi className="mt-0.5 size-4 shrink-0 text-ink-3" />Same LAN: phone and server on the same Wi-Fi. No internet needed.</p>
-        <p className="flex gap-2.5"><Network className="mt-0.5 size-4 shrink-0 text-ink-3" />Remote: Tailscale HTTPS names work when you're away. Optional.</p>
+        <p className="flex gap-2.5"><Network className="mt-0.5 size-4 shrink-0 text-ink-3" />Away from home: connect through your own trusted network, such as Tailscale. Optional.</p>
       </div>
       {probe.state !== "idle" && probe.state !== "checking" && <Button variant="ghost" block className="mt-6" onClick={() => { setConnection({ ...connection, origin }); back(); }}>Keep this address and continue</Button>}
     </Frame>
@@ -174,15 +174,14 @@ function Register({ back, done }: { back(): void; done(): void }) {
 }
 
 function LocalIntro({ back, done }: { back(): void; done(): void }) {
-  const { adapter } = useSession();
   return (
     <Frame onBack={back} step="Local device mode">
       <div className="mb-6 grid size-14 place-items-center rounded-2xl bg-s2"><HardDrive className="size-6 text-ember" /></div>
       <h1 className="text-2xl font-extrabold tracking-tight">Use Locat on this device only</h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-2">No account and no server. Nothing leaves this device.</p>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-ok/8 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ok">Works</p><ul className="space-y-1.5 text-[13px] text-ink-2"><li>Cinema & Music (device files)</li><li>Photos viewer & editor</li>{adapter.mode === "preview" && <li>Remote viewer</li>}<li>Browser diagnostics</li></ul></div>
-        <div className="rounded-2xl bg-s1 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ink-3">Needs an account</p><ul className="space-y-1.5 text-[13px] text-ink-3"><li>Messages & contacts</li><li>Devices / Link</li><li>Vault, Secrets, Sentinel</li><li>Server media libraries</li></ul></div>
+        <div className="rounded-2xl bg-ok/8 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ok">Available here</p><ul className="space-y-1.5 text-[13px] text-ink-2"><li>App appearance and accessibility</li><li>Chat attachment previews</li><li>Browser diagnostics</li></ul></div>
+        <div className="rounded-2xl bg-s1 p-4 hairline"><p className="mb-2 text-2xs font-bold uppercase tracking-wider text-ink-3">Connect to your Locat server</p><ul className="space-y-1.5 text-[13px] text-ink-3"><li>Chat and contacts</li><li>Link device pairing and transfers</li><li>Files, Vault and Secrets</li><li>Account and server settings</li></ul></div>
       </div>
       <Button variant="primary" size="lg" block className="mt-8" onClick={done} data-testid="local-continue">Continue on this device</Button>
     </Frame>

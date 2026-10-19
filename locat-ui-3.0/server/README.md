@@ -32,7 +32,7 @@ Messaging uses the managed Matrix gateway and reviewed Matrix/Rust SDK, with con
 
 Sessions are HttpOnly SameSite=Strict cookies. Mutating requests require a matching HTTP Origin. Data is stored in versioned transactional SQLite at `server/data/locat.sqlite` by default and is ignored by Git. Set `LOCAT_DATABASE_FILE` to select another SQLite file. The retired `LOCAT_DATA_FILE` variable fails startup rather than overwriting legacy JSON. Direct TLS and reviewed SDK client-key management are implemented; native secure storage and full account recovery acceptance remain separate. Keep HTTP development bound to loopback. For explicit same-LAN HTTPS configuration see ../docs/SELF_HOSTING.md; internet deployment is not validated.
 
-The live UI is now the default entry and uses the UI 3.0 shell for account management, contacts, device media, search and account security events. Set VITE_LOCAT_LIVE=false only to open the explicitly separate preview. Unsupported live modules show notices instead of fixtures. Android, Windows native builds, and release packaging are not verified.
+The live UI is now the default entry and uses the UI 3.0 shell for account management, contacts, Link transfers, private files, scoped search and account activity. Set VITE_LOCAT_LIVE=false only to open the explicitly separate preview. Unsupported live modules show notices instead of fixtures. Android, Windows native builds, and release packaging are not verified.
 
 ## Development checklist
 
@@ -65,47 +65,12 @@ Recovery: stop the API, preserve the current database and its `-wal`/`-shm` side
 
 Authentication mutations allow 20 attempts per minute per socket IP, with Retry-After responses. This per-process development limiter is not a distributed policy; behind a proxy all requests may share a bucket. Audit storage retention is pending.
 
-Device media uses browser IndexedDB, separate from server SQLite and backups. Import is not server upload. Files are not encrypted, and clearing browser storage removes copies. Native background music, tags/artwork, HLS/adaptive streaming and screen control remain pending. Test actual codec playback manually; unit tests cannot prove a browser decoder supports a particular file.
+## Current UI and API scope
 
-## New server/media and directory scope
+The active app scope is Chat, Link, Files & Vault, account settings, and the surrounding Locat workspace. Obsidian Ember is the default appearance (`#0B0B0C` canvas and `#E86B2C` accent); the official Locat logo remains unchanged. Files has nested Vault and Secrets destinations, and account settings use grouped, focused sections.
 
-`npm start` serves the built UI and API from one origin. `GET /api/media` lists operator-authorized read-only media; `GET/HEAD /api/media/stream/<opaque-id>` provides authenticated byte ranges. See docs/SELF_HOSTING.md for limits, TLS configuration and known platform races. Self-hosting does not enable E2EE or native-client integration.
+Standalone Cinema/video playback, Music/audio libraries, Photos library, media-library streaming and sharing, remote control, and Sentinel/vendor alert integrations are retired from the UI and server routes. Their API paths are unavailable. Ordinary image, voice, and file attachments in Chat remain part of messaging. Link's verified device pairing and encrypted file/text transfers remain active.
 
-Schema v4 adds immutable unique four-digit LC directory codes and public bio metadata, preserving account IDs and existing data. Exact username, LC-1234 and bare four-digit code discovery are supported. LC codes have a 9000-account capacity and are not login secrets. API profile changes reject identity-code updates. Bio is limited to 500 characters and is server-visible.
+**Existing data is preserved.** No media, Sentinel, remote-session, account, message, Link, Vault, or Secrets records are deleted or rewritten by this scope change. SQLite schema remains at version 16; legacy tables stay in place for existing installations and backups. New requests to retired endpoints return not-found and do not expose those records. Account activity remains available within Settings → Security.
 
-`GET /api/diagnostics` requires authentication and exposes service/SQLite/media status without credentials or absolute host paths. The app polls readiness every 15 seconds while open. Login-first entry and the default Home landing match Locat's later navigation requirement; explicit local mode opens browser media without a fake account. Server actions remain unavailable there. Local mode is not offline password authentication and must be reselected after reload.
-
-The real TLS integration test requires OpenSSL on PATH; it creates temporary keys/certificates and validates using that temporary CA. No production key is read by tests. Docker files are templates and were not executed locally.
-
-## Media compatibility runtime
-
-GET /api/media/probe/<id> requires authentication and bounded FFprobe inspection. GET /api/media/stream/<id>?mode=remux or mode=transcode runs an authorized progressive FFmpeg worker; optional audio=<index> must identify a real audio stream. HEAD and non-initial byte ranges are rejected for conversion. Direct streaming continues to support ranges. File handles remain open through inspection/conversion and close on completion or cancellation. No shell interpolation or arbitrary client path is used. See docs/SELF_HOSTING.md for executable configuration, limits and progressive-input limitations.
-
-Backend tests now require FFmpeg/FFprobe as well as OpenSSL. CI includes source/test/build jobs for Linux, Windows and macOS, but these jobs are not native app builds and their results must be checked before claiming cross-platform runtime acceptance.
-
-### Sentinel incidents
-
-Schema v5 adds account-owned incidents, history and integration-token hashes without replacing existing users or media data. In the live Sentinel screen, create a named token and copy its one-time value into an emitter secret store. Send JSON to `/api/sentinel/webhook?format=generic` with `Authorization: Bearer <token>`; a login cookie does not authorize ingestion. Required `title` (1–200 characters); optional `description` (5000), `source` (64), `fingerprint` (128), `severity` (info/low/medium/high/critical) and `status` (open/firing/resolved). Stable source/fingerprint pairs deduplicate per account. Repeated alerts increase occurrences and preserve the higher severity; resolved alerts close the incident, and a later firing alert reopens it. Acknowledged firing alerts remain acknowledged.
-
-Original Locat nScout and PipelineGuard mappings are available with `format=nscout` or `format=pipelineguard`. These are adapter contracts, not verified integrations with a running vendor emitter. Integration tokens can only write incidents, are SHA-256 hashed at rest, and can be revoked immediately. Up to 20 active tokens per account; ingestion 120 requests/minute/token; body limit 64 KiB measured in UTF-8 bytes. Incident actions require account cookies and the exact trusted Origin. List/detail/history endpoints enforce account ownership. Tokens never authorize incident reads. UI lists latest 100 incidents and 200 history entries; manual refresh updates the view.
-
-Incident descriptions, notes and history are server-readable. Do not send credentials in alerts. Automatic retention/redaction, native health monitoring, push/background notifications and external alert delivery remain pending. Database backups include Sentinel history and token hashes; protect backups as account data.
-
-### Encrypted private-store API
-
-Schema v6 adds privateStores/privateObjects. GET /api/private/vault or /api/private/secrets returns only configuration and object metadata. GET /<module>/<UUID> returns an owned ciphertext envelope and revision. POST /<module>/initialize, /put and /remove require account cookies and the exact trusted Origin; no integration token grants access. Initialize is immutable, put/remove enforce expectedRevision, and quotas are transactional (128 objects/64 MiB ciphertext per account/module). Strict validators reject extra plaintext fields. See docs/PRIVATE_STORAGE.md for crypto, backup/recovery and scope limitations. SQLite backups contain encrypted configuration/objects, not the unlocking passphrase.
-
-### Devices and Link
-
-Schema v7/v8 connects /api/link/register, challenge, prove, devices, heartbeat, rename, pair, confirm and revoke. Protected commands additionally require X-Locat-Device-Proof bound to the valid account cookie/session. Payload routes create immutable metadata, upload bounded encrypted chunks, list/get owned device deliveries and acknowledge/cancel. Roles, pair verification, quota, exact lengths and terminal state are enforced; pair rejection/revocation purges queued chunks. See docs/LINK_INTEGRATION.md for client crypto, readable metadata, restart/expiry and native limits.
-
-### Browser Remote signaling
-
-Schema v9 extends protected /api/link/remote routes with source-decided sessions and encrypted signaling. Account/session/device proof and verified pairs remain mandatory. Roles gate offers/answers, expiry/close/revocation purge signals, and no server capture/control endpoint exists. See docs/REMOTE_INTEGRATION.md for browser consent, direct connectivity and native limitations.
-
-Optional connection infrastructure: see ../docs/CONNECT_ARCHITECTURE.md and ../docs/CONNECT_NETWORK_TRAVERSAL.md for fixed-peer TLS proxying, health WebSockets and protected temporary TURN credentials. No discovery/relay service is enabled by default. Legacy /api/messages now returns an authenticated 501 security gate until reviewed messaging integration is accepted; existing database rows remain preserved.
-
-
-## Owned server media
-
-Media roots now default to fail-closed operator-assigned ownership and configured accepted friends. See ../docs/MEDIA_LIBRARY_ACCESS.md before upgrading an existing shared-root setup. All-account legacy behavior requires explicit LOCAT_MEDIA_ACCESS_MODE=authenticated; no media bytes are migrated or deleted. Dynamic grant UI and cross-homeserver media sharing remain roadmap work.
+Diagnostics report connection, TLS, runtime, database and messaging state only. They do not scan or index host media folders. Legacy historical implementation notes elsewhere in this repository describe prior behavior and are not active endpoint guidance; see [REWORK_SCOPE.md](../docs/REWORK_SCOPE.md) for the current scope and [ENGINEERING_HISTORY.md](../docs/ENGINEERING_HISTORY.md) for provenance.

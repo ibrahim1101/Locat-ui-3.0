@@ -6,7 +6,7 @@ import { Screen } from "@/layouts/Screen";
 import { FlaskConical } from "lucide-react";
 import { AvailabilityBadge, Avatar, Banner, Button, SearchField, cn } from "@/ui";
 
-const ORDER: ModuleCategory[] = ["core", "media", "connect", "protect", "organize", "system"];
+const ORDER: ModuleCategory[] = ["core", "connect", "protect", "organize", "system"];
 
 /** "More" destination on phones and the full ecosystem directory on desktop. Every module is discoverable here. */
 export default function Modules() {

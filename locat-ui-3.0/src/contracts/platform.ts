@@ -10,12 +10,9 @@ export type PlatformInfo = {
   capabilities: {
     nativeSaveDialog: boolean;
     notifications: boolean;
-    pictureInPicture: boolean;
     biometric: false; // intentionally false until signed verification exists (Locat #22)
     shareTarget: false; // Locat #49 planned
     widgets: false; // Locat #37 planned
-    mediaStore: boolean; // Android MediaStore device library
-    backgroundAudio: false; // native audio focus/background not integrated
   };
 };
 

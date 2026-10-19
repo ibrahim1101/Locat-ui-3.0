@@ -83,7 +83,7 @@ export default function Devices() {
           </section>
           <section>
             <SectionTitle>Coming to Link</SectionTitle>
-            <div className="space-y-2">{[[Radar, "Nearby discovery (LAN / mDNS)", "Find devices on your network without the server"], [Wifi, "Peer-to-peer transfer", "Direct device-to-device paths"], [Link2, "Cross-device media browsing", "Opt-in libraries from your other devices"]].map(([I, t, d]) => { const Icon = I as typeof Radar; return (
+            <div className="space-y-2">{[[Radar, "Nearby discovery (LAN / mDNS)", "Find devices on your network without the server"], [Wifi, "Peer-to-peer transfer", "Direct device-to-device paths"], [Link2, "Clipboard relay", "Share text between devices you have paired"]].map(([I, t, d]) => { const Icon = I as typeof Radar; return (
               <div key={t as string} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong p-3"><Icon className="size-5 shrink-0 text-planned" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{t as string}</p><p className="text-xs text-ink-3">{d as string}</p></div><Badge tone="planned">Planned</Badge></div>); })}</div>
             <p className="mt-3 text-xs text-ink-3">Locat never shows "discovered" devices it hasn't actually paired.</p>
           </section>

@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, mkdir, writeFile, symlink } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -21,20 +21,11 @@ async function freePort() {
 
 test("development API: auth, isolation, discovery and messaging security gate", async () => {
   const dir = await mkdtemp(join(tmpdir(), "locat-api-test-"));
-  const mediaDir = join(dir, "media");
-  await mkdir(mediaDir);
-  await writeFile(join(mediaDir, "movie.mp4"), "0123456789");
-  await writeFile(join(mediaDir, "song.flac"), "audio-fixture");
-  await writeFile(join(mediaDir, "ignored.txt"), "not media");
-  const outside = join(dir, "private.mp4");
-  await writeFile(outside, "private-outside-root");
-  let supportsSymlinks = true;
-  try { await symlink(outside, join(mediaDir, "escape.mp4")); } catch { supportsSymlinks = false; }
   const port = await freePort();
   const origin = "http://127.0.0.1:" + port;
   const child = spawn(process.execPath, ["server/index.mjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_PUBLIC_ORIGIN:origin, LOCAT_DATABASE_FILE: join(dir, "auth.sqlite"), LOCAT_MEDIA_ACCESS_MODE:'authenticated',LOCAT_MEDIA_AUTHORIZED_ROOTS: mediaDir },
+    env: { ...process.env, LOCAT_HOST: "127.0.0.1", LOCAT_PORT: String(port), LOCAT_PUBLIC_ORIGIN:origin, LOCAT_DATABASE_FILE: join(dir, "auth.sqlite") },
     stdio: "ignore",
   });
   async function request(path, method = "GET", data, cookie, extraHeaders = {}) {
@@ -73,53 +64,13 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const bobCookie = bobLogin.headers.get("set-cookie").split(";")[0];
     const bob = (await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users[0];
     assert.ok(bob.id);
-    for(const path of ['/api/auth/me','/api/media','/api/contacts','/api/users/search?q=bob','/api/preferences','/api/profile/privacy','/api/auth/sessions','/api/private/vault','/api/private/secrets','/api/sentinel/incidents','/api/sentinel/tokens','/api/security/events'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
+    for(const path of ['/api/auth/me','/api/contacts','/api/users/search?q=bob','/api/preferences','/api/profile/privacy','/api/auth/sessions','/api/private/vault','/api/private/secrets','/api/security/events'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
     assert.equal((await request('/api/contacts','GET',undefined,bobCookie,{'X-Locat-Account':bob.id})).status,200,'Matching expected account remains authorized');
     assert.equal(bob.globalIdentity.address,bob.lcCode+'@127.0.0.1:'+port);
     assert.equal((await (await request('/api/users/search?q='+encodeURIComponent(bob.globalIdentity.address),'GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
     assert.equal((await request('/api/users/search?q=LC-1234@elsewhere.test','GET',undefined,aliceCookie)).status,501);
-    assert.equal((await request("/api/media")).status, 401);
-    const media = await (await request("/api/media", "GET", undefined, aliceCookie)).json();
-    assert.equal(media.items.length, 2);
-    assert.ok(!JSON.stringify(media).includes(mediaDir), "absolute host paths must not escape");
-    assert.equal((await request('/api/media/refresh','POST')).status,401);
-    assert.equal((await request('/api/media/refresh','POST',{},aliceCookie,{Origin:'https://wrong.invalid'})).status,403);
-    await writeFile(join(mediaDir,'added.png'),'photo-fixture');
-    const rescanned=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(rescanned.status,200);assert.equal((await rescanned.json()).items.length,3);
-    await rm(join(mediaDir,'added.png'));
-    const removed=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(removed.status,200);assert.equal((await removed.json()).items.length,2);
-    for(let count=0;count<4;count++)assert.equal((await request('/api/media/refresh','POST',{},aliceCookie)).status,200);
-    const throttled=await request('/api/media/refresh','POST',{},aliceCookie);assert.equal(throttled.status,429);assert.ok(Number(throttled.headers.get('retry-after'))>0);assert.ok(Number(throttled.headers.get('retry-after'))<=60);
-    assert.equal((await request('/api/media','GET',undefined,aliceCookie)).status,200,'cached library remains readable while refresh is throttled');
-    assert.equal((await request('/api/media/refresh','POST',{},bobCookie)).status,200,'another account retains its own refresh budget');
-    const movie = media.items.find(item => item.name === "movie.mp4");
-    const whole = await request(movie.streamUrl, "GET", undefined, aliceCookie);
-    assert.equal(whole.status, 200); assert.equal(await whole.text(), "0123456789");
-    const partial = await request(movie.streamUrl, "GET", undefined, aliceCookie, { Range: "bytes=2-5" });
-    assert.equal(partial.status, 206); assert.equal(partial.headers.get("content-range"), "bytes 2-5/10"); assert.equal(await partial.text(), "2345");
-    const suffix = await request(movie.streamUrl, "GET", undefined, bobCookie, { Range: "bytes=-3" });
-    assert.equal(await suffix.text(), "789");
-    assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie, { Range: "bytes=50-" })).status, 416);
-    const head = await request(movie.streamUrl, "HEAD", undefined, aliceCookie);
-    assert.equal(head.headers.get("content-length"), "10"); assert.equal(await head.text(), "");
-    assert.equal((await request(movie.streamUrl)).status, 401);
-    assert.equal((await request("/api/media/stream/invalid", "GET", undefined, aliceCookie)).status, 400);
-    assert.equal((await request("/api/media/stream/" + "0".repeat(64), "GET", undefined, aliceCookie)).status, 404);
-    const probeUrl = movie.streamUrl.replace('/stream/', '/probe/');
-    assert.equal((await request(probeUrl)).status, 401);
-    assert.equal((await request('/api/media/probe/invalid', 'GET', undefined, aliceCookie)).status, 400);
-    assert.equal((await request(movie.streamUrl + '?mode=shell', 'GET', undefined, aliceCookie)).status, 400);
-    assert.equal((await request(movie.streamUrl + '?audio=2', 'GET', undefined, aliceCookie)).status, 400);
-    assert.equal((await request(movie.streamUrl + '?mode=remux', 'HEAD', undefined, aliceCookie)).status, 405);
-    assert.equal((await request(movie.streamUrl + '?mode=remux', 'GET', undefined, aliceCookie, { Range: 'bytes=5-' })).status, 416);
-    for(const query of ['mode=transcode&start=-1','mode=transcode&start=1.5','mode=transcode&start=86401','mode=transcode&start=2&start=3','mode=transcode&unknown=1','start=1'])assert.equal((await request(movie.streamUrl+'?'+query,'GET',undefined,aliceCookie)).status,400);
-    // The fixture is deliberately not video: a valid timestamp must reach inspection (503), not be rejected as malformed (400).
-    for(const start of [0,1,12,86400])assert.equal((await request(movie.streamUrl+'?mode=transcode&start='+start,'GET',undefined,aliceCookie)).status,503);
-    const invalidProbe = await request(probeUrl, 'GET', undefined, aliceCookie);
-    assert.equal(invalidProbe.status, 503); assert.ok(!(await invalidProbe.text()).includes(mediaDir));
-    if (supportsSymlinks) {
-      await rm(join(mediaDir, "movie.mp4")); await symlink(outside, join(mediaDir, "movie.mp4"));
-      assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie)).status, 404);
+    for (const path of ['/api/media','/api/media/refresh','/api/media/shares','/api/media/stream/'+'a'.repeat(64),'/api/sentinel/incidents','/api/sentinel/tokens']) {
+      assert.equal((await request(path, 'GET', undefined, aliceCookie)).status, 404, 'retired module route must not be served: '+path);
     }
     assert.match(bob.lcCode, /^LC-[1-9][0-9]{3}$/);
     const codeLookup = await (await request("/api/users/search?q=" + bob.lcCode, "GET", undefined, aliceCookie)).json();
@@ -128,45 +79,6 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
     assert.equal(diagnostics.database.schemaVersion, 16); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
-    assert.equal((await request('/api/sentinel/incidents')).status, 401);
-    const createdToken = await request('/api/sentinel/tokens', 'POST', {name:'Monitor'}, aliceCookie);
-    assert.equal(createdToken.status, 201);
-    const integration = await createdToken.json();
-    const bearer = {Authorization:'Bearer ' + integration.token};
-    const alert = {title:'Service failed',source:'test',fingerprint:'host-1',severity:'medium'};
-    assert.equal((await request('/api/sentinel/webhook','POST',alert,aliceCookie)).status,401);
-    assert.equal((await request('/api/sentinel/webhook?format=unknown','POST',alert,undefined,bearer)).status,400);
-    assert.equal((await request('/api/sentinel/webhook','POST',{title:22},undefined,bearer)).status,400);
-    const received = await request('/api/sentinel/webhook','POST',alert,undefined,bearer);
-    assert.equal(received.status,202); const incidentId=(await received.json()).id;
-    assert.equal((await request('/api/sentinel/webhook','POST',{...alert,severity:'critical'},undefined,bearer)).status,202);
-    const alerts = await (await request('/api/sentinel/incidents','GET',undefined,aliceCookie)).json();
-    assert.equal(alerts.incidents.length,1); assert.equal(alerts.incidents[0].occurrences,2); assert.equal(alerts.incidents[0].severity,'critical');
-    assert.equal((await (await request('/api/sentinel/incidents','GET',undefined,bobCookie)).json()).incidents.length,0);
-    const incidentPath='/api/sentinel/incidents/'+incidentId;
-    assert.equal((await request(incidentPath,'GET',undefined,bobCookie)).status,404);
-    assert.equal((await request(incidentPath,'POST',{action:'resolve'},bobCookie)).status,404);
-    assert.equal((await request(incidentPath,'POST',{action:'resolve'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
-    for(const action of ['acknowledge','resolve']) assert.equal((await request(incidentPath,'POST',{action},aliceCookie)).status,200);
-    assert.equal((await request(incidentPath,'POST',{action:'acknowledge'},aliceCookie)).status,409);
-    assert.equal((await request(incidentPath,'POST',{action:'reopen'},aliceCookie)).status,200);
-    assert.equal((await request(incidentPath,'POST',{action:'note',note:'Investigating'},aliceCookie)).status,200);
-    for(const query of ['userId=foreign','status=open&status=resolved','severity=urgent','limit=101','before=invalid'])assert.equal((await request('/api/sentinel/incidents?'+query,'GET',undefined,aliceCookie)).status,400);
-    const filteredAlerts=await(await request('/api/sentinel/incidents?limit=1&status=open','GET',undefined,aliceCookie)).json();
-    assert.equal(filteredAlerts.incidents.length,1);assert.ok('nextCursor' in filteredAlerts);
-    for(const query of ['userId=foreign','limit=201','before=0','before=1&before=2'])assert.equal((await request(incidentPath+'?'+query,'GET',undefined,aliceCookie)).status,400);
-    const smallHistory=await(await request(incidentPath+'?limit=1','GET',undefined,aliceCookie)).json();assert.equal(smallHistory.events.length,1);assert.ok(smallHistory.nextCursor);
-    const olderHistory=await(await request(incidentPath+'?limit=1&before='+smallHistory.nextCursor,'GET',undefined,aliceCookie)).json();assert.ok(olderHistory.events[0].id<smallHistory.events[0].id);
-    for(const query of ['userId=foreign','state=unknown','limit=101','before=invalid'])assert.equal((await request('/api/sentinel/tokens?'+query,'GET',undefined,aliceCookie)).status,400);
-    const activeTokens=await(await request('/api/sentinel/tokens?state=active&limit=1','GET',undefined,aliceCookie)).json();assert.equal(activeTokens.tokens.length,1);assert.equal(activeTokens.tokens[0].revokedAt,null);assert.ok('nextCursor' in activeTokens);
-    const detail=await (await request(incidentPath,'GET',undefined,aliceCookie)).json();
-    assert.equal(detail.incident.status,'open'); assert.equal(detail.events[0].note,'Investigating');
-    assert.equal((await request('/api/sentinel/tokens/revoke','POST',{id:integration.id},bobCookie)).status,404);
-    const metadata=await (await request('/api/sentinel/tokens','GET',undefined,aliceCookie)).text();
-    assert.ok(!metadata.includes(integration.token)); assert.ok(!metadata.includes('hash'));
-    assert.equal((await request('/api/sentinel/webhook','POST',{title:'é'.repeat(40000)},undefined,bearer)).status,413);
-    assert.equal((await request('/api/sentinel/tokens/revoke','POST',{id:integration.id},aliceCookie)).status,200);
-    assert.equal((await request('/api/sentinel/webhook','POST',alert,undefined,bearer)).status,401);
     const privateConfig={v:1,storeId:'11111111-1111-4111-8111-111111111111',salt:Buffer.alloc(16).toString('base64'),iterations:600000,wrappedKey:{v:1,iv:Buffer.alloc(12).toString('base64'),data:Buffer.alloc(48).toString('base64')}};
     const privateEnvelope=privateConfig.wrappedKey;const privateId='22222222-2222-4222-8222-222222222222';
     assert.equal((await request('/api/private/vault')).status,401);
@@ -232,6 +144,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const confirmTwo=await (await request('/api/link/confirm','POST',{id:pairingId,approved:true},aliceCookie,secondDevice.headers)).json();assert.equal(confirmTwo.verified,true);
     assert.equal((await request('/api/link/confirm','POST',{id:pairingId,approved:true},bobCookie,foreignDevice.headers)).status,404);
     const liveDevices=await (await request('/api/link/devices','GET',undefined,aliceCookie,firstDevice.headers)).json();assert.equal(liveDevices.devices.length,2);assert.equal(liveDevices.pairs[0].status,'verified');
+    assert.equal((await request('/api/link/remote/create','POST',{pairId:pairingId,host:secondDevice.id},aliceCookie,firstDevice.headers)).status,404,'retired remote-control route is not served');
     const createLinkPayload=await request('/api/link/payload/create','POST',{pairId:pairingId,peer:secondDevice.id,kind:'text',name:'Encrypted text',mime:'text/plain',size:4},aliceCookie,firstDevice.headers);assert.equal(createLinkPayload.status,201);const relayPayload=(await createLinkPayload.json()).payload;
     const remoteDeviceKey=await crypto.subtle.importKey('spki',Buffer.from(secondDevice.publicKey,'base64'),{name:'ECDH',namedCurve:'P-256'},false,[]);
     const linkBits=await crypto.subtle.deriveBits({name:'ECDH',public:remoteDeviceKey},firstDevice.identity.privateKey,256);const linkBase=await crypto.subtle.importKey('raw',linkBits,'HKDF',false,['deriveKey']);
@@ -249,22 +162,6 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/link/payload/finish','POST',{id:relayPayload.id,status:'complete'},aliceCookie,firstDevice.headers)).status,403);
     assert.equal((await request('/api/link/payload/finish','POST',{id:relayPayload.id,status:'complete'},aliceCookie,secondDevice.headers)).status,200);
     assert.equal((await request('/api/link/payload/chunk','POST',{id:relayPayload.id,seq:0,envelope:relayEnvelope},aliceCookie,firstDevice.headers)).status,409);
-    const remoteCreated=await request('/api/link/remote/create','POST',{pairId:pairingId,host:secondDevice.id},aliceCookie,firstDevice.headers);assert.equal(remoteCreated.status,201);const remoteId=(await remoteCreated.json()).session.id;
-    assert.equal((await request('/api/link/remote/decide','POST',{id:remoteId,approved:true},aliceCookie,firstDevice.headers)).status,403);
-    const remoteSignalId=crypto.randomUUID(),remotePlain={type:'offer',sdp:'v=0\r\n'};
-    const remoteAad=new TextEncoder().encode(JSON.stringify(['locat-ui3-remote-signal:v1',firstDevice.userId,pairingId,remoteId,remoteSignalId,secondDevice.id,firstDevice.id,'offer']));
-    const remoteIv=crypto.getRandomValues(new Uint8Array(12));const remoteCipher=await crypto.subtle.encrypt({name:'AES-GCM',iv:remoteIv,additionalData:remoteAad},linkKey,new TextEncoder().encode(JSON.stringify(remotePlain)));const remoteEnvelope={v:1,iv:Buffer.from(remoteIv).toString('base64'),data:Buffer.from(remoteCipher).toString('base64')};
-    const remoteCommand={id:remoteId,signalId:remoteSignalId,kind:'offer',envelope:remoteEnvelope};
-    assert.equal((await request('/api/link/remote/signal','POST',remoteCommand,aliceCookie,secondDevice.headers)).status,409);
-    assert.equal((await request('/api/link/remote/decide','POST',{id:remoteId,approved:true},aliceCookie,{...secondDevice.headers,Origin:'https://evil.invalid'})).status,403);
-    assert.equal((await request('/api/link/remote/decide','POST',{id:remoteId,approved:true},aliceCookie,secondDevice.headers)).status,200);
-    assert.equal((await request('/api/link/remote/signal','POST',remoteCommand,aliceCookie,firstDevice.headers)).status,403);
-    assert.equal((await request('/api/link/remote/signal','POST',remoteCommand,aliceCookie,secondDevice.headers)).status,200);
-    const remoteReceived=await (await request('/api/link/remote/signals?id='+remoteId,'GET',undefined,aliceCookie,firstDevice.headers)).json();assert.equal(remoteReceived.signals.length,1);
-    assert.deepEqual(JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(remoteReceived.signals[0].envelope.iv,'base64'),additionalData:remoteAad},receiverKey,Buffer.from(remoteReceived.signals[0].envelope.data,'base64')))),remotePlain);
-    assert.equal((await request('/api/link/remote/signals?id='+remoteId,'GET',undefined,bobCookie,foreignDevice.headers)).status,404);
-    assert.equal((await request('/api/link/remote/close','POST',{id:remoteId},aliceCookie,firstDevice.headers)).status,200);
-    assert.equal((await request('/api/link/remote/signal','POST',{...remoteCommand,signalId:crypto.randomUUID()},aliceCookie,secondDevice.headers)).status,409);
     assert.equal((await request('/api/link/revoke','POST',{id:secondDevice.id},aliceCookie,firstDevice.headers)).status,200);
     assert.equal((await request('/api/link/connectivity','GET',undefined,aliceCookie,secondDevice.headers)).status,403);
     assert.equal((await request('/api/link/devices','GET',undefined,aliceCookie,secondDevice.headers)).status,403);
@@ -320,7 +217,6 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request("/api/auth/password", "POST", { currentPassword: "incorrect", newPassword: "new-long-password-123" }, aliceCookie)).status, 401);
     assert.equal((await request("/api/auth/password", "POST", { currentPassword: password, newPassword: "new-long-password-123" }, aliceCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
-    assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie)).status, 401);
     assert.equal((await request("/api/auth/login", "POST", { username: "alice", password })).status, 401);
     const updatedLogin = await request("/api/auth/login", "POST", { username: "alice", password: "new-long-password-123" });
     assert.equal(updatedLogin.status, 200);
@@ -337,7 +233,6 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request("/api/auth/me", "GET", undefined, updatedCookie)).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, aliceCookie)).status, 401);
-    assert.equal((await request(movie.streamUrl, "GET", undefined, aliceCookie)).status, 401);
     // Keep a real request body incomplete while revoking its authenticated session.
     // Use fixture-owned sessions to avoid interfering with login rate-limit acceptance.
     const inspection=openDatabase(join(dir,'auth.sqlite'));

@@ -32,7 +32,7 @@ function Automate() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div><SectionTitle>Rule builder</SectionTitle>
-        {[["When", Zap, "Sentinel raises a critical alert"], ["If", Shield, "Between 23:00 and 07:00"], ["Then", Bell, "Notify my phone with sound"]].map(([k, I, t]) => { const Icon = I as typeof Zap; return (
+        {[["When", Zap, "A calendar event is about to start"], ["If", Shield, "Between 23:00 and 07:00"], ["Then", Bell, "Notify me on this device"]].map(([k, I, t]) => { const Icon = I as typeof Zap; return (
           <div key={k as string} className="relative mb-2 flex items-center gap-3 rounded-2xl bg-s1 p-4 hairline"><span className="w-12 text-2xs font-bold uppercase tracking-wider text-ember">{k as string}</span><Icon className="size-5 text-ink-2" /><span className="flex-1 text-sm font-semibold">{t as string}</span><ChevronRight className="size-4 text-ink-3" /></div>); })}
         <Button icon={Plus} disabledReason={OFF} className="mt-2">Add step</Button>
       </div>
@@ -80,12 +80,12 @@ function ShareM() {
 }
 
 function Extensions() {
-  const ext = [["Weather widget", "Reads: location (once)", "1.2.0"], ["Backup to NAS", "Reads: Vault metadata · Writes: network share", "0.4.1"], ["Jellyfin bridge", "Reads: Cinema library", "0.9.0"]];
+  const ext = [["Weather widget", "Reads: location (once)", "1.2.0"], ["Backup to NAS", "Reads: Vault metadata · Writes: network share", "0.4.1"], ["Calendar handoff", "Reads: selected event details", "0.3.0"]];
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <Section title="Discover">{ext.map(([n, p, v]) => <ListRow key={n} icon={Puzzle} title={n} subtitle={`${p} · v${v}`} trailing={<Button size="sm" disabledReason={OFF}>Review</Button>} />)}</Section>
       <div className="rounded-3xl bg-s1 p-4 hairline"><p className="font-bold">Permission review</p><p className="mt-1 text-xs text-ink-3">Before install you'll see every capability an extension requests.</p>
-        <div className="mt-3 space-y-1">{["Read Cinema library", "Network access to your LAN", "Show notifications"].map((c) => <div key={c} className="flex items-center gap-2 rounded-lg bg-s2 p-2.5 text-sm"><Lock className="size-4 text-warn" />{c}</div>)}</div>
+        <div className="mt-3 space-y-1">{["Read selected files", "Network access to your LAN", "Show notifications"].map((c) => <div key={c} className="flex items-center gap-2 rounded-lg bg-s2 p-2.5 text-sm"><Lock className="size-4 text-warn" />{c}</div>)}</div>
         <div className="mt-2"><Switch label="Enabled" checked={false} onChange={() => undefined} disabledReason="No sandbox runtime — extensions receive no privileges" /></div>
       </div>
     </div>

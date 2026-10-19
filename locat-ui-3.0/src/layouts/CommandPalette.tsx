@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { CornerDownLeft } from "lucide-react";
-import { MODULES } from "@/app/registry";
+import { MODULES, moduleById } from "@/app/registry";
 import { useSession } from "@/app/session";
 import { useBackLayer } from "@/app/back";
 import { AvailabilityBadge, Kbd, cn } from "@/ui";
@@ -24,9 +24,9 @@ function Palette({ onClose }: { onClose(): void }) {
     const s = q.trim().toLowerCase();
     const mods = MODULES.map((m) => ({ id: m.id, label: m.name, hint: m.tagline, icon: m.icon, to: m.route, a: availability(m.id).availability, k: `${m.name} ${m.tagline} ${m.keywords ?? ""}`.toLowerCase() }));
     const actions = [
-      { id: "new-chat", label: "New conversation", hint: "Messages", icon: MODULES[1].icon, to: "/messages?compose=1", a: availability("messages").availability, k: "new conversation chat message compose" },
-      { id: "pair", label: "Pair a device", hint: "Devices", icon: MODULES[6].icon, to: "/devices?pair=1", a: availability("devices").availability, k: "pair link device" },
-      { id: "eq", label: "Open equalizer", hint: "Music", icon: MODULES[4].icon, to: "/music?eq=1", a: availability("music").availability, k: "eq equalizer sound" },
+      { id: "new-chat", label: "New conversation", hint: "Chat", icon: moduleById("messages").icon, to: "/messages?compose=1", a: availability("messages").availability, k: "new conversation chat message compose" },
+      { id: "pair", label: "Pair a device", hint: "Link", icon: moduleById("devices").icon, to: "/devices?pair=1", a: availability("devices").availability, k: "pair link device" },
+      { id: "files", label: "Open Files & Vault", hint: "Files", icon: moduleById("files").icon, to: "/files", a: availability("files").availability, k: "files vault credentials secrets documents" },
     ];
     return [...actions, ...mods].filter((x) => !s || x.k.includes(s)).slice(0, 12);
   }, [q, availability]);

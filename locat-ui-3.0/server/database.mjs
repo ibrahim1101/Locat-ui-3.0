@@ -1,4 +1,3 @@
-import {mediaShareStore} from './mediaShares.mjs';
 import {matrixConversationStore} from './matrixConversations.mjs';
 import {auditEventPage} from './auditEvents.mjs';
 import {managedMatrixDeviceStore} from './matrixManagedDevices.mjs';
@@ -6,7 +5,6 @@ import {matrixRevocationStore} from './matrixRevocation.mjs';
 import { matrixBindingStore } from './matrixBinding.mjs';
 import { linkStore } from './link.mjs';
 import { privateStore } from './privateStore.mjs';
-import { sentinelStore } from './sentinel.mjs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {writeServerSnapshot} from './backupSnapshot.mjs';
@@ -133,14 +131,12 @@ export function openDatabase(filename) {
   const userById = sql.prepare('SELECT * FROM users WHERE id = ?');
   const userByName = sql.prepare('SELECT * FROM users WHERE username = ?');
   return {
-    mediaShares:mediaShareStore(sql),
     serverId: sql.prepare("SELECT value FROM serverMetadata WHERE key='serverId'").get().value,
     link,
     matrixRevocations,
     matrixManagedDevices,
     matrixBindings,
     matrixConversations:matrixConversationStore(sql,matrixBindings),
-    sentinel: sentinelStore(sql),
     privateStore: privateStore(sql),
     acceptedContact: (a,b) => { const [low,high]=[a,b].sort(); return !!sql.prepare("SELECT 1 FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").get(low,high); },
     savePrivacy: (id,profile,username,requests) => sql.prepare('UPDATE users SET profileVisibility=?,usernameVisibility=?,allowContactRequests=? WHERE id=?').run(profile,username,Number(requests),id),

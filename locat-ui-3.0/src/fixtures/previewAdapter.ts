@@ -35,9 +35,7 @@ function moduleAvailability(id: ModuleId, ctx: Parameters<LocatUiAdapter["module
   if (m.adminOnly && !ctx.isAdmin) return { availability: "admin-only" as const, reason: "Administrator access required" };
   if (!m.localCapable && (ctx.connection.mode === "local-only" || ctx.connection.server !== "connected"))
     return { availability: "offline" as const, reason: ctx.connection.mode === "local-only" ? "Requires a Locat server account" : "Connect to your server" };
-  if (id === "remote" && ctx.platform.kind === "capacitor-android") return { availability: "experimental" as const, reason: "Viewer only on Android; host runs on Windows" };
   if (m.implementation === "experimental") return { availability: "beta" as const };
-  if (m.implementation === "partial" && m.category === "media") return { availability: "beta" as const };
   return { availability: "available" as const };
 }
 
@@ -60,16 +58,10 @@ export const previewAdapter: LocatUiAdapter = {
     conversationAction: (_id, action) => P(`Conversation action "${action}"`), createGroup: () => P("Group creation and key distribution"),
     shareLocation: () => P("Encrypted location sharing"),
   },
-  media: {
-    refreshLibrary: (kind) => P(`${kind} library scan`), requestAccess: () => Promise.resolve("prompt"),
-    openVideo: () => P("Video playback engine"), exportPhoto: () => P("Photo export (renderPhotoEdit)"), saveEqPreset: () => P("EQ preset persistence"),
-  },
   link: {
     requestPairing: () => P("Device pairing"), approvePairing: () => P("Pairing approval"), renameDevice: () => P("Device rename"),
     revokeDevice: () => P("Device revocation"), sendFile: () => P("Encrypted chunked transfer"), sendClipboard: () => P("Encrypted clipboard transfer"),
   },
-  remote: { connect: () => P("Remote WebRTC session"), disconnect: () => P("Remote disconnect"), setInput: () => P("Remote input toggle") },
-  sentinel: { setAlertState: () => P("Alert state change"), createToken: () => P("Integration token creation"), revokeToken: () => P("Token revocation") },
   privateStore: {
     unlock: () => wait(500).then(() => P("Private store unlock (PBKDF2/AES-GCM)")), lock: () => undefined,
     reveal: () => P("Secret reveal"), copyField: () => P("Clipboard copy"), upload: () => P("Encrypted upload"),

@@ -6,9 +6,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import type {
-  AdminUserView, AlertView, ContactView, ConversationView, DeviceView, MessageView, PhotoView, RemoteHostView,
-  ScheduledMessageView, SecretEntryView, SentinelSourceView, SentinelTokenView, SessionUserView, TrackView,
-  TransferView, VaultEntryView, VideoItemView, SavedAccountView,
+  AdminUserView, ContactView, ConversationView, DeviceView, MessageView,
+  ScheduledMessageView, SecretEntryView, SessionUserView, TransferView, VaultEntryView, SavedAccountView,
 } from "@/contracts";
 
 const now = Date.now();
@@ -52,7 +51,7 @@ const m = (id: string, conv: string, mine: boolean, text: string | undefined, ag
 
 export const FIXTURE_MESSAGES: MessageView[] = [
   m("m1", "c-mira", false, "Did the mix survive the export?", 3 * hr),
-  m("m2", "c-mira", true, "Mostly. The low end is a bit muddy on the 4K reel, checking it in Cinema now.", 3 * hr - 4 * min),
+  m("m2", "c-mira", true, "Mostly. The low end is a bit muddy in the mix, checking the export now.", 3 * hr - 4 * min),
   m("m3", "c-mira", false, undefined, 2 * hr, { attachment: { kind: "image", name: "console-wide.jpg", size: 2_480_000, width: 4032, height: 3024, original: true } }),
   m("m4", "c-mira", true, "That console is gorgeous", 2 * hr - min, { reactions: [{ emoji: "🔥", count: 1, mine: false }], replyTo: { id: "m3", authorName: "Mira", excerpt: "Photo · console-wide.jpg", state: "ok" } }),
   m("m5", "c-mira", false, undefined, 90 * min, { attachment: { kind: "voice", durationSec: 23, waveform: [3, 6, 9, 5, 8, 12, 7, 4, 9, 11, 6, 3, 7, 10, 5, 8, 4, 6, 9, 3] } }),
@@ -73,40 +72,6 @@ export const FIXTURE_SCHEDULED: ScheduledMessageView[] = [
   { id: "s3", conversationId: "c-jun", conversationTitle: "Jun Park", excerpt: "Done?", sendAt: now - day, state: "failed" },
 ];
 
-const v = (id: string, title: string, folder: string, durationSec: number, h: number, w: number, codec: string, hue: number, extra: Partial<VideoItemView> = {}): VideoItemView =>
-  ({ id, title, source: "device", folder, durationSec, sizeBytes: durationSec * 900_000, container: "mp4", videoCodec: codec, audioCodec: "aac", width: w, height: h, posterHue: hue, delivery: "direct", ...extra });
-
-export const FIXTURE_VIDEOS: VideoItemView[] = [
-  v("v1", "Night Market Walk", "Camera", 724, 2160, 3840, "hevc", 18, { progressSec: 310, lastPlayedAt: now - hr }),
-  v("v2", "Studio Session 04", "Projects", 3480, 1080, 1920, "h264", 210, { source: "server", delivery: "remux", progressSec: 1200, lastPlayedAt: now - day }),
-  v("v3", "Coastline Drone", "Camera", 412, 2160, 3840, "hevc", 190, { source: "server", delivery: "hls" }),
-  v("v4", "Lecture — Signal Flow", "Downloads", 5320, 720, 1280, "h264", 40),
-  v("v5", "Birthday 2025", "Family", 186, 1080, 1920, "h264", 330),
-  v("v6", "Archive_tape_03_interlaced_1998_transfer.mkv", "Archive", 2700, 576, 720, "mpeg2video", 260, { container: "mkv", delivery: "unsupported" }),
-  v("v7", "Timelapse Rooftop", "Camera", 95, 2160, 3840, "av1", 280, { source: "server", delivery: "direct" }),
-  v("v8", "Kitchen Experiments", "Family", 840, 1080, 1920, "h264", 12),
-];
-
-const t = (id: string, title: string, artist: string, album: string, sec: number, format: string, hue: number, extra: Partial<TrackView> = {}): TrackView =>
-  ({ id, title, artist, album, folder: "Music/" + artist, durationSec: sec, source: "device", format, sampleRate: 44100, bitDepth: 16, favorite: false, hue, ...extra });
-
-export const FIXTURE_TRACKS: TrackView[] = [
-  t("t1", "Low Tide Signal", "Halden", "Coastal Static", 248, "FLAC", 20, { favorite: true, sampleRate: 96000, bitDepth: 24 }),
-  t("t2", "Copper Wire", "Halden", "Coastal Static", 201, "FLAC", 20),
-  t("t3", "Northbound", "Mira & The Rooms", "Rooms", 315, "ALAC", 200, { source: "server" }),
-  t("t4", "Ember Lines", "Okto", "Heat Map", 187, "MP3", 8, { bitrateKbps: 320, favorite: true }),
-  t("t5", "Glass Weather", "Okto", "Heat Map", 233, "MP3", 8, { bitrateKbps: 320 }),
-  t("t6", "Quiet Hours", "Lena Voss", "Afterlight", 402, "OPUS", 260, { source: "server", bitrateKbps: 160 }),
-  t("t7", "Titanium", "Lena Voss", "Afterlight", 276, "AAC", 260, { bitrateKbps: 256 }),
-  t("t8", "Parallel Rooms", "Mira & The Rooms", "Rooms", 289, "ALAC", 200, { source: "server" }),
-];
-
-export const FIXTURE_PHOTOS: PhotoView[] = Array.from({ length: 30 }, (_, i) => ({
-  id: "p" + i, name: `IMG_${2040 + i}.${i === 7 ? "heic" : "jpg"}`, album: ["Camera", "Screenshots", "Trips", "Studio"][i % 4],
-  width: i % 3 ? 4032 : 3024, height: i % 3 ? 3024 : 4032, sizeBytes: 1_800_000 + i * 90_000, takenAt: now - i * 9 * hr,
-  mime: i === 7 ? "image/heic" : "image/jpeg", hue: (i * 37) % 360, supported: i !== 7,
-}));
-
 export const FIXTURE_DEVICES: DeviceView[] = [
   { id: "d1", alias: "Rowan's Pixel", platform: "android", current: true, state: "paired", online: true },
   { id: "d2", alias: "Studio Desktop", platform: "windows", current: false, state: "paired", online: true, lastSeenAt: now - 2 * min },
@@ -118,29 +83,6 @@ export const FIXTURE_TRANSFERS: TransferView[] = [
   { id: "x2", kind: "url", name: "https://example.org/reference-track", direction: "received", peer: "Studio Desktop", progress: 1, state: "complete", at: now - hr },
   { id: "x3", kind: "file", name: "invoice-march.pdf", sizeBytes: 220_000, direction: "received", peer: "ThinkPad", progress: 0.3, state: "failed", at: now - day, error: "Device went offline" },
   { id: "x4", kind: "clipboard", name: "Clipboard text (42 chars)", direction: "sent", peer: "Studio Desktop", progress: 1, state: "complete", at: now - 2 * day },
-];
-
-export const FIXTURE_REMOTE_HOSTS: RemoteHostView[] = [
-  { id: "r1", name: "Studio Desktop", os: "windows", approved: true, inputSupported: true, reachable: true },
-  { id: "r2", name: "Media Box", os: "linux", approved: true, inputSupported: false, reachable: false },
-];
-
-export const FIXTURE_ALERTS: AlertView[] = [
-  { id: "a1", title: "Unexpected SSH login from new ASN", source: "nScout", severity: "critical", state: "open", at: now - 12 * min, summary: "Successful login for user deploy from an ASN not seen in 90 days.", fields: { host: "edge-01", user: "deploy", asn: "AS64500 (doc range)" } },
-  { id: "a2", title: "Pipeline secret exposed in build log", source: "PipelineGuard", severity: "high", state: "acknowledged", at: now - 2 * hr, summary: "Token-shaped string detected in job output. Rotation recommended.", fields: { pipeline: "web/release", job: "build#4412" } },
-  { id: "a3", title: "Port scan detected", source: "nScout", severity: "medium", state: "open", at: now - 5 * hr, summary: "Sequential SYN probes against 120 ports.", fields: { target: "lan-gateway" } },
-  { id: "a4", title: "Dependency advisory", source: "PipelineGuard", severity: "low", state: "resolved", at: now - 2 * day, summary: "Moderate advisory in a transitive dev dependency.", fields: { package: "example-lib" } },
-  { id: "a5", title: "Webhook test event", source: "Generic webhook", severity: "info", state: "resolved", at: now - 4 * day, summary: "Manual test from integration settings.", fields: {} },
-];
-export const FIXTURE_TOKENS: SentinelTokenView[] = [
-  { id: "k1", label: "nScout edge", scope: "alerts:write", createdAt: now - 30 * day, lastUsedAt: now - 12 * min, revoked: false, prefix: "snt_7f2…" },
-  { id: "k2", label: "PipelineGuard CI", scope: "alerts:write", createdAt: now - 20 * day, lastUsedAt: now - 2 * hr, revoked: false, prefix: "snt_a91…" },
-  { id: "k3", label: "Old test", scope: "alerts:write", createdAt: now - 90 * day, revoked: true, prefix: "snt_002…" },
-];
-export const FIXTURE_SOURCES: SentinelSourceView[] = [
-  { id: "s-ns", name: "nScout", kind: "nScout", health: "receiving", lastEventAt: now - 12 * min },
-  { id: "s-pg", name: "PipelineGuard", kind: "PipelineGuard", health: "silent", lastEventAt: now - 2 * hr },
-  { id: "s-gw", name: "Generic webhook", kind: "generic-webhook", health: "never-connected" },
 ];
 
 export const FIXTURE_VAULT: VaultEntryView[] = [

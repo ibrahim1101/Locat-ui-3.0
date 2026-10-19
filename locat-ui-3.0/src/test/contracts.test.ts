@@ -8,13 +8,14 @@ import type { AvailabilityContext } from "@/contracts";
 
 const ctx = (over: Partial<AvailabilityContext> = {}): AvailabilityContext => ({
   connection: { mode: "server", server: "connected", pendingOutbox: 0 }, isAdmin: false, authenticated: true,
-  platform: { kind: "browser", capabilities: { nativeSaveDialog: false, notifications: false, pictureInPicture: false, biometric: false, shareTarget: false, widgets: false, mediaStore: false, backgroundAudio: false } }, ...over,
+  platform: { kind: "browser", capabilities: { nativeSaveDialog: false, notifications: false, biometric: false, shareTarget: false, widgets: false } }, ...over,
 });
 
 describe("module registry", () => {
   it("covers every required ecosystem section", () => {
     const ids = MODULES.map((m) => m.id);
-    for (const id of ["home", "messages", "cinema", "music", "photos", "devices", "sentinel", "remote", "vault", "secrets", "search", "hub", "admin", "diagnostics", "workspace", "calendar", "automate", "share", "extensions", "offline", "settings", "profile"]) expect(ids).toContain(id);
+    for (const id of ["home", "messages", "devices", "files", "search", "hub", "admin", "diagnostics", "workspace", "calendar", "automate", "share", "extensions", "offline", "settings", "profile"]) expect(ids).toContain(id);
+    for (const id of ["cinema", "music", "photos", "remote", "sentinel"]) expect(ids).not.toContain(id);
   });
   it("planned modules are never available", () => {
     for (const m of MODULES.filter((x) => x.implementation === "planned")) expect(previewAdapter.moduleAvailability(m.id, ctx()).availability).toBe("planned");
@@ -26,7 +27,7 @@ describe("module registry", () => {
   it("server modules go offline in local mode while local tools stay usable", () => {
     const local = ctx({ connection: { mode: "local-only", server: "not-configured", pendingOutbox: 0 }, authenticated: false });
     expect(previewAdapter.moduleAvailability("messages", local).availability).toBe("offline");
-    expect(previewAdapter.moduleAvailability("cinema", local).availability).not.toBe("offline");
+    expect(previewAdapter.moduleAvailability("files", local).availability).toBe("offline");
   });
 });
 
@@ -68,7 +69,7 @@ describe("control states (mirrors docs/CONTROL-STATES.md)", () => {
 describe("android back contract", () => {
   it("detail routes return to their parent", () => {
     expect(parentRoute("/messages/c-mira")).toBe("/messages");
-    expect(parentRoute("/cinema/play/v1")).toBe("/cinema/play");
+    expect(parentRoute("/files/secrets")).toBe("/files");
     expect(parentRoute("/settings")).toBeNull();
   });
 });

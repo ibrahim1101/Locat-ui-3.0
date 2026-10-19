@@ -1,7 +1,6 @@
 import type { AppLockAdapter, AuthAdapter } from "./auth";
 import type { Availability } from "./common";
-import type { AdminAdapter, LinkAdapter, PrivateStoreAdapter, RemoteAdapter, SentinelAdapter } from "./ecosystem";
-import type { MediaAdapter } from "./media";
+import type { AdminAdapter, LinkAdapter, PrivateStoreAdapter } from "./ecosystem";
 import type { MessagingAdapter } from "./messaging";
 import type { ConnectionState, PlatformInfo } from "./platform";
 import type { ModuleId } from "../app/registry";
@@ -20,10 +19,7 @@ export interface LocatUiAdapter {
   auth: AuthAdapter;
   appLock: AppLockAdapter;
   messaging: MessagingAdapter;
-  media: MediaAdapter;
   link: LinkAdapter;
-  remote: RemoteAdapter;
-  sentinel: SentinelAdapter;
   privateStore: PrivateStoreAdapter;
   admin: AdminAdapter;
   /** Production truth for module availability (port of Locat moduleDisabledReason). */
