@@ -3,7 +3,7 @@
 | Priority | Source implementation | Automated validation | Platform/security acceptance |
 | --- | --- | --- | --- |
 | P0 existing stabilization | Auth, direct TLS, Host/Origin, proofs, UI3 account privacy/contact actions | Foundation API/TLS/negative/migration tests | Independent security review pending |
-| P1 homeserver connection | Discovery, instance UUID, manual browser server navigation, readiness retry, authenticated health WebSockets/session inspection; explicit proxy mode and optional deployment templates | Client/unit/real HTTP and HTTPS tests | Public/LAN hardware, Docker/ARM64 and DNS inactive/unverified |
+| P1 homeserver connection | Discovery, instance UUID, manual browser server navigation, readiness retry, authenticated health WebSockets/session inspection; explicit proxy mode; optional exact-peer client-IP attribution with layered per-client/proxy authentication limits | Client/unit/real HTTP and HTTPS tests; trusted-proxy isolation, invalid-header fallback and separate-client rate-limit regression | Public/LAN hardware, Docker/ARM64 and DNS inactive/unverified; rate limits remain process-local |
 | P2 global identity | Local IDs preserved; qualified local addresses/search and browser device proof | Existing isolation/revocation tests | Authenticated global authority/key lifecycle pending |
 | P3 E2EE/offline | Matrix 44 / Rust 18.9, managed/pinned devices, account-owned verified encrypted text UI, private-room transport and bounded original-event retries | 283 frontend / 117 backend; actual Synapse/HTTPS plus complete 55-message composer/reload/history Chromium acceptance | Accepted runtime 01ea66b / workflow 38923870766; bounded durable retry/history are verified; full identity recovery, public/global and native acceptance remain open |
 | P4 federation | Standards-based direction/dependencies documented | None | Not implemented |
@@ -12,6 +12,8 @@
 | P7 beta | Threat boundaries and acceptance procedures documented | Local foundation checks only | Not internet/public-beta ready |
 
 Continuous scope is MASTER_ROADMAP.md; earlier all-49 register remains intact. Implemented Matrix setup/account mapping and device verification now have isolated real-browser evidence; encrypted text UI now passes its defined browser flow; attachments/full recovery, global authority/key lifecycle and native acceptance remain pending. Do not equate documentation or a tunnel with completed connectivity.
+
+2026-10-19 trusted-proxy follow-on: optional single-IP attribution behind exact configured TLS proxy peers, paired with per-client and proxy-peer auth limits. Real proxy HTTP, malformed-header, separate-client and aggregate-ceiling checks pass; latest source CI is pending. Operator must verify proxy overwrite behavior before configuring it. Limits remain process-local; public/LAN hardware, Docker/ARM and DNS acceptance remain open.
 
 2026-10-15 managed messaging checkpoint: optional restricted service registration, proof-bound derived account/device provisioning, UI3 managed setup, local public-key binding and managed-token cleanup are implemented and locally tested. Real Synapse acceptance exercises the provisioning module. Complete browser, peer verification/recovery, conversations, federation and native acceptance remain pending; no live chat or full roadmap completion claim.
 

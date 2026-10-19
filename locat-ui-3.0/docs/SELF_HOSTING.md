@@ -29,7 +29,7 @@ $env:LOCAT_MEDIA_AUTHORIZED_ROOTS='D:\Shared\Movies;D:\Shared\Music'
 npm start
 ```
 
-Use your actual hostname and certificate paths. Configure host DNS and permit port 8787 on your private LAN firewall. Same-LAN use does not require Tailscale. Native app onboarding and remote access are separate work. Non-loopback listeners fail startup without TLS and an explicit public origin. Secure cookies and exact Origin/Host checks apply in HTTPS mode; forwarding-proxy headers are not trusted. Optional explicit reverse-proxy TLS termination is documented in CONNECT_ARCHITECTURE.md and CLOUDFLARE_DEPLOYMENT.md. Direct TLS remains the default LAN path.
+Use your actual hostname and certificate paths. Configure host DNS and permit port 8787 on your private LAN firewall. Same-LAN use does not require Tailscale. Native app onboarding and remote access are separate work. Non-loopback listeners fail startup without TLS and an explicit public origin. Secure cookies and exact Origin/Host checks apply in HTTPS mode; forwarded headers never determine origin. Optional explicit reverse-proxy TLS termination is documented in CONNECT_ARCHITECTURE.md and CLOUDFLARE_DEPLOYMENT.md. Direct TLS remains the default LAN path.
 
 ## Shared media
 

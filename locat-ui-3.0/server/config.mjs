@@ -13,6 +13,9 @@ export function serverConfig(env = process.env) {
   const proxyPeers = (env.LOCAT_PROXY_PEERS ?? '').split(',').map(s => s.trim()).filter(Boolean);
   if (proxy && (!proxyPeers.length || proxyPeers.length > 16 || proxyPeers.some(ip => !isIP(ip)))) throw new Error('Proxy termination requires explicit LOCAT_PROXY_PEERS IP addresses');
   if (!proxy && proxyPeers.length) throw new Error('LOCAT_PROXY_PEERS requires proxy termination');
+  const proxyClientIpHeader=(env.LOCAT_PROXY_CLIENT_IP_HEADER??'').trim().toLowerCase();
+  if(proxyClientIpHeader&&!['cf-connecting-ip','x-forwarded-for'].includes(proxyClientIpHeader))throw new Error('LOCAT_PROXY_CLIENT_IP_HEADER must be cf-connecting-ip or x-forwarded-for');
+  if(proxyClientIpHeader&&!proxy)throw new Error('LOCAT_PROXY_CLIENT_IP_HEADER requires proxy termination');
   const secure = tls || proxy;
   let origin;
   if (env.LOCAT_PUBLIC_ORIGIN) {
@@ -25,12 +28,20 @@ export function serverConfig(env = process.env) {
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host);
   if (!loopback && (!secure || !origin)) throw new Error('Non-loopback serving requires TLS and LOCAT_PUBLIC_ORIGIN');
   if (secure && !origin) throw new Error('TLS serving requires LOCAT_PUBLIC_ORIGIN');
-  return { host, port, key, cert, tls, secure, proxy, proxyPeers, origin, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
+  return { host, port, key, cert, tls, secure, proxy, proxyPeers, proxyClientIpHeader, origin, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
+}
+function normalizeIp(value){return typeof value==='string'?value.replace(/^::ffff:/,''):'';}
+/** Trust one canonical client IP header only through an explicitly trusted proxy peer. */
+export function requestClientAddress(req,config){
+  const peer=normalizeIp(req.socket?.remoteAddress)||'unknown';
+  if(!config.proxy||!config.proxyPeers.includes(peer)||!config.proxyClientIpHeader)return peer;
+  const candidate=req.headers?.[config.proxyClientIpHeader];
+  return typeof candidate==='string'&&!candidate.includes(',')&&isIP(candidate.trim())?normalizeIp(candidate.trim()):peer;
 }
 export function requestOrigin(req, config) {
   try {
     if (config.proxy) {
-      const address = req.socket?.remoteAddress?.replace(/^::ffff:/, '');
+      const address = normalizeIp(req.socket?.remoteAddress);
       if (!config.proxyPeers.includes(address)) return null;
     }
     const host = req.headers.host;

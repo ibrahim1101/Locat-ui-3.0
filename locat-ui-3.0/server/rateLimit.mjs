@@ -15,3 +15,8 @@ export function createRateLimiter(maximum = 20, windowMs = 60000, now = Date.now
     return 0;
   };
 }
+/** Keep a per-proxy ceiling while distinguishing clients only via configured trusted attribution. */
+export function createLayeredRateLimiter({peerMaximum=1200,clientMaximum=20,windowMs=60000,clientAddress,now=Date.now}={}){
+ const peerLimit=createRateLimiter(peerMaximum,windowMs,now),clientLimit=createRateLimiter(clientMaximum,windowMs,now);
+ return req=>{const peer=req.socket?.remoteAddress||'unknown',client=clientAddress?.(req)||peer;return Math.max(peerLimit(peer),clientLimit(client));};
+}

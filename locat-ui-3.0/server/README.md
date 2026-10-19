@@ -63,7 +63,7 @@ Recovery: stop the API, preserve the current database and its `-wal`/`-shm` side
 - GET/POST /api/preferences: persist validated appearance/startup preferences; rejects unknown fields and preview stress-fixture switches.
 - GET /api/security/events: latest 100 actual account events, scoped to the caller.
 
-Authentication mutations allow 20 attempts per minute per socket IP, with Retry-After responses. This per-process development limiter is not a distributed policy; behind a proxy all requests may share a bucket. Audit storage retention is pending.
+Authentication mutations allow 20 attempts per minute per client address and a 1200-attempt per-minute ceiling per connection peer, with Retry-After responses. The limiter is per process, not a distributed policy. Behind a trusted TLS proxy the client address remains the proxy peer unless `LOCAT_PROXY_CLIENT_IP_HEADER` is explicitly set to `cf-connecting-ip` or `x-forwarded-for`. Configure this only when that exact trusted proxy strips/replaces the chosen header with one canonical client IP; multi-value, invalid and missing headers conservatively fall back to the peer address. `LOCAT_PROXY_PEERS` remains mandatory, and forwarded headers never affect origin validation. Audit storage retention is pending.
 
 ## Current UI and API scope
 

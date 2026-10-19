@@ -17,11 +17,11 @@ import { attachRealtime } from './realtime.mjs';
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { readFile } from "node:fs/promises";
-import { serverConfig, requestOrigin } from "./config.mjs";
+import { serverConfig, requestClientAddress, requestOrigin } from "./config.mjs";
 import { serveStatic } from "./static.mjs";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
-import { createRateLimiter } from "./rateLimit.mjs";
+import { createLayeredRateLimiter } from "./rateLimit.mjs";
 import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
 import { openDatabase } from "./database.mjs";
@@ -37,7 +37,7 @@ if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
-const authLimit = createRateLimiter();
+const authLimit = createLayeredRateLimiter({clientAddress:req=>requestClientAddress(req,config)});
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -92,7 +92,7 @@ async function handle(req, res) {
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
   const url = new URL(req.url ?? "/", trustedOrigin);
   if (req.method === "POST" && ["/api/auth/login", "/api/auth/register", "/api/auth/password"].includes(url.pathname)) {
-    const retryAfter = authLimit(req.socket.remoteAddress ?? "unknown");
+    const retryAfter = authLimit(req);
     if (retryAfter) return json(res, 429, { error: "Too many attempts. Try again later." }, { "Retry-After": String(retryAfter) });
   }
   if (await sessionSecurity(req,res,url,trustedOrigin)) return;

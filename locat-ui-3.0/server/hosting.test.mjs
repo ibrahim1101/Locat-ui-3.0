@@ -60,7 +60,7 @@ test('explicit proxy termination retains Host/Origin checks and Secure cookies o
  try{
   const reservation=createServer();await new Promise(resolve=>reservation.listen(0,'127.0.0.1',resolve));const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
   const origin='https://locat.test';
-  child=spawn(process.execPath,['server/index.mjs'],{env:{...process.env,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_DATABASE_FILE:join(dir,'app.sqlite'),LOCAT_TLS_KEY:'',LOCAT_TLS_CERT:'',LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PUBLIC_ORIGIN:origin,LOCAT_MEDIA_AUTHORIZED_ROOTS:''},stdio:'ignore'});
+  child=spawn(process.execPath,['server/index.mjs'],{env:{...process.env,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_DATABASE_FILE:join(dir,'app.sqlite'),LOCAT_TLS_KEY:'',LOCAT_TLS_CERT:'',LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PROXY_CLIENT_IP_HEADER:'cf-connecting-ip',LOCAT_PUBLIC_ORIGIN:origin,LOCAT_MEDIA_AUTHORIZED_ROOTS:''},stdio:'ignore'});
   const request=(path,method='GET',data,extra={})=>new Promise((resolve,reject)=>{
     const req=httpRequest({hostname:'127.0.0.1',port,path,method,headers:{Host:'locat.test',Origin:origin,'Content-Type':'application/json',...extra}},res=>{
       let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>resolve({status:res.statusCode,ok:res.statusCode===200,headers:{get:key=>Array.isArray(res.headers[key])?res.headers[key][0]:res.headers[key]},json:async()=>JSON.parse(body)}));
@@ -74,5 +74,8 @@ test('explicit proxy termination retains Host/Origin checks and Secure cookies o
   assert.equal((await request('/api/auth/register','POST',credentials)).status,201);
   const login=await request('/api/auth/login','POST',credentials);assert.equal(login.status,200);assert.match(login.headers.get('set-cookie'),/; Secure/);
   const cookie=login.headers.get('set-cookie').split(';')[0];const diagnostics=await (await request('/api/diagnostics','GET',undefined,{Cookie:cookie})).json();assert.equal(diagnostics.tls,true);assert.equal(diagnostics.tlsTermination,'proxy');
+  const clientA={'CF-Connecting-IP':'198.51.100.10'};for(let attempt=0;attempt<20;attempt++)assert.equal((await request('/api/auth/login','POST',{...credentials,password:'incorrect-password'},clientA)).status,401);
+  assert.equal((await request('/api/auth/login','POST',{...credentials,password:'incorrect-password'},clientA)).status,429);
+  assert.equal((await request('/api/auth/register','POST',{username:'bob',displayName:'Bob',password:'another-long-test-password-123'},{'CF-Connecting-IP':'198.51.100.11'})).status,201);
  }finally{if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await once(child,'exit');}await rm(dir,{recursive:true,force:true});}
 });

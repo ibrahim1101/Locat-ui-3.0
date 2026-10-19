@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serverConfig, requestOrigin } from './config.mjs';
+import { serverConfig, requestClientAddress, requestOrigin } from './config.mjs';
 test('LAN serving fails closed without TLS and an explicit public origin', () => {
   assert.throws(() => serverConfig({ LOCAT_HOST: '0.0.0.0' }), /TLS/);
   assert.throws(() => serverConfig({ LOCAT_TLS_KEY: 'key' }), /both/);
@@ -29,4 +29,14 @@ test('TLS termination trusts exact socket peers and fixed HTTPS origin, never fo
   assert.equal(requestOrigin(request('172.30.8.2'),config),'https://locat.test');
   assert.equal(requestOrigin(request('172.30.8.3'),config),null);
   assert.equal(requestOrigin(request('127.0.0.1','evil.test'),config),null);
+});
+
+test('proxy client attribution requires an exact trusted peer and one valid configured IP header',()=>{
+  assert.throws(()=>serverConfig({LOCAT_PROXY_CLIENT_IP_HEADER:'cf-connecting-ip'}),/proxy termination/);
+  assert.throws(()=>serverConfig({LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PROXY_CLIENT_IP_HEADER:'x-real-ip'}),/must be/);
+  const config=serverConfig({LOCAT_TLS_TERMINATION:'proxy',LOCAT_PROXY_PEERS:'127.0.0.1',LOCAT_PROXY_CLIENT_IP_HEADER:'cf-connecting-ip',LOCAT_PUBLIC_ORIGIN:'https://locat.test'});
+  const request=(peer,header)=>({socket:{remoteAddress:peer},headers:{'cf-connecting-ip':header}});
+  assert.equal(requestClientAddress(request('::ffff:127.0.0.1','2001:db8::5'),config),'2001:db8::5');
+  assert.equal(requestClientAddress(request('127.0.0.1','forged, 192.0.2.1'),config),'127.0.0.1');
+  assert.equal(requestClientAddress(request('172.30.0.9','192.0.2.1'),config),'172.30.0.9');
 });
