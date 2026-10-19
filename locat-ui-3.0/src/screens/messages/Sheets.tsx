@@ -137,7 +137,7 @@ export function ScheduleSheet({ open, onClose, conversation, initialText }: { op
     <Sheet open={open} onClose={onClose} title="Schedule message" description={`To ${conversation.title} · your local time`} size="sm" testId="schedule-sheet"
       footer={<Button variant="primary" icon={CalendarClock} disabledReason={!text.trim() ? "Write a message" : past ? "Pick a future time" : null} onClick={async () => { report(await adapter.messaging.schedule(conversation.id, { text }, new Date(when).getTime()), "Scheduled"); onClose(); }} data-testid="schedule-submit">Schedule</Button>}>
       <label className="mb-1.5 block text-[13px] font-semibold text-ink-2" htmlFor="sched-text">Message</label>
-      <textarea id="sched-text" value={text} onChange={(e) => setText(e.target.value)} rows={3} className="mb-4 w-full resize-none rounded-xl bg-s2 p-3 text-[15px] outline-none hairline focus:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))]" />
+      <textarea id="sched-text" value={text} onChange={(e) => setText(e.target.value)} rows={3} className="mb-4 w-full resize-none rounded-xl bg-s2 p-3 text-[15px] outline-hidden hairline focus:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))]" />
       <TextField label="Send at" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} error={past ? "That time has passed" : null} />
     </Sheet>
   );

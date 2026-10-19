@@ -17,7 +17,7 @@ function CursorMenu({ args, onClose }: { args: MenuOpenArgs; onClose(): void }) 
     const down = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) onClose(); };
     const prev = document.activeElement as HTMLElement | null;
     addEventListener("mousedown", down, true); addEventListener("blur", onClose); addEventListener("resize", onClose);
-    return () => { removeEventListener("mousedown", down, true); removeEventListener("blur", onClose); removeEventListener("resize", onClose); prev?.focus?.(); };
+    return () => { removeEventListener("mousedown", down, true); removeEventListener("blur-sm", onClose); removeEventListener("resize", onClose); prev?.focus?.(); };
   }, [onClose]);
   const move = (d: number) => { const n = args.items.length; let i = active; for (let k = 0; k < n; k++) { i = (i + d + n) % n; if (!args.items[i].disabledReason) break; } setActive(i); };
   const choose = (i: number) => { const it = args.items[i]; if (!it || it.disabledReason) return; onClose(); it.onSelect(); };
@@ -31,7 +31,7 @@ function CursorMenu({ args, onClose }: { args: MenuOpenArgs; onClose(): void }) 
         else if (e.key === "Tab") { e.preventDefault(); onClose(); }
         else if (e.key.length === 1) { const now = Date.now(); typed.current = { s: (now - typed.current.t < 600 ? typed.current.s : "") + e.key.toLowerCase(), t: now }; const i = args.items.findIndex((it) => !it.disabledReason && it.label.toLowerCase().startsWith(typed.current.s)); if (i >= 0) setActive(i); }
       }}
-      className="fixed z-50 min-w-[220px] max-w-[320px] animate-pop rounded-xl bg-s2/95 p-1 shadow-float outline-none backdrop-blur-xl">
+      className="fixed z-50 min-w-[220px] max-w-[320px] animate-pop rounded-xl bg-s2/95 p-1 shadow-float outline-hidden backdrop-blur-xl">
       {args.items.map((it, i) => { const I = it.icon; return (
         <div key={it.id}>
           {it.separatorBefore && <div className="mx-2 my-1 h-px bg-line" role="separator" />}

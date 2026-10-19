@@ -25,7 +25,7 @@ export function PreviewLab() {
   return (
     <>
       {!compact && <button onClick={() => setOpen(true)} data-testid="preview-lab-button" aria-label="Open preview lab"
-        className="fixed left-1/2 z-[60] -translate-x-1/2 opacity-80 hover:opacity-100 inline-flex h-[18px] items-center gap-1 rounded-b-lg bg-planned/20 px-2.5 text-[10px] font-bold uppercase tracking-wide text-planned backdrop-blur hover:bg-planned/30"
+        className="fixed left-1/2 z-60 -translate-x-1/2 opacity-80 hover:opacity-100 inline-flex h-[18px] items-center gap-1 rounded-b-lg bg-planned/20 px-2.5 text-[10px] font-bold uppercase tracking-wide text-planned backdrop-blur-sm hover:bg-planned/30"
         style={{ top: "env(safe-area-inset-top)" }}>
         <FlaskConical className="size-3" /> Preview
       </button>}

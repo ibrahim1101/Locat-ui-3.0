@@ -13,7 +13,7 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps>(function TextF
       <div className={cn("flex h-12 items-center gap-2 rounded-xl bg-s2 px-3.5 hairline transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))] md:h-11", error && "shadow-[inset_0_0_0_1.5px_rgb(var(--danger))]")}>
         {I && <I className="size-[18px] shrink-0 text-ink-3" aria-hidden />}
         <input ref={ref} id={fid} type={reveal ? (shown ? "text" : "password") : type} aria-invalid={!!error || undefined}
-          aria-describedby={error || hint ? `${fid}-d` : undefined} className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-3 md:text-sm" {...rest} />
+          aria-describedby={error || hint ? `${fid}-d` : undefined} className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-hidden placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ember md:text-sm" {...rest} />
         {reveal && <button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? "Hide" : "Show"} className="grid size-9 place-items-center rounded-lg text-ink-3 hover:text-ink">{shown ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}</button>}
         {trailing}
       </div>
@@ -27,7 +27,7 @@ export function SearchField({ value, onChange, placeholder, className, autoFocus
     <div className={cn("flex h-11 items-center gap-2 rounded-xl bg-s2 px-3 hairline focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))] md:h-10", className)}>
       <Search className="size-[18px] shrink-0 text-ink-3" aria-hidden />
       <input data-testid={testId} autoFocus={autoFocus} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
-        className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-3 md:text-sm [&::-webkit-search-cancel-button]:hidden" />
+        className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-hidden placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ember md:text-sm [&::-webkit-search-cancel-button]:hidden" />
       {value && <button aria-label="Clear search" onClick={() => onChange("")} className="grid size-7 place-items-center rounded-md text-ink-3 hover:text-ink"><X className="size-4" /></button>}
     </div>
   );
@@ -43,7 +43,7 @@ export function Switch({ checked, onChange, label, description, disabledReason, 
       </div>
       <button id={id} data-testid={testId} role="switch" type="button" aria-checked={checked} disabled={!!disabledReason} onClick={() => onChange(!checked)}
         className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200", checked ? "bg-ember" : "bg-s3 hairline")}>
-        <span className={cn("absolute top-1 size-5 rounded-full bg-white shadow transition-transform duration-200", checked ? "translate-x-6" : "translate-x-1")} />
+        <span className={cn("absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform duration-200", checked ? "translate-x-6" : "translate-x-1")} />
       </button>
     </div>
   );
@@ -85,7 +85,7 @@ export function Slider({ value, min, max, step = 1, onChange, label, format, ver
   return (
     <input type="range" disabled={disabled} aria-label={label} aria-valuetext={format?.(value)} min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))}
       style={{ background: `linear-gradient(to right, rgb(var(--ember)) ${pct}%, rgb(var(--surface-3)) ${pct}%)`, ...(vertical ? { writingMode: "vertical-lr", direction: "rtl" } : {}) }}
-      className={cn("h-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 appearance-none rounded-full accent-[rgb(var(--ember))] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white",
+      className={cn("h-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 appearance-none rounded-full accent-[rgb(var(--ember))] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white",
         vertical ? "h-32 w-1.5" : "w-full", className)} />
   );
 }

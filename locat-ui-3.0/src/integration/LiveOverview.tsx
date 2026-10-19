@@ -45,7 +45,7 @@ export function LiveOverview({ kind }: { kind: "home" | "search" | "modules" }) 
   const sections = kind === "home" ? [{ category: "core" as const, modules: homeModules }] : categories.map((category) => ({ category, modules: MODULES.filter((module) => module.category === category && module.id !== "gallery" && module.id !== "profile") }));
   return <Screen title={title} subtitle={kind === "home" ? "Your conversations, devices, and private files in one place" : "A clear map of your Locat workspace"}>
     <div className="mx-auto max-w-6xl space-y-8">
-      {kind === "home" && <header className="rounded-3xl border border-ember/20 bg-gradient-to-br from-ember/10 via-s1 to-s1 p-6 sm:p-8">
+      {kind === "home" && <header className="rounded-3xl border border-ember/20 bg-linear-to-br from-ember/10 via-s1 to-s1 p-6 sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-ember">Obsidian Ember</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{heading}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-2">Start with the things you use every day. Your files, device links, and conversations each have their own focused space.</p>

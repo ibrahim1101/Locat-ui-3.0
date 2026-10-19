@@ -1,7 +1,7 @@
 name: Locat core checks
 on:
   push:
-    branches: [integration/locat-core]
+    branches: [integration/locat-core, rework/locat-core-scope]
   pull_request:
 jobs:
   connector-preparation:

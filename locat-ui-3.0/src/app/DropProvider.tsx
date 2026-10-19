@@ -35,7 +35,7 @@ export function DropProvider({ children }: { children: ReactNode }) {
     <DropContext.Provider value={api}>
       {children}
       {dragging && createPortal(
-        <div className="pointer-events-none fixed inset-0 z-50 grid animate-fade place-items-center bg-canvas/70 p-6 backdrop-blur-sm" data-testid="drop-overlay">
+        <div className="pointer-events-none fixed inset-0 z-50 grid animate-fade place-items-center bg-canvas/70 p-6 backdrop-blur-xs" data-testid="drop-overlay">
           <div className={cn("flex w-full max-w-md flex-col items-center rounded-3xl border-2 border-dashed p-10 text-center", t ? "border-ember bg-ember/10" : "border-line-strong bg-s1")}>
             {t ? <FileUp className="mb-3 size-10 text-ember" /> : <Ban className="mb-3 size-10 text-ink-3" />}
             <p className="text-lg font-bold">{t ? t.label : "Files can't be dropped here"}</p>

@@ -1,7 +1,161 @@
-@import "./theme/themes.css";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import './theme/themes.css' layer(base);
+@import 'tailwindcss';
+
+@theme {
+  --color-canvas: rgb(var(--canvas));
+  --color-s1: rgb(var(--surface-1));
+  --color-s2: rgb(var(--surface-2));
+  --color-s3: rgb(var(--surface-3));
+  --color-line: rgb(var(--line));
+  --color-line-strong: rgb(var(--line-strong));
+  --color-ink: rgb(var(--ink));
+  --color-ink-2: rgb(var(--ink-2));
+  --color-ink-3: rgb(var(--ink-3));
+  --color-ember: rgb(var(--ember));
+  --color-ember-ink: rgb(var(--ember-ink));
+  --color-ember-soft: rgb(var(--ember-soft));
+  --color-titanium: rgb(var(--titanium));
+  --color-ok: rgb(var(--ok));
+  --color-warn: rgb(var(--warn));
+  --color-danger: rgb(var(--danger));
+  --color-info: rgb(var(--info));
+  --color-planned: rgb(var(--planned));
+
+  --font-sans: 'Manrope Variable', Manrope, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.02em;
+
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+  --radius-3xl: 28px;
+
+  --spacing-safe-t: env(safe-area-inset-top);
+  --spacing-safe-b: env(safe-area-inset-bottom);
+
+  --shadow-lift:
+    0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --shadow-float:
+    0 24px 64px -16px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(var(--line) / 1);
+  --shadow-ember: 0 8px 28px -10px rgb(var(--ember) / 0.55);
+
+  --animate-rise: rise 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-sheet-up: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade: fade 0.2s ease-out both;
+  --animate-pop: pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pulse2: pulse2 1.4s ease-in-out infinite;
+  --animate-eq: eq 0.9s ease-in-out infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse2 {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @keyframes eq {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility mesh {
+  background-image: radial-gradient(
+    rgb(var(--ink) / 0.05) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+
+@utility hairline {
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+}
+
+@utility titanium-edge {
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.06), transparent 40%);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
 
 @layer base {
   html, body, #root { height: 100%; }
@@ -18,17 +172,6 @@
   ::selection { background: rgb(var(--ember) / 0.35); }
   @media (max-width: 767px) { input, textarea { font-size: 16px; } }
   * { scrollbar-width: thin; scrollbar-color: rgb(var(--line-strong)) transparent; }
-}
-
-@layer utilities {
-  .pt-safe { padding-top: env(safe-area-inset-top); }
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-  .mesh { background-image: radial-gradient(rgb(var(--ink) / 0.05) 1px, transparent 1px); background-size: 18px 18px; }
-  .hairline { box-shadow: inset 0 0 0 1px rgb(var(--line)); }
-  .titanium-edge { background: linear-gradient(180deg, rgb(var(--ink) / 0.06), transparent 40%); }
-  .no-scrollbar { scrollbar-width: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .tabular { font-variant-numeric: tabular-nums; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -17,14 +17,14 @@ function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attac
   switch (a.kind) {
     case "image": return (
       <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-xl">
-        <div className="grid aspect-[4/3] w-[min(68vw,300px)] place-items-center" style={{ background: "linear-gradient(135deg,hsl(28 30% 30%),hsl(220 20% 14%))" }}><ImageIcon className="size-8 text-white/40" /></div>
-        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-2xs font-semibold text-white backdrop-blur">{a.original ? "Original" : "Compressed"} · {a.width}×{a.height}</span>
+        <div className="grid aspect-4/3 w-[min(68vw,300px)] place-items-center" style={{ background: "linear-gradient(135deg,hsl(28 30% 30%),hsl(220 20% 14%))" }}><ImageIcon className="size-8 text-white/40" /></div>
+        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-2xs font-semibold text-white backdrop-blur-sm">{a.original ? "Original" : "Compressed"} · {a.width}×{a.height}</span>
       </div>);
     case "file": return (
       <div className={cn("flex min-w-[220px] max-w-[300px] items-center gap-3 rounded-xl p-2.5", mine ? "bg-black/15" : "bg-s3")}>
         <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", mine ? "bg-black/15 text-ember-ink" : "bg-ember/15 text-ember")}><FileText className="size-5" /></span>
         <span className="min-w-0 flex-1"><span className="block break-all text-[13px] font-semibold leading-snug line-clamp-2">{a.name}</span><span className="text-2xs opacity-70">{formatBytes(a.size)} · encrypted</span></span>
-        {onDownload?<button type="button" onClick={onDownload} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-black/10 focus-visible:outline focus-visible:outline-2" aria-label={`Download ${a.name}`}><Download className="size-4 opacity-80" /></button>:<Download className="size-4 shrink-0 opacity-70" aria-label="Download" />}
+        {onDownload?<button type="button" onClick={onDownload} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-black/10 focus-visible:outline-solid focus-visible:outline-2" aria-label={`Download ${a.name}`}><Download className="size-4 opacity-80" /></button>:<Download className="size-4 shrink-0 opacity-70" aria-label="Download" />}
       </div>);
     case "voice": return (
       <div className="flex w-[min(64vw,260px)] items-center gap-3">
@@ -55,7 +55,7 @@ export const MessageBubble = memo(function MessageBubble({ m, grouped, showAutho
         <div tabIndex={0} role="article" aria-label={`${m.mine ? "You" : m.authorName}: ${m.text ?? m.attachment?.kind ?? ""}`}
           onContextMenu={(e) => { e.preventDefault(); onMenu(m, { x: e.clientX, y: e.clientY, pointer: "mouse" }); }} onTouchStart={press} onTouchEnd={release} onTouchMove={release}
           onKeyDown={(e) => { if (e.key === "Enter" || (e.shiftKey && e.key === "F10") || e.key === "ContextMenu") { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); onMenu(m, { x: r.left + 16, y: r.bottom - 8, pointer: "keyboard" }); } }}
-          className={cn("relative rounded-[20px] px-3.5 py-2 text-[15px] leading-snug md:text-sm", m.mine ? "bg-ember text-ember-ink" : "bg-s2 text-ink hairline",
+          className={cn("relative rounded-2xl px-3.5 py-2 text-[15px] leading-snug md:text-sm", m.mine ? "bg-ember text-ember-ink" : "bg-s2 text-ink hairline",
             m.mine ? (grouped ? "rounded-tr-md" : "rounded-br-md") : (grouped ? "rounded-tl-md" : "rounded-bl-md"), m.deletedForEveryone && "bg-transparent italic text-ink-3 hairline")}>
           {m.forwarded && <p className="mb-1 flex items-center gap-1 text-2xs font-semibold opacity-75"><CornerUpRight className="size-3" />Forwarded</p>}
           {m.replyTo && (
@@ -65,7 +65,7 @@ export const MessageBubble = memo(function MessageBubble({ m, grouped, showAutho
             </button>)}
           {m.deletedForEveryone ? <span>This message was deleted</span> : <>
             {m.attachment && <Attachment a={m.attachment} mine={m.mine} onDownload={onDownload?()=>onDownload(m):undefined} />}
-            {m.text && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.text}</p>}
+            {m.text && <p className="whitespace-pre-wrap wrap-break-word wrap-anywhere">{m.text}</p>}
           </>}
           <span className={cn("float-right ml-2 mt-1 inline-flex translate-y-0.5 items-center gap-1 text-[10px] tabular", m.mine ? "text-ember-ink/70" : "text-ink-3")}>
             {m.pinned && <Pin className="size-3" aria-label="Pinned" />}{m.editedAt && <span>edited</span>}{clockTime(m.createdAt)}{m.mine && <span className={cn(m.mine && m.delivery === "read" && "[&_svg]:text-ember-ink")}><DeliveryIcon d={m.delivery} /></span>}

@@ -42,7 +42,7 @@ function Palette({ onClose }: { onClose(): void }) {
             if (e.key === "ArrowUp") { e.preventDefault(); setI((x) => Math.max(0, x - 1)); }
             if (e.key === "Enter" && items[i]) go(items[i].to);
           }}
-          className="h-14 w-full border-b border-line bg-transparent px-5 text-[15px] outline-none placeholder:text-ink-3" />
+          className="h-14 w-full border-b border-line bg-transparent px-5 text-[15px] outline-hidden placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ember" />
         <ul className="max-h-[50vh] overflow-y-auto p-2" role="listbox">
           {items.map((it, idx) => { const I = it.icon; return (
             <li key={it.id} role="option" aria-selected={idx === i}>

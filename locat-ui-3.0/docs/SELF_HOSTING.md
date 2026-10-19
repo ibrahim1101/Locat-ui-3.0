@@ -2,6 +2,8 @@
 
 Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Experimental encrypted text conversations now use the optional private Matrix/Synapse service and have actual browser acceptance. Full recovery, broader messaging, native clients and advanced administration remain incomplete. See MESSAGING_QUICKSTART.md for the verified workflow and limits. Progressive FFmpeg conversion is connected with documented limits. Nothing is automatically deployed.
 
+The web UI's current CSS toolchain requires Chrome/Edge 111+, Firefox 128+, or Safari 16.4+. Keep the embedded Android WebView at a supported Chromium version. Native platform acceptance remains separate.
+
 ## One machine
 
 From locat-ui-3.0:

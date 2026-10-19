@@ -18,7 +18,7 @@ function Calendar() {
       <div className="rounded-3xl bg-s1 p-4 hairline">
         <div className="mb-3 flex items-center justify-between"><p className="font-bold">June 2026</p><div className="flex gap-1">{["Month", "Week", "Day", "Agenda"].map((v, i) => <span key={v} className={cn("rounded-lg px-2.5 py-1 text-xs font-semibold", i === 0 ? "bg-s3" : "text-ink-3")}>{v}</span>)}</div></div>
         <div className="grid grid-cols-7 gap-1 text-center text-2xs font-bold uppercase text-ink-3">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <span key={d} className="py-1">{d}</span>)}</div>
-        <div className="grid grid-cols-7 gap-1">{days.map((d) => <div key={d} className={cn("min-h-[64px] rounded-lg p-1.5 text-left text-xs", d < 1 || d > 30 ? "text-ink-3/50" : "bg-s2/60")}>{d > 0 && d <= 30 && d}{ev[d] && <span className="mt-1 block truncate rounded bg-ember/20 px-1 text-[10px] font-semibold text-ember">{ev[d]}</span>}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1">{days.map((d) => <div key={d} className={cn("min-h-[64px] rounded-lg p-1.5 text-left text-xs", d < 1 || d > 30 ? "text-ink-3/50" : "bg-s2/60")}>{d > 0 && d <= 30 && d}{ev[d] && <span className="mt-1 block truncate rounded-sm bg-ember/20 px-1 text-[10px] font-semibold text-ember">{ev[d]}</span>}</div>)}</div>
       </div>
       <div><SectionTitle>Event</SectionTitle><Section>
         <ListRow icon={Clock} title="Studio session" subtitle="Thu 4 Jun · 19:00–22:00" /><ListRow icon={Repeat} title="Repeats" subtitle="Every week" disabledReason="Recurrence — planned" />

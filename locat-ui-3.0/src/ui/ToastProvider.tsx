@@ -26,7 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {items.map((t) => {
             const I = ICON[t.tone];
             return (
-              <div key={t.id} role="status" data-testid="toast" className="pointer-events-auto flex w-full max-w-sm animate-rise items-start gap-3 rounded-xl bg-s3/95 p-3 pr-2 shadow-float backdrop-blur">
+              <div key={t.id} role="status" data-testid="toast" className="pointer-events-auto flex w-full max-w-sm animate-rise items-start gap-3 rounded-xl bg-s3/95 p-3 pr-2 shadow-float backdrop-blur-sm">
                 <I className={cn("mt-0.5 size-5 shrink-0", TONE[t.tone])} aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{t.title}</p>

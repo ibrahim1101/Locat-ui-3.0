@@ -48,7 +48,7 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
             <textarea ref={ta} rows={1} value={draft.text} disabled={!!textOff} aria-label="Message" placeholder={editing ? "Edit message" : "Encrypted message"} data-testid="composer-input"
               onChange={(e) => onDraft({ ...draft, text: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.innerWidth >= 768) { e.preventDefault(); if (canSend) onSend(); } }}
-              className="max-h-40 min-h-[44px] flex-1 resize-none bg-transparent py-[11px] text-[15px] leading-snug outline-none placeholder:text-ink-3 md:text-sm" />
+              className="max-h-40 min-h-[44px] flex-1 resize-none bg-transparent py-[11px] text-[15px] leading-snug outline-hidden placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ember md:text-sm" />
             <IconButton icon={Smile} label="Emoji and GIF" size="sm" className="mb-1.5 -mr-1.5" onClick={() => onAttach("gif")} disabledReason={r(cap.gif)} />
           </div>
           {canSend ? <IconButton icon={SendHorizontal} label={editing ? "Save edit" : "Send"} tone="ember" onClick={onSend} data-testid="composer-send" />

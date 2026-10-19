@@ -32,7 +32,7 @@ export function Sheet({ open, onClose, title, description, children, footer, siz
     <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center md:p-6" data-testid={testId}>
       <div className="absolute inset-0 animate-fade bg-black/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
       <div ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={id}
-        className={cn("relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-s1 shadow-float outline-none animate-sheet-up md:animate-pop md:rounded-2xl",
+        className={cn("relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-s1 shadow-float outline-hidden animate-sheet-up md:animate-pop md:rounded-2xl",
           size === "sm" ? "md:max-w-md" : size === "lg" ? "md:max-w-3xl" : "md:max-w-xl")}>
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-line-strong md:hidden" aria-hidden />
         <header className="flex shrink-0 items-start gap-3 px-5 pb-3 pt-3 md:pt-5">
