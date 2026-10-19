@@ -13,7 +13,7 @@ export function LiveConversation({peerId}:{peerId:string}){
  const owner=useMatrixOwner(),navigate=useNavigate();const handle=owner?.handle;
  const [state,setState]=useState<ConversationSnapshot>({transport:'connecting',busy:false,messages:[]}),[error,setError]=useState(''),[draft,setDraft]=useState<ComposerDraft>({text:''}),[forget,setForget]=useState(false),[downloadReady,setDownloadReady]=useState<{url:string;name:string}|null>(null);
  const picker=useRef<HTMLInputElement>(null),downloadUrl=useRef<string|null>(null);
-  useEffect(()=>()=>{if(downloadUrl.current)URL.revokeObjectURL(downloadUrl.current);},[peerId]);
+  useEffect(()=>{setDownloadReady(null);return()=>{if(downloadUrl.current){URL.revokeObjectURL(downloadUrl.current);downloadUrl.current=null;}};},[peerId]);
  useEffect(()=>{if(!handle)return;let active=true;const session=handle.conversations(),off=session.subscribe(value=>{if(active)setState(value.peer?.accountId===peerId?value:{...value,peer:undefined,roomId:undefined,messages:[]});});void Promise.resolve().then(async()=>{if(!active)return;try{await session.open(peerId);}catch(reason){if(active)setError(reason instanceof Error?reason.message:'Conversation unavailable.');}});return()=>{active=false;off();};},[handle,peerId]);
  if(!handle||handle.closed)return <div className="space-y-4 p-6"><Button onClick={()=>navigate('/messages')}>Back to contacts</Button><StateView kind="locked" title="Start messaging in Settings" body="Bind and verify this browser, then choose Keep messaging active. Reopening retains its stored crypto keys."/><Button onClick={()=>navigate('/settings')}>Messaging device setup</Button></div>;
  const disabled=cannot('This option is not integrated with encrypted conversations.');
