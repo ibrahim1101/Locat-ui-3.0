@@ -1,15 +1,16 @@
 import {webcrypto} from 'node:crypto';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import type {MatrixClient} from 'matrix-js-sdk';
-import {createMatrixConversationSession,type MatrixConversationSession} from './matrixConversationSession';
+import {createMatrixConversationSession,type MatrixConversationSession,type ConversationSnapshot} from './matrixConversationSession';
+import {encryptMatrixAttachment} from './matrixEncryptedAttachment';
 vi.mock('./matrixTrackedPeer.mjs',()=>({trackAuthorizedMatrixPeer:vi.fn(async()=>{})}));
 const peer={accountId:'b'.repeat(32),matrixUserId:'@bob:test',devices:[{deviceId:'BOB'}]};
-let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,sendEvent:ReturnType<typeof vi.fn>,upload:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,decrypt:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
+let session:MatrixConversationSession,verified:boolean,members:string[],events:unknown[],pendingEvents:unknown[],resend:ReturnType<typeof vi.fn>,resolve:ReturnType<typeof vi.fn<(accountId:string)=>Promise<typeof peer>>>,send:ReturnType<typeof vi.fn>,sendEvent:ReturnType<typeof vi.fn>,upload:ReturnType<typeof vi.fn>,mediaUrl:ReturnType<typeof vi.fn>,discard:ReturnType<typeof vi.fn>,scrollback:ReturnType<typeof vi.fn>,decrypt:ReturnType<typeof vi.fn>,pagination:{paginationToken:string|null};
 beforeEach(()=>{verified=true;members=['@alice:test','@bob:test'];events=[];pendingEvents=[];resend=vi.fn(async()=>({event_id:'$retried'}));resolve=vi.fn(async()=>peer);send=vi.fn(async()=>({event_id:'$sent'}));discard=vi.fn(async()=>{});decrypt=vi.fn(async()=>{});pagination={paginationToken:'older'};scrollback=vi.fn(async()=>{pagination.paginationToken=null;});
  const room={oldState:pagination,getPendingEvents:()=>pendingEvents,getLiveTimeline:()=>({getEvents:()=>events}),currentState:{getStateEvents:()=>({getContent:()=>({algorithm:'m.megolm.v1.aes-sha2'})})},getMembers:()=>members.map(userId=>({userId,membership:'join'})),getMyMembership:()=> 'join',getMember:()=>({membership:'join'})};
  const crypto={getUserDeviceInfo:vi.fn(async()=>new Map([[peer.matrixUserId,new Map([['BOB',{}]])]])),getDeviceVerificationStatus:vi.fn(async()=>({isVerified:()=>verified})),isEncryptionEnabledInRoom:vi.fn(async()=>true),forceDiscardSession:discard};
  sendEvent=vi.fn(async()=>({event_id:'$file'}));upload=vi.fn(async()=>({content_uri:'mxc://media.test/file-id'}));
- const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,sendEvent,uploadContent:upload,mxcUrlToHttp:vi.fn(),getHomeserverUrl:()=> 'https://matrix.test',resendEvent:resend,scrollback,decryptEventIfNeeded:decrypt};
+ mediaUrl=vi.fn();const client={getRoom:()=>room,getSyncState:()=> 'SYNCING',getUserId:()=> '@alice:test',getCrypto:()=>crypto,joinRoom:vi.fn(async()=>{}),sendTextMessage:send,sendEvent,uploadContent:upload,mxcUrlToHttp:mediaUrl,getHomeserverUrl:()=> 'https://matrix.test',resendEvent:resend,scrollback,decryptEventIfNeeded:decrypt};
  const outbox={load:vi.fn(async()=>undefined),prepare:vi.fn(async()=>{}),beforeSend:vi.fn(async()=>{}),complete:vi.fn(async()=>{}),check:vi.fn()};
  session=createMatrixConversationSession(client as unknown as MatrixClient,resolve,async()=>({roomId:'!room:test'}),async()=>{},outbox as never);
 });
@@ -33,6 +34,19 @@ it('uploads ciphertext and sends only an encrypted Matrix file event after devic
  await expect(session.sendAttachment(file)).resolves.toEqual({eventId:'$file'});
  const uploaded=upload.mock.calls[0][0] as Uint8Array;expect(uploaded).not.toEqual(plain);expect(upload.mock.calls[0][1]).toMatchObject({type:'application/octet-stream'});
  expect(sendEvent).toHaveBeenCalledOnce();const event=sendEvent.mock.calls[0][2];expect(event).toMatchObject({msgtype:'m.file',body:'private.png',info:{mimetype:'image/png',size:plain.length},file:{url:'mxc://media.test/file-id',v:'v2',key:{alg:'A256CTR'}}});expect(JSON.stringify(event)).not.toContain('a confidential original photo');expect(discard).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();
+});
+
+it('projects encrypted file events and verifies downloaded ciphertext before returning the original bytes',async()=>{
+ vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);const plain=new TextEncoder().encode('original attachment'),encrypted=await encryptMatrixAttachment(plain),file={...encrypted.file,url:'mxc://media.test/opaque'};
+ events=[{getWireType:()=> 'm.room.encrypted',getId:()=> '$encrypted-file',getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>false,shouldAttemptDecryption:()=>false,isDecryptionFailure:()=>false,getContent:()=>({msgtype:'m.file',body:'image.png',info:{size:plain.length,mimetype:'image/png'},file}),getType:()=> 'm.room.message',getTs:()=>123}];let snapshot:ConversationSnapshot|undefined;session.subscribe(value=>{snapshot=value;});
+ await vi.waitFor(()=>expect(snapshot?.messages).toMatchObject([{id:'$encrypted-file',attachment:{name:'image.png',size:plain.length,mime:'image/png'}}]));
+ mediaUrl.mockReturnValue('https://matrix.test/_matrix/media/v3/download/media.test/opaque');vi.stubGlobal('fetch',vi.fn(async()=>new Response(encrypted.ciphertext)));
+ const downloaded=await session.downloadAttachment(file);expect(new TextDecoder().decode(await downloaded.arrayBuffer())).toBe('original attachment');expect(fetch).toHaveBeenCalledWith(expect.stringContaining('https://matrix.test/'),{credentials:'omit',cache:'no-store',redirect:'error'});
+});
+
+it('refuses encrypted media URLs that resolve outside the configured homeserver',async()=>{
+ vi.stubGlobal('crypto',webcrypto);const encrypted=await encryptMatrixAttachment(new TextEncoder().encode('secret')),file={...encrypted.file,url:'mxc://media.test/opaque'};mediaUrl.mockReturnValue('https://attacker.test/download');const download=vi.fn();vi.stubGlobal('fetch',download);
+ await expect(session.downloadAttachment(file)).rejects.toThrow('conversation’s homeserver');expect(download).not.toHaveBeenCalled();
 });
 it('denies history access for unverified devices and never fetches beyond the 200-event display window',async()=>{
  await session.open(peer.accountId);verified=false;await expect(session.loadOlder()).rejects.toThrow('Verify every');expect(scrollback).not.toHaveBeenCalled();verified=true;
