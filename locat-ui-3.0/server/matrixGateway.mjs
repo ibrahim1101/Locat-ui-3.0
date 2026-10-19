@@ -35,8 +35,8 @@ export function createMatrixGateway({provider,store,conversations,sessionUser,se
   const mediaDownload=!!mediaMatch;
   if(mediaDownload){
    if(mediaMatch[1]!==provider.serverName)fail(403,'Remote Matrix media is disabled');
-   const allowRemote=url.searchParams.getAll('allow_remote');
-   if([...url.searchParams.keys()].some(key=>key!=='allow_remote')||allowRemote.length>1||allowRemote[0]==='true')fail(400,'Only same-server encrypted media downloads are permitted');
+   const allowRedirect=url.searchParams.getAll('allow_redirect');
+   if([...url.searchParams.keys()].some(key=>key!=='allow_redirect')||allowRedirect.length>1||allowRedirect[0]==='true')fail(400,'Matrix media redirects are disabled');
   }
   if(mediaUpload){
    if([...url.searchParams.keys()].some(key=>key!=='filename')||url.searchParams.getAll('filename').length>1||(url.searchParams.has('filename')&&(url.searchParams.get('filename')??'').length>255))fail(400,'Invalid Matrix media upload query');
