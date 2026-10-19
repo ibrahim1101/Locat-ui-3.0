@@ -103,7 +103,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
    const uploadResponse=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'));
    await alice.page.locator('[data-testid="live-conversation"] input[type="file"]').setInputFiles({name,mimeType:'text/plain',buffer:plain});
    const request=await uploadRequest,response=await uploadResponse,ciphertext=request.postDataBuffer();
-   expect(request.method()).toBe('POST');expect(request.headers()['content-type']).toContain('application/octet-stream');expect(response.status()).toBe(200);
+   expect(request.method()).toBe('POST');expect(request.headers()['content-type']).toContain('application/octet-stream');expect(response.status(),`upload ${new URL(response.url()).pathname}: ${await response.text()}`).toBe(200);
    expect(ciphertext).toBeTruthy();expect(ciphertext.equals(plain)).toBe(false);expect(ciphertext.includes(plain)).toBe(false);
    const aliceLog=alice.page.getByRole('log',{name:'Messages',exact:true}),bobLog=bob.page.getByRole('log',{name:'Messages',exact:true});
    await expect(aliceLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});await expect(bobLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});
