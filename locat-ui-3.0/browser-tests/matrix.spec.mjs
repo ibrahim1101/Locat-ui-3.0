@@ -1,6 +1,6 @@
 import {test,expect,chromium} from '@playwright/test';
 import {randomBytes} from 'node:crypto';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {startBrowserFixture} from '../tools/browser-fixture.mjs';
@@ -96,6 +96,21 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
   bob.page.on('response',response=>{if(new URL(response.url()).pathname==='/_matrix/client/v3/sync'){syncCodes.push(response.status());if(syncCodes.length>12)syncCodes.shift();if(response.ok())void response.json().then(value=>{for(const room of Object.values(value.rooms?.join??{}))for(const event of room.timeline?.events??[])if(event.type==='m.room.encrypted')syncedIds.add(event.event_id);}).catch(()=>{});}});
   await test.step('Block sending while a new contact device is unverified',async()=>{const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block'});contexts.push(context);await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());const page=await context.newPage();await page.goto(fixture.origin);await page.getByTestId('login-username').fill(bob.username);await page.getByTestId('login-password').fill(bob.password);await page.getByTestId('login-submit').click();await expect(page.getByTestId('entry-flow')).toHaveCount(0);const extra={page,user:bob.user};const dialog=await bind(extra);const sends=roomSends.length;await alice.page.getByLabel('Message',{exact:true}).fill(markers[5]);await alice.page.getByRole('button',{name:'Send',exact:true}).click();await expect(alice.page.getByRole('alert')).toContainText('Verify every active contact device');expect(roomSends.length).toBe(sends);await dialog.getByRole('button',{name:'Close',exact:true}).click();await page.getByTestId('nav-devices').click();await page.getByRole('heading',{name:/ · This browser$/}).locator('..').getByRole('button',{name:'Revoke device',exact:true}).click();await page.getByRole('button',{name:'Confirm device revocation',exact:true}).click();await expect(page.getByRole('alert')).toContainText('This key was revoked.');});
   await test.step('Send and decrypt through the actual composer',async()=>{await alice.page.getByLabel('Message',{exact:true}).fill(markers[0]);await alice.page.getByRole('button',{name:'Send',exact:true}).click();await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toBeVisible({timeout:30000});await expect(alice.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toBeVisible();});
+  await test.step('Upload an encrypted attachment and verify recipient download integrity',async()=>{
+   const name='private-note-'+randomBytes(6).toString('hex')+'.txt',secret='LOCAT_ATTACHMENT_PLAINTEXT_'+randomBytes(24).toString('hex'),plain=Buffer.from(secret,'utf8');
+   await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('button',{name:'Document or file · up to 2.9 MB',exact:true}).click();
+   const uploadRequest=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/upload'));
+   const uploadResponse=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'));
+   await alice.page.locator('[data-testid="live-conversation"] input[type="file"]').setInputFiles({name,mimeType:'text/plain',buffer:plain});
+   const request=await uploadRequest,response=await uploadResponse,ciphertext=request.postDataBuffer();
+   expect(request.method()).toBe('POST');expect(request.headers()['content-type']).toContain('application/octet-stream');expect(response.status()).toBe(200);
+   expect(ciphertext).toBeTruthy();expect(ciphertext.equals(plain)).toBe(false);expect(ciphertext.includes(plain)).toBe(false);
+   const aliceLog=alice.page.getByRole('log',{name:'Messages',exact:true}),bobLog=bob.page.getByRole('log',{name:'Messages',exact:true});
+   await expect(aliceLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});await expect(bobLog.getByText(name,{exact:true})).toBeVisible({timeout:30000});
+   const download=bob.page.waitForEvent('download');await bobLog.getByRole('button',{name:'Download '+name,exact:true}).click();const saved=await download;
+   expect(saved.suggestedFilename()).toBe(name);const downloaded=await readFile(await saved.path());expect(downloaded.equals(plain)).toBe(true);
+   expect(wire.some(body=>body.includes(secret))).toBe(false);await fixture.assertNoMessagePlaintext([secret]);
+  });
   await test.step('Add a second private room while crypto stays active, then restore the original history',async()=>{
    const charlie=await account('Browser Room Charlie');await alice.page.getByRole('button',{name:'Back to contacts',exact:true}).click();await alice.page.getByPlaceholder('Exact username or LC code').fill(charlie.username);await alice.page.getByRole('button',{name:'Find contact',exact:true}).click();await alice.page.getByRole('button',{name:'Send friend request',exact:true}).click();await charlie.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await charlie.page.getByRole('button',{name:'Accept',exact:true}).click();await expect(charlie.page.getByText('Friend',{exact:true})).toBeVisible();await alice.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();
    const setup=await bind(charlie);await setup.getByRole('button',{name:'Keep messaging active',exact:true}).click();await charlie.page.getByTestId('nav-messages').click();await charlie.page.getByRole('button',{name:'Open encrypted conversation',exact:true}).click();await expect(charlie.page.locator('[data-testid="live-conversation"] header p.break-all')).toContainText('@',{timeout:30000});
