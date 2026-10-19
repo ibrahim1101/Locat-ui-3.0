@@ -5,7 +5,9 @@
 - Typography: **Manrope Variable** for UI (geometric, warm, legible at small sizes), with **JetBrains Mono** for LC codes, origins, metrics and timecodes. Both are self-hosted with `@fontsource` and work offline.
 - Tone: restrained, with one accent per view. Depth comes from surface steps and hairlines, not from nested cards.
 
-## Tokens (`src/theme/themes.css`, `src/theme/tokens.ts`, `tailwind.config.js`)
+## Tokens (`src/theme/themes.css`, `src/theme/tokens.ts`, `src/index.css`)
+
+Tailwind CSS v4 maps the shared CSS variables to utilities in the `@theme` block in `src/index.css`. Keep the actual palette values in `themes.css`; do not add per-screen colors or replace the shared theme tokens.
 | Token | Use |
 |---|---|
 | `canvas` | App background |

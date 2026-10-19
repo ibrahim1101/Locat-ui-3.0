@@ -7,7 +7,7 @@ A standalone React 19 + TypeScript + Vite 7 + Tailwind 3 presentation layer, com
 `react-router@7` (already in Locat), `lucide-react` (already in Locat), `clsx` (already in Locat), `@fontsource-variable/manrope`, `@fontsource/jetbrains-mono`. No Radix, Expo, React Native, Next.js or animation libraries.
 
 ## How to integrate (recommended sequence, following Locat's `LOCAT_UI_INTEGRATION_PLAN.md`)
-1. Copy `src/ui`, `src/theme`, `src/contracts`, `src/layouts`, `src/app`, `src/screens` into an isolated area of the Locat repo (e.g. `src/ui3/`). Merge `tailwind.config.js` colours and `themes.css` behind a namespace. **Don't** copy `src/fixtures` into production entrypoints.
+1. Copy `src/ui`, `src/theme`, `src/contracts`, `src/layouts`, `src/app`, `src/screens` into an isolated area of the Locat repo (e.g. `src/ui3/`). Merge the `@theme` utility mappings from `src/index.css` and `themes.css` behind a namespace. **Don't** copy `src/fixtures` into production entrypoints.
 2. Implement `LiveLocatAdapter implements LocatUiAdapter`:
    - `auth.*` → `useAuth()` login/register/logout (identity-key unlock stays inside Locat), `NativeServerSetup` probe, `registrationPasswordError` for guidance, `quickSignIn` saved accounts.
    - `messaging.*` → the existing Chat.tsx handlers: encrypt → outbox → relay. `saveDraft` → `encryptedDraft`. `messageAction` → reactions / pins / replies / forwarding / edit / delete control payloads. `friendAction` / `conversationAction` → tRPC routers.

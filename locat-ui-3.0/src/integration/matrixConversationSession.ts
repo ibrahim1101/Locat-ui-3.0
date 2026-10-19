@@ -2,7 +2,7 @@ import type {MatrixOutbox,PendingMatrixSend} from './matrixOutbox';
 import {MatrixEvent,EventStatus,EventType,type MatrixClient} from 'matrix-js-sdk';
 import type {VerificationPeer} from './matrixVerificationSession';
 import {trackAuthorizedMatrixPeer} from './matrixTrackedPeer.mjs';
-import {decryptMatrixAttachment,encryptMatrixAttachment,isEncryptedMatrixFile} from './matrixEncryptedAttachment';
+import {decryptMatrixAttachment,encryptMatrixAttachment,isEncryptedMatrixFile} from './matrixEncryptedAttachment.ts';
 export type ConversationMessage={id:string;text?:string;attachment?:{name:string;size:number;mime:string;file:import('matrix-js-sdk/lib/@types/media').EncryptedFile};mine:boolean;createdAt:number;failed:boolean};
 export type ConversationSnapshot={roomId?:string;peer?:VerificationPeer;transport:string;busy:boolean;roomReady?:boolean;historyAvailable?:boolean;pendingSend?:PendingMatrixSend;error?:string;messages:ConversationMessage[]};
 /** Account-owned controller. Plaintext is projected only from successfully decrypted SDK events. */

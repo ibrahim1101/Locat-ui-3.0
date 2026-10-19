@@ -38,7 +38,7 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-link:'+accountId,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
    try{return await new Promise((resolve,reject)=>{const tx=db.transaction('identity','readonly'),request=tx.objectStore('identity').get('current');tx.oncomplete=()=>resolve(request.result.publicKeyB64);tx.onerror=()=>reject(tx.error);});}finally{db.close();}
   },registered.user.id);expect(persistedKey).toBe(identity.publicKey);
-  await page.goto(fixture.origin+'/secrets');await page.bringToFront();
+  await page.goto(fixture.origin+'/files/secrets');await page.bringToFront();
   const phrase='Synthetic private phrase '+randomBytes(12).toString('hex'),next='Synthetic changed phrase '+randomBytes(12).toString('hex');
   await page.getByLabel('Private-store passphrase',{exact:true}).fill(phrase);await page.getByLabel('Confirm private-store passphrase',{exact:true}).fill(phrase);await page.getByRole('button',{name:'Create encrypted store',exact:true}).click();
   await page.getByRole('button',{name:'Add credential or note',exact:true}).click();await page.getByLabel('Entry name',{exact:true}).fill('Browser retained secret');await page.getByLabel('Password',{exact:true}).fill('synthetic secret value');await page.getByRole('button',{name:'Encrypt and save',exact:true}).click();
