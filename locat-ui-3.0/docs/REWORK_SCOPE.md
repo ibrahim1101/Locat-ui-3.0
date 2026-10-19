@@ -15,7 +15,7 @@ The navigation groups related destinations. Files opens a nested section for Vau
 - Remote-control UI and Link remote-signaling endpoints.
 - Sentinel incident webhooks, vendor mappings, tokens, and incident screens.
 
-The Search view scopes app destinations. Chat continues to support ordinary image, voice, and file attachments; attachment handling is not routed through a standalone library. Link pairing and encrypted file/text transfers remain. Account activity remains under Settings → Security and uses the existing account events endpoint.
+The Search view scopes app destinations. Chat supports ordinary encrypted file attachments in verified one-to-one Matrix conversations; bytes are encrypted in the browser before upload, attachment keys travel inside the encrypted room event, and ciphertext integrity is checked before decryption. The current live composer accepts original image files and other files up to 2,900,000 bytes. Image previews/transforms, video, and physical device acceptance are still open. Attachment handling is not routed through a standalone library. Link pairing and encrypted file/text transfers remain. Account activity remains under Settings → Security and uses the existing account events endpoint.
 
 ## Data and endpoint behavior
 

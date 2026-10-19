@@ -1,5 +1,13 @@
 # Locat UI3 engineering handoff — 2026-10-18
 
+## October 19 scope rework continuation
+
+The active source of truth for current product scope is [`REWORK_SCOPE.md`](REWORK_SCOPE.md). The user authorized continued development and branch publication on `rework/locat-core-scope`; do not deploy or merge to `main`. The former integration/media roadmap entries below are historical records, not current priorities. Continue retained Locat work without restoring Cinema, Music, Photos library/editor, Remote, Sentinel, or their external integrations.
+
+Current code checkpoint adds Matrix v2 encrypted file attachments to verified one-to-one conversations. The browser encrypts bytes before Matrix media upload, sends the key only inside the Megolm-encrypted room event, stores only the SDK Megolm ciphertext in the retry journal, verifies the ciphertext hash before download/decryption, and rejects media URLs outside the configured homeserver origin. Existing composer Photo/File options remain nested. File size is limited to 2,900,000 bytes; image preview/transformation, video, physical device and browser-to-browser acceptance remain open. This is source-level behavior, not a claim of full E2EE audit or release readiness.
+
+Evidence for this checkpoint: `npm run check`, `npm run lint`, `npm run test:all` (206 frontend / 99 server tests), and `npm run build` passed; focused attachment/session rerun passed (14 tests). The production build retains the existing large Matrix chunk warning. Changes are not yet published at this note. Next inspect the complete recovered 49-item and A–AM register against the new scope, then continue the next retained milestone (Link cross-worker proof state and real LAN transport; do not mark the historical media rows active). Refresh this handoff after each meaningful published batch.
+
 Work in `ibrahim1101/Locat-ui-3.0`, branch `integration/locat-core`, nested app `locat-ui-3.0/`. Read root AGENTS.md. Preserve the UI3 shared theme/components, existing account/media data, all 49 requirements and the full A–AM master ecosystem. Original Locat repositories are read-only references. Ordinary source/tests/docs/branch publication are authorized; public deployment/DNS, purchases, destructive real data/history operations, unrelated infrastructure, main merge and public releases require separate explicit approval. No such external action occurred.
 
 ## Latest durable sharing candidate

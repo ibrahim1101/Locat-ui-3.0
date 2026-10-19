@@ -13,7 +13,7 @@ function DeliveryIcon({ d }: { d: MessageView["delivery"] }) {
   return <I className={cn("size-3.5", tone)} aria-label={label} />;
 }
 
-function Attachment({ a, mine }: { a: NonNullable<MessageView["attachment"]>; mine: boolean }) {
+function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attachment"]>; mine: boolean; onDownload?:()=>void }) {
   switch (a.kind) {
     case "image": return (
       <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-xl">
@@ -24,7 +24,7 @@ function Attachment({ a, mine }: { a: NonNullable<MessageView["attachment"]>; mi
       <div className={cn("flex min-w-[220px] max-w-[300px] items-center gap-3 rounded-xl p-2.5", mine ? "bg-black/15" : "bg-s3")}>
         <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", mine ? "bg-black/15 text-ember-ink" : "bg-ember/15 text-ember")}><FileText className="size-5" /></span>
         <span className="min-w-0 flex-1"><span className="block break-all text-[13px] font-semibold leading-snug line-clamp-2">{a.name}</span><span className="text-2xs opacity-70">{formatBytes(a.size)} · encrypted</span></span>
-        <Download className="size-4 shrink-0 opacity-70" aria-label="Download" />
+        {onDownload?<button type="button" onClick={onDownload} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-black/10 focus-visible:outline focus-visible:outline-2" aria-label={`Download ${a.name}`}><Download className="size-4 opacity-80" /></button>:<Download className="size-4 shrink-0 opacity-70" aria-label="Download" />}
       </div>);
     case "voice": return (
       <div className="flex w-[min(64vw,260px)] items-center gap-3">
@@ -43,7 +43,7 @@ function Attachment({ a, mine }: { a: NonNullable<MessageView["attachment"]>; mi
 }
 
 /** Single message bubble. Long-press (touch) / right-click (desktop) opens the action menu. */
-export const MessageBubble = memo(function MessageBubble({ m, grouped, showAuthor, onMenu, onJump, onRetry }: { m: MessageView; grouped: boolean; showAuthor: boolean; onMenu(m: MessageView, at?: { x: number; y: number; pointer: "mouse" | "keyboard" }): void; onJump(id: string): void; onRetry(m: MessageView): void }) {
+export const MessageBubble = memo(function MessageBubble({ m, grouped, showAuthor, onMenu, onJump, onRetry, onDownload }: { m: MessageView; grouped: boolean; showAuthor: boolean; onMenu(m: MessageView, at?: { x: number; y: number; pointer: "mouse" | "keyboard" }): void; onJump(id: string): void; onRetry(m: MessageView): void; onDownload?(m:MessageView):void }) {
   const timer = useRef<number>(0);
   if (m.system) return <p className="py-3 text-center text-2xs font-semibold text-ink-3" data-testid={`system-${m.id}`}>{m.system}</p>;
   const press = () => { timer.current = window.setTimeout(() => onMenu(m), 450); };
@@ -64,7 +64,7 @@ export const MessageBubble = memo(function MessageBubble({ m, grouped, showAutho
               <span className="block truncate opacity-80">{m.replyTo.state === "ok" ? m.replyTo.excerpt : m.replyTo.state === "deleted" ? "Original message was deleted" : m.replyTo.state === "hidden" ? "Original is hidden on this device" : "Original not available on this device"}</span>
             </button>)}
           {m.deletedForEveryone ? <span>This message was deleted</span> : <>
-            {m.attachment && <Attachment a={m.attachment} mine={m.mine} />}
+            {m.attachment && <Attachment a={m.attachment} mine={m.mine} onDownload={onDownload?()=>onDownload(m):undefined} />}
             {m.text && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.text}</p>}
           </>}
           <span className={cn("float-right ml-2 mt-1 inline-flex translate-y-0.5 items-center gap-1 text-[10px] tabular", m.mine ? "text-ember-ink/70" : "text-ink-3")}>
