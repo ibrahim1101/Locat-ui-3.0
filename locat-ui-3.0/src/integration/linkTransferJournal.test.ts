@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import {webcrypto} from 'node:crypto';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {decryptLinkPayload,encryptLinkPayload,type LinkPayload} from './linkPayloadCrypto';
-import {clearLinkTransferJournal,createLinkTransferJournal,deleteLinkTransferJournal,loadLinkTransferJournal,saveLinkTransferChunk} from './linkTransferJournal';
+import {clearLinkTransferJournal,createLinkTransferJournal,deleteLinkTransferJournal,ensureUploadedLinkChunksAreJournaled,loadLinkTransferJournal,saveLinkTransferChunk} from './linkTransferJournal';
 
 beforeEach(()=>vi.stubGlobal('crypto',webcrypto));
 afterEach(()=>vi.unstubAllGlobals());
@@ -24,4 +24,10 @@ it('refuses a different transfer definition for an existing journal and clears j
  const accountId=crypto.randomUUID(),meta={payloadId:crypto.randomUUID(),pairId:'pair-b',peer:3,name:'archive.bin',mime:'application/octet-stream',size:0,chunkCount:1};
  await createLinkTransferJournal(accountId,meta);await expect(createLinkTransferJournal(accountId,{...meta,size:1})).rejects.toThrow();
  await clearLinkTransferJournal(accountId);expect(await loadLinkTransferJournal(accountId,meta.payloadId)).toBeUndefined();
+});
+
+it('fails clearly when the local journal no longer covers ciphertext already accepted by the server',()=>{
+ expect(()=>ensureUploadedLinkChunksAreJournaled([],1)).toThrow('Some saved encrypted chunks are missing');
+ expect(()=>ensureUploadedLinkChunksAreJournaled([{seq:0},{seq:1}],2)).not.toThrow();
+ expect(()=>ensureUploadedLinkChunksAreJournaled([{seq:0},{seq:2}],2)).toThrow('Some saved encrypted chunks are missing');
 });
