@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `c8a808c` (`Follow nested private-store security navigation in browser test`). The current work also corrects the Matrix browser test to return to the nested Contacts section after sending and accepting a request.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `666b461` (`Allow full hosted browser acceptance runtime`). The active UI retains Obsidian Ember styling and nested navigation.
 
 ## Active direction
 
@@ -18,14 +18,15 @@ Read `docs/REWORK_SCOPE.md` and `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` fi
 - `342ebbc` connected live Home to account-owned contact/request counts and routed `/search` through account-scoped live search.
 - `21cf810` increased the Windows proxy readiness window after hosted startup exceeded the old three-second test limit.
 - `077e1d0` documented the live Home/Search boundaries; `c8a808c` updated the private-store browser flow to open the nested Security section before changing its passphrase.
+- `23057ab` restored the complete Matrix browser spec and switched back to the nested Contacts section after accepting a new contact.
+- `b19d23b` and `46974d0` covered the cross-tab app-lock signal and returned to Security after re-unlocking a tab.
+- `666b461` raised the browser job cap to 35 minutes for Chromium, Firefox and the repeated private-store acceptance.
 
 Current Home conversation summaries are still not connected. Do not derive “recent conversations” from contact membership or show preview records as live.
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The Home-to-Requests browser scenario also asserts that live Search returns no fictional person for a fixture-only query. Browser specs pass syntax checks, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Hosted browser logs exposed two stale assumptions in acceptance flows: the private-store passphrase control now lives under Security, and an accepted-contact test must switch from Requests back to Contacts after refreshing. Both are being corrected. The workflow-run summary wrapper filters pull-request runs, so use commit check-runs and job logs to verify push-triggered hosted results.
-
-The workflow-run summary wrapper filters pull-request runs, so query commit check-runs when verifying push-triggered hosted results.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. Hosted acceptance on `666b461` passed 7/7 Chromium tests, 7/7 Firefox tests and all three repeated private-store foreground runs; Linux, Windows, macOS and connector checks also passed (workflow run 39477108881, artifact 12291521749). The previous full run on `46974d0` passed the same browser acceptance. Browser specs pass syntax checks, but local execution is blocked because the Chromium headless executable is not installed in this workspace. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices and that live Search returns no fictional person for a fixture-only query. The workflow-run summary wrapper filters pull-request runs, so use commit check-runs and job logs to verify push-triggered hosted results.
 
 ## Remaining work
 
