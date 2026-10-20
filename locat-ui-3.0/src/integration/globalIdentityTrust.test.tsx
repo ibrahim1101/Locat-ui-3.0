@@ -2,7 +2,7 @@ import {createHash,generateKeyPairSync,sign,type KeyObject} from 'node:crypto';
 import {afterEach,expect,it,vi} from 'vitest';
 import {fireEvent,render,screen,waitFor} from '@testing-library/react';
 import type {QualifiedAccountIdentity} from '../contracts/auth';
-import {compareAuthorityPin,findPinnedAuthorityClones,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin} from './globalIdentityTrust';
+import {compareAuthorityPin,findInvalidAuthorityPinKeys,findPinnedAuthorityClones,readAuthorityPin,removeAuthorityPin,removeInvalidAuthorityPins,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin} from './globalIdentityTrust';
 import {GlobalIdentityTrustDisclosure} from './GlobalIdentityTrustDisclosure';
 
 const origin='https://locat.test',serverId='123e4567-e89b-42d3-a456-426614174000',accountId='a'.repeat(32);
@@ -28,7 +28,7 @@ it('verifies canonical authority discovery and account signatures before accepti
 });
 
 it('rejects invalid account and authority signatures and treats network failure as unavailable',async()=>{
- const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.discovery),{status:200})));
+ const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  const invalid={...fixture.identity,attestation:{...fixture.identity.attestation!,signature:'AA'}};
  await expect(verifyQualifiedIdentity(invalid,accountId)).resolves.toEqual({status:'invalid'});
  const invalidDiscovery={...fixture.discovery,identity:{...fixture.discovery.identity,signature:'AA'}};
@@ -54,6 +54,13 @@ it('finds the same pinned server UUID at another origin across accounts',()=>{
  expect(findPinnedAuthorityClones('different-server',origin)).toEqual([]);
 });
 
+it('repairs malformed authority records without removing valid pins',()=>{
+ const malformedKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');
+ localStorage.setItem(malformedKey,'not-json');writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId:'different-server',keyId:'good-key',publicKey:'good-public'});
+ expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey]);expect(removeInvalidAuthorityPins()).toBe(1);
+ expect(localStorage.getItem(malformedKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('good-key');expect(findPinnedAuthorityClones(serverId,origin)).toEqual([]);
+});
+
 it('requires a separate fingerprint confirmation for first contact and changed keys',async()=>{
  const first=signedIdentity(),fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify(first.discovery),{status:200}));vi.stubGlobal('fetch',fetch);
  const view=render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={first.identity}/>);
@@ -66,12 +73,23 @@ it('requires a separate fingerprint confirmation for first contact and changed k
 
 it('warns about a cloned server UUID and requires operator confirmation before pinning another origin',async()=>{
  const existing:AuthorityPin={origin:'https://old-locat.test',serverId,keyId:'previous-key',publicKey:'previous-public',pinnedAt:new Date(0).toISOString()};writeAuthorityPin('b'.repeat(32),existing);
- const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.discovery),{status:200})));
+ const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
  await screen.findByRole('alert');expect(screen.getByText(/This server UUID is already pinned at another origin/)).toHaveTextContent('https://old-locat.test');
  const confirmation=screen.getByRole('checkbox',{name:/only active writable owner/}),pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(pin).toBeDisabled();
  fireEvent.click(confirmation);fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
  expect(readAuthorityPin(accountId,origin)?.keyId).toBe(fixture.identity.attestation?.keyId);
+});
+
+it('blocks pinning until malformed records are explicitly removed and trust is rechecked',async()=>{
+ const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');localStorage.setItem(invalidKey,'not-json');
+ writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId:'different-server',keyId:'keep-key',publicKey:'keep-public'});
+ const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
+ render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
+ await screen.findByText(/Clone checks are stopped/);expect(screen.queryByRole('button',{name:'Pin after comparison'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Remove malformed entries and recheck'}));
+ const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('keep-key');expect(pin).toBeDisabled();
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
 });
 
 it('accepts a key only after an explicit signed rotation click from the pinned old key',async()=>{
