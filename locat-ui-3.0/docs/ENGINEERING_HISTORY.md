@@ -22,6 +22,8 @@ Local TypeScript, ESLint, all frontend/server tests, production build, browser-s
 
 Earlier publication failures: commit `89e1f36` included a malformed `ConversationSearch.tsx` from a wrong working directory; UI run `39442044980` and core run `39442037749` failed TypeScript on that source. Commit `715f369` repaired the source but its large docs were truncated by the connector. Commits `2788518` and `003585b` then used UTF-8 blob uploads that created empty app-file blobs; their GitHub Actions failures were upload corruption, not source failures. This repair restored the last verified non-empty source snapshot, reapplied encrypted edits and republished changed files using base64. Fetched GitHub blob sizes and SHAs match local file hashes.
 
+Hosted browser run `39460633601` passed all platform core checks but its browser job exposed two acceptance updates after Messages gained nested sections: Matrix setup still expected Find contact on the default Contacts section, and the encrypted-store flow could not locate the Lock now header action after its unlock round-trip in both Chromium and Firefox. The Matrix flow now explicitly opens Find people and moves between Requests and Contacts; the encrypted-store browser diagnostic now reports visible action labels without field values. The Lock now failure's cause remains under investigation and must be confirmed by the next hosted browser run.
+
 ## Remaining limits
 
 Search covers loaded messages only. Client-side edit projection can be bypassed by a modified client, so peers should accept only authenticated same-author events. Scheduled sending stays unavailable until it has a durable sender compatible with device-held Matrix credentials. Physical-device and broader identity-recovery acceptance remain open.
