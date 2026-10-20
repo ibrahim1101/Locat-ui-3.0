@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 64045)
-Total output lines: 1144
+Warning: truncated output (original token count: 64186)
+Total output lines: 1149
 
 ## 2026-10-19 — Product scope and navigation rework
 
@@ -169,9 +169,7 @@ Commands: npm run check; npm run lint; npm run test:all; npm run build; node --t
 
 Observed failures: first targeted backup tests rejected the schema change because the verifier manifest was not yet extended; added schema-15 table/columns and reran all 19 focused migration/backup tests successfully. Real Synapse room creation failed HTTP 400 M_UNKNOWN because v12 prohibits putting its creator in the power-level users map; selected v12 explicitly, removed that entry and accepted hash-style room IDs. The corrected real run passed. Expanded gateway history initially returned 403 because the fixture used Bob's old token after reopening/rebinding to a renewed one; preserved the production exact-token rule and corrected the fixture to use the current binding. Subsequent expanded acceptance passed. The final added post-gateway database/WAL scan for both homeserver and Locat passed.
 
-Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…44045 tokens truncated…trictMode source protection; SERVER001 strict-CSP reviewed navigation; REMOTE001 bounded streaming status consumer; MEDIA-REFRESH002 account/shared scan budgets. Cinema001–005 automated regressions remain accepted. Files/subsystems and detailed commands/failed-then-fixed evidence are in preceding entries and ENGINEERING_BUG_REGISTER.
-
-Exact next engineering task: add deterministic rapid consecutive converted-seek-during-setup acceptance (including preservation of playing intent), then explicit operator-assigned per-library ownership and accepted-friend grants enforced on listing/probe/direct/remux/transcode and revocation, with negative API/browser tests before friend-sharing claims. Guided server-source setup remains Cinema006. Current media roots remain authenticated-global; Cinema010 is OPEN. Long13 GB/original movie, Pi throughput, native/physical Windows/Android/macOS, actual international/federation/TURN/media and independent review remain unverified. BUILD001 remains OPEN: full npm audit5high dev nodes/no patched braces release; production audit0. Theme/logo/account data/all 49 requirements / A–AM scope preserved. No public deployment/DNS/main merge/release/purchase or unrelated lab service changed.
+Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…44186 tokens truncated…ts enforced on listing/probe/direct/remux/transcode and revocation, with negative API/browser tests before friend-sharing claims. Guided server-source setup remains Cinema006. Current media roots remain authenticated-global; Cinema010 is OPEN. Long13 GB/original movie, Pi throughput, native/physical Windows/Android/macOS, actual international/federation/TURN/media and independent review remain unverified. BUILD001 remains OPEN: full npm audit5high dev nodes/no patched braces release; production audit0. Theme/logo/account data/all 49 requirements / A–AM scope preserved. No public deployment/DNS/main merge/release/purchase or unrelated lab service changed.
 
 
 ## 2026-10-18 — CINEMA-012 consecutive seek intent
@@ -349,3 +347,8 @@ Hosted browser diagnostics on `95af653b9a29eed9e75d5f3d9755c89d3b774813` showed 
 ### Conversation open overlap follow-up — 2026-10-20
 
 The next browser candidate still surfaced a transient busy message in Firefox while the reaction test lacked an outbound event. To remove duplicate-mount/navigation overlap as another source, `open()` now waits up to 15 seconds behind an active operation, validates the session epoch while waiting, then follows the existing full bootstrap/sync path. This preserves the existing private-room and device guards. A regression holds the first open at the peer lookup, starts a second open, and verifies both complete in order without a busy error. Focused session tests (28) and typecheck pass; full repository/Synapse/hosted browser validation is pending.
+
+
+### Reaction browser state instrumentation — 2026-10-20
+
+The hosted reaction test still observed no encrypted request after the picker was selected, with no consistent visible error. Added a test-readable `data-conversation-busy` snapshot on the live conversation and an acceptance assertion that distinguishes a dispatched session operation from an action that never starts; failure diagnostics now include the busy value and any conversation alert. This is observability only and does not relax encryption or send assertions. New hosted execution is pending.
