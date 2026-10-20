@@ -11,8 +11,12 @@ export function createMatrixOutbox(scope:string,deviceId:string,senderKey:string
  }
  function validateBody(body:string){
   if(typeof body!=='string'||body.length>70000)throw new Error('Invalid encrypted retry payload.');const value=JSON.parse(body);
-  if(!value||Array.isArray(value)||Object.keys(value).some(key=>!['algorithm','sender_key','ciphertext','session_id','device_id'].includes(key))||value.algorithm!=='m.megolm.v1.aes-sha2'||value.device_id!==deviceId||value.sender_key!==senderKey)throw new Error('Only this device’s Megolm ciphertext can be stored for retry.');
-  for(const key of ['sender_key','session_id','ciphertext'])if(typeof value[key]!=='string'||!value[key]||value[key].length>(key==='ciphertext'?65536:255)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value[key]))throw new Error('Invalid encrypted retry encoding.');
+  if(!value||Array.isArray(value))throw new Error('Only this device’s Megolm ciphertext can be stored for retry.');
+  if(Object.keys(value).some(key=>!['algorithm','sender_key','ciphertext','session_id','device_id'].includes(key)))throw new Error('Encrypted retry payload contains unsupported clear fields.');
+  if(value.algorithm!=='m.megolm.v1.aes-sha2')throw new Error('Encrypted retry payload has an unsupported algorithm.');
+  if(value.device_id!==deviceId)throw new Error('Encrypted retry payload belongs to a different device.');
+  if(value.sender_key!==senderKey)throw new Error('Encrypted retry payload belongs to a different sender key.');
+  for(const key of ['sender_key','session_id','ciphertext'])if(typeof value[key]!=='string'||!value[key]||value[key].length>(key==='ciphertext'?65536:255)||!/^[A-Za-z0-9+/]+={0,2}$/.test(value[key]))throw new Error('Invalid encrypted retry encoding for '+key+'.');
  }
  async function access<T>(write:boolean,operation:(current:PendingMatrixSend|undefined,store:IDBObjectStore)=>T):Promise<T>{
   const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open(name,2);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('pending'))request.result.createObjectStore('pending');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('Close other Locat tabs before opening encrypted retry storage.'));});
