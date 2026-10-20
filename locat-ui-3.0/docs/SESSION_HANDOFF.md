@@ -1,3 +1,9 @@
+## Follow-on — nested photo framing controls
+
+The live encrypted Photo review now offers a collapsed Crop or rotate option that opens the existing local editor as a second step. Rotation and crop presets/positions are previewed on-device; Cancel returns to the original review, while Send edited copy creates and sends a new JPEG only after confirmation. The original remains unchanged and attachment bytes are not uploaded during editing. Added component and two-account browser coverage for the nested editor flow and zero uploads before Send.
+
+Validation: `npm run check`, `npm run lint`, `npm run test:all` (**260 frontend / 108 server tests**), `npm run build`, browser spec syntax/discovery and `git diff --check` passed. Hosted browser/OS acceptance is pending this source.
+
 ## Follow-on — local doodle attachments
 
 Stickers & doodles now opens themed, nested creative tools. The doodle sheet supports mouse, pen, touch and keyboard drawing, four colors, three brush sizes and clear. The local sticker picker groups twelve original emoji-based designs into Daily, Reactions and Nature packs. Both produce PNGs on-device, respect the existing 2.9 MB cap, and send through the encrypted attachment path. No standalone media library or cross-device index is used. Focused component tests and the two-account Matrix browser scenario cover selection/drawing, PNG upload and recipient preview. Schedule sending remains planned.

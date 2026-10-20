@@ -37,3 +37,18 @@ it("keeps an oversized original blocked and sends only the chosen resized copy",
   fireEvent.click(screen.getByRole("button", { name: "Send resized copy" }));
   await waitFor(() => expect(onSend).toHaveBeenCalledWith(resized));
 });
+
+it("opens the detailed editor only from its nested photo option", () => {
+  vi.stubGlobal("URL", { createObjectURL: vi.fn().mockReturnValue("blob:photo-preview"), revokeObjectURL: vi.fn() });
+  const file = new File(["photo"], "camera-photo.jpg", { type: "image/jpeg" });
+  const onEdit = vi.fn();
+  const onSend = vi.fn().mockResolvedValue(undefined);
+  render(<ImageAttachmentReview file={file} onClose={() => undefined} onSend={onSend} onEdit={onEdit} />);
+
+  const framing = screen.getByTestId("image-framing-options");
+  expect(framing).toHaveProperty("open", false);
+  fireEvent.click(screen.getByText("Crop or rotate"));
+  fireEvent.click(screen.getByRole("button", { name: "Open photo editor" }));
+  expect(onEdit).toHaveBeenCalledOnce();
+  expect(onSend).not.toHaveBeenCalled();
+});

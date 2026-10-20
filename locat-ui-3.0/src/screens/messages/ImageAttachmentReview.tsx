@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Image as ImageIcon, Sparkles } from "lucide-react";
+import { ChevronDown, Image as ImageIcon, Pencil, Sparkles } from "lucide-react";
 import { Button, Sheet, formatBytes } from "@/ui";
 import { IMAGE_RESIZE_PRESETS, resizeImageCopy, type ImageResizePreset } from "@/integration/imageAttachmentTransform";
 
 const MAX_ATTACHMENT_BYTES = 2_900_000;
 
-export function ImageAttachmentReview({ file, onClose, onSend }: { file: File; onClose(): void; onSend(file: File): Promise<void> }) {
+export function ImageAttachmentReview({ file, onClose, onSend, onEdit }: { file: File; onClose(): void; onSend(file: File): Promise<void>; onEdit?(): void }) {
   const [copy, setCopy] = useState<File | null>(null);
   const [preset, setPreset] = useState<ImageResizePreset | null>(null);
   const [busyPreset, setBusyPreset] = useState<ImageResizePreset | null>(null);
@@ -80,6 +80,15 @@ export function ImageAttachmentReview({ file, onClose, onSend }: { file: File; o
           </div>
         ) : <p className="mt-3 text-sm text-ink-3">This format cannot be resized here. The original remains available.</p>}
       </details>
+      {onEdit && <details className="group mt-3 rounded-xl bg-s2 p-3 hairline" data-testid="image-framing-options">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold marker:hidden">
+          <Pencil className="size-4 text-ember" />
+          <span className="flex-1">Crop or rotate</span>
+          <ChevronDown className="size-4 text-ink-3 transition-transform group-open:rotate-180" />
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-ink-3">Open the detailed editor for framing controls. It creates a new copy on this device; the original stays unchanged.</p>
+        <Button className="mt-3 w-full" disabled={sending || !!busyPreset} onClick={onEdit}>Open photo editor</Button>
+      </details>}
       {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
       <div className="mt-4 flex flex-wrap justify-end gap-2">
         <Button variant="ghost" disabled={sending || !!busyPreset} onClick={onClose}>Cancel</Button>
