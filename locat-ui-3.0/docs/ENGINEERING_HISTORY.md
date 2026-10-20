@@ -1076,3 +1076,12 @@ Core browser failure on \`39348310273\` confirmed the implementation change reac
 The photo browser check on source \`cfee5c5ec9bd04e265a98397b04f0ef7d2f5cc8d\` (\`39349550863\`) confirmed local review, no pre-confirm upload, successful encrypted upload, and acknowledgement. It then failed only because the test expected an image filename text node; image bubbles expose the filename as the accessible “Preview <name>” button. Updated sender/recipient assertions to use that action, which is the actual UI contract.
 
 The follow-up browser run \`39350051779\` exposed that the selector edit had changed the older generic-file assertion instead of the photo-specific one. Restored the file card's filename assertion and applied the “Preview <name>” accessibility selector only inside the photo test. The run reached the existing file case and failed at that stale selector; no attachment send or decrypt regression was indicated.
+
+
+## 2026-10-20 — Nested image and video attachment acceptance
+
+Published source **6d65b6c19e22f793580d244d342899f486048f4e** on `rework/locat-core-scope`. The composer keeps actions nested by intent. Photo review provides original send or local resize at three presets; video review shows a local non-autoplay preview and sends original bytes only after explicit confirmation. Supported decrypted image/video previews load on demand. Both use existing Matrix encryption, authenticated media download and durable uncertain-send safeguards, with a 2,900,000-byte cap.
+
+UI workflow **39350549058** passed. Core workflow **39350549022** passed all five jobs (Ubuntu, macOS, Windows, connector preparation, browser foundation). All three OS checks passed typecheck, lint, **219 frontend /104 backend tests**, and production build. Real browser acceptance passed **7 Chromium tests (8.0m), 7 Firefox tests (8.4m), and 3 repeated private-store tests (11.5s)**. This includes the encrypted file flow and the generated PNG photo flow: no upload before confirmation, sender/recipient preview actions, successful decrypted 64×64 image preview, and byte-exact save.
+
+The branch retains Obsidian Ember and the Locat logo; no retired standalone media library/editor was restored. Existing large Matrix bundle warning remains. Physical-device acceptance, Safari, full identity recovery, independent review, cross-homeserver/federation, TURN relay, and public deployment remain open. No deployment, DNS change, merge, or live-data migration occurred.

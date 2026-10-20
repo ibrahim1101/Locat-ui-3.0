@@ -1,4 +1,13 @@
-# Locat UI3 engineering handoff — 2026-10-18
+# Locat UI3 engineering handoff — 2026-10-20
+
+## Current attachment UI checkpoint — 2026-10-20
+
+The nested Chat composer now offers Photo, Document or file, Video, Location & schedule, and Stickers & doodles by intent. Images open a themed local review sheet with original and three resize choices; transformation happens locally, preserves the filename/type, and no bytes upload until the user confirms. Video opens a local non-autoplay review and sends original bytes only after confirmation. Both use the existing browser-side Matrix encryption, authenticated media download, uncertain-send protections, and 2,900,000-byte cap. Supported image/video previews are decrypted on demand in message bubbles.
+
+Published source: **6d65b6c19e22f793580d244d342899f486048f4e** on `rework/locat-core-scope`. UI workflow **39350549058** passed. Core workflow **39350549022** passed all five jobs: Ubuntu, macOS, Windows, connector preparation, and browser foundation. Each OS passed check, lint, **219 frontend / 104 backend tests**, and production build. Browser acceptance passed **7 Chromium tests (8.0m), 7 Firefox tests (8.4m), and 3 private-store repeats (11.5s)**, including encrypted file and image flows. Existing Matrix bundle-size warning remains.
+
+The 2.9 MB limit applies to these attachments; video transcoding is not offered. Physical Android/Windows/Pi, Safari, full identity recovery, independent security review, cross-homeserver/federation, TURN relay, and public deployment acceptance remain open. No deployment, DNS change, merge, or live-data migration occurred.
+
 
 ## October 19 scope rework continuation
 
