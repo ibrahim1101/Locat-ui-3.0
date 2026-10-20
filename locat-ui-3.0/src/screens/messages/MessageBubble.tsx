@@ -19,7 +19,7 @@ function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attac
       <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-xl bg-black/20">
         {a.previewUrl ? <img src={a.previewUrl} alt={a.name} className="max-h-[min(52vh,360px)] w-[min(68vw,300px)] object-contain" /> : <div className="grid aspect-4/3 w-[min(68vw,300px)] place-items-center" style={{ background: "linear-gradient(135deg,hsl(28 30% 30%),hsl(220 20% 14%))" }}><ImageIcon className="size-8 text-white/40" /></div>}
         <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-2xs font-semibold text-white backdrop-blur-sm">{a.original ? "Original" : "Compressed"}{a.width && a.height ? " · " + a.width + "×" + a.height : ""}</span>
-        {!a.previewUrl && onDownload && <button type="button" onClick={onDownload} className="absolute inset-0 grid place-items-center bg-black/15 text-sm font-semibold text-white opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2" aria-label={"Preview " + a.name}><span className="rounded-full bg-black/65 px-3 py-2 backdrop-blur-sm">Load photo preview</span></button>}
+        {!a.previewUrl && onDownload && <button type="button" onClick={onDownload} className="absolute bottom-2 right-2 grid place-items-center rounded-full bg-black/65 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80 focus-visible:outline-solid focus-visible:outline-2" aria-label={"Preview " + a.name}><span>Load photo preview</span></button>}
       </div>);
     case "file": return (
       <div className={cn("flex min-w-[220px] max-w-[300px] items-center gap-3 rounded-xl p-2.5", mine ? "bg-black/15" : "bg-s3")}>
@@ -39,7 +39,11 @@ function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attac
         <p className="px-1 pt-2 text-[13px] font-semibold">Location · ±{a.accuracyM} m</p><p className="px-1 text-2xs opacity-70">{a.label} · not live tracking</p>
       </div>);
     case "gif": return <div className="grid h-36 w-48 place-items-center rounded-xl bg-s3 text-xs font-bold">GIF</div>;
-    case "video": return <div className="rounded-xl bg-s3 p-3 text-xs">Video · {formatBytes(a.size)} — {a.state === "unsupported-in-messaging" ? "encrypted video sharing not yet available" : "ready"}</div>;
+    case "video": return (
+      <div className="-mx-1 -mt-1 mb-1 w-[min(68vw,300px)] overflow-hidden rounded-xl bg-black/20">
+        {a.previewUrl ? <video src={a.previewUrl} controls preload="metadata" className="max-h-[min(52vh,360px)] w-full bg-black" aria-label={a.name} /> : a.state === "unsupported-in-messaging" ? <div className="p-3 text-xs">Video preview is unavailable. Download the encrypted attachment to save it.</div> : <button type="button" onClick={onDownload} disabled={!onDownload} className="grid aspect-video w-full place-items-center bg-s3 text-sm font-semibold hover:bg-s3/80 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ember" aria-label={"Load video " + a.name}><span className="grid justify-items-center gap-2"><span className="grid size-12 place-items-center rounded-full bg-ember text-ember-ink"><Play className="size-5 fill-current" /></span>Load video</span></button>}
+        <p className="bg-s2 px-3 py-2 text-xs text-ink-2">{a.name} · {formatBytes(a.size)} · encrypted</p>
+      </div>);
   }
 }
 

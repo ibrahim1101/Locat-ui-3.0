@@ -63,7 +63,7 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
       <ActionMenu open={subMenu === "media"} onClose={() => setSubMenu(null)} title="Photo, file or video" actions={[
         { id: "image", label: "Photo · original or resized copy", icon: ImageIcon, onSelect: () => onAttach("image"), disabledReason: r(cap.image) },
         { id: "file", label: "Document or file · up to 2.9 MB", icon: FileUp, onSelect: () => onAttach("file"), disabledReason: r(cap.file) },
-        { id: "video", label: "Video", icon: Video, onSelect: () => onAttach("video"), disabledReason: r(cap.video) },
+        { id: "video", label: "Video · up to 2.9 MB", icon: Video, onSelect: () => onAttach("video"), disabledReason: r(cap.video) },
       ]} />
       <ActionMenu open={subMenu === "place"} onClose={() => setSubMenu(null)} title="Location & schedule" actions={[
         { id: "location", label: "Share my location once", icon: MapPin, onSelect: () => onAttach("location"), disabledReason: r(cap.location) },
