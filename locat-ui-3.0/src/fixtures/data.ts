@@ -54,7 +54,7 @@ export const FIXTURE_MESSAGES: MessageView[] = [
   m("m2", "c-mira", true, "Mostly. The low end is a bit muddy in the mix, checking the export now.", 3 * hr - 4 * min),
   m("m3", "c-mira", false, undefined, 2 * hr, { attachment: { kind: "image", name: "console-wide.jpg", size: 2_480_000, width: 4032, height: 3024, original: true } }),
   m("m4", "c-mira", true, "That console is gorgeous", 2 * hr - min, { reactions: [{ emoji: "🔥", count: 1, mine: false }], replyTo: { id: "m3", authorName: "Mira", excerpt: "Photo · console-wide.jpg", state: "ok" } }),
-  m("m5", "c-mira", false, undefined, 90 * min, { attachment: { kind: "voice", durationSec: 23, waveform: [3, 6, 9, 5, 8, 12, 7, 4, 9, 11, 6, 3, 7, 10, 5, 8, 4, 6, 9, 3] } }),
+  m("m5", "c-mira", false, undefined, 90 * min, { attachment: { kind: "voice", name: "Voice message.webm", size: 48_000, mime: "audio/webm", durationSec: 23, waveform: [3, 6, 9, 5, 8, 12, 7, 4, 9, 11, 6, 3, 7, 10, 5, 8, 4, 6, 9, 3] } }),
   m("m6", "c-mira", true, undefined, 80 * min, { attachment: { kind: "file", name: "Mix_notes_final_FINAL_v7_really-final-version-for-review.pdf", size: 812_000, mime: "application/pdf" }, delivery: "delivered" }),
   m("m7", "c-mira", false, "This message was deleted", 70 * min, { deletedForEveryone: true, text: undefined }),
   m("m8", "c-mira", true, "Moving the session to Thursday, works for you?", 30 * min, { editedAt: now - 28 * min, pinned: true, delivery: "read" }),
@@ -62,7 +62,7 @@ export const FIXTURE_MESSAGES: MessageView[] = [
   m("m10", "c-mira", true, "Perfect. I'll be offline on the train, it'll queue.", 2 * min, { delivery: "queued-offline" }),
   m("m11", "c-mira", true, "Retry test — this one failed", 60_000, { delivery: "failed" }),
   m("g1", "c-studio", false, "Jun added Ada to the group", 2 * hr, { system: "Jun added Ada" }),
-  m("g2", "c-studio", false, undefined, 38 * min, { authorName: "Jun", authorId: "u-jun", attachment: { kind: "voice", durationSec: 14, waveform: [4, 8, 6, 9, 3, 7, 10, 5, 6, 8, 4, 7] } }),
+  m("g2", "c-studio", false, undefined, 38 * min, { authorName: "Jun", authorId: "u-jun", attachment: { kind: "voice", name: "Voice message.webm", size: 31_000, mime: "audio/webm", durationSec: 14, waveform: [4, 8, 6, 9, 3, 7, 10, 5, 6, 8, 4, 7] } }),
   m("j1", "c-jun", false, undefined, 3 * hr, { authorName: "Jun", authorId: "u-jun", attachment: { kind: "location", lat: 52.52, lng: 13.405, accuracyM: 25, label: "Shared once, explicitly" } }),
 ];
 

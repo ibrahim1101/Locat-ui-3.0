@@ -126,6 +126,19 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
    await bobLog.getByRole('button',{name:'Preview '+name,exact:true}).click();const preview=bobLog.getByRole('img',{name,exact:true});await expect.poll(()=>preview.evaluate(image=>image.naturalWidth)).toBe(64);
    await expect(bob.page.getByTestId('save-decrypted-file')).toBeVisible();const savedDownload=bob.page.waitForEvent('download');await bob.page.getByTestId('save-decrypted-file').click();const saved=await savedDownload;expect(saved.suggestedFilename()).toBe(name);expect((await readFile(await saved.path())).equals(Buffer.from(bytes))).toBe(true);
   });
+  await test.step('Record, review and send encrypted voice only after confirmation',async()=>{
+   if(process.env.LOCAT_BROWSER_ENGINE==='firefox')return;
+   await alice.context.grantPermissions(['microphone'],{origin:fixture.origin});const uploads=[];const watch=request=>{if(new URL(request.url()).pathname.includes('/_matrix/media/v3/upload'))uploads.push(request);};alice.page.on('request',watch);
+   try{
+    await alice.page.getByTestId('composer-voice').click();const recorder=alice.page.getByTestId('voice-attachment-recorder');await expect(recorder).toBeVisible();
+    await recorder.getByRole('button',{name:'Start recording',exact:true}).click();await expect(recorder.getByText('Recording on this device',{exact:true})).toBeVisible();await alice.page.waitForTimeout(800);
+    await recorder.getByRole('button',{name:'Stop recording',exact:true}).click();await expect(recorder.getByLabel('Preview voice recording')).toBeVisible();expect(uploads).toHaveLength(0);
+    const uploaded=alice.page.waitForResponse(response=>new URL(response.url()).pathname==='/_matrix/media/v3/upload');await recorder.getByRole('button',{name:'Send voice message',exact:true}).click();expect((await uploaded).status()).toBe(200);await expect(recorder).toHaveCount(0);
+    const bobLog=bob.page.getByRole('log',{name:'Messages',exact:true}),voice=bobLog.getByRole('button',{name:'Load voice message Voice message.webm',exact:true});await expect(voice).toBeVisible({timeout:30000});
+    const downloadResponse=bob.page.waitForResponse(response=>new URL(response.url()).pathname.startsWith('/_matrix/client/v1/media/download/'));await voice.click();expect((await downloadResponse).status()).toBe(200);
+    const playback=bobLog.getByLabel('Voice message Voice message.webm');await expect(playback).toBeVisible();await expect(playback).toHaveJSProperty('paused',true);await expect(playback).toHaveAttribute('controls','');
+   }finally{alice.page.off('request',watch);}
+  });
   await test.step('Add a second private room while crypto stays active, then restore the original history',async()=>{
    const charlie=await account('Browser Room Charlie');await alice.page.getByRole('button',{name:'Back to contacts',exact:true}).click();await alice.page.getByPlaceholder('Exact username or LC code').fill(charlie.username);await alice.page.getByRole('button',{name:'Find contact',exact:true}).click();await alice.page.getByRole('button',{name:'Send friend request',exact:true}).click();await charlie.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();await charlie.page.getByRole('button',{name:'Accept',exact:true}).click();await expect(charlie.page.getByText('Friend',{exact:true})).toBeVisible();await alice.page.getByRole('button',{name:'Refresh contacts',exact:true}).click();
    const setup=await bind(charlie);await setup.getByRole('button',{name:'Keep messaging active',exact:true}).click();await charlie.page.getByTestId('nav-messages').click();await charlie.page.getByRole('button',{name:'Open encrypted conversation',exact:true}).click();await expect(charlie.page.locator('[data-testid="live-conversation"] header p.break-all')).toContainText('@',{timeout:30000});

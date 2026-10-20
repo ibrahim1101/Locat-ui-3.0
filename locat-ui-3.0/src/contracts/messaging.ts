@@ -21,7 +21,7 @@ export type AttachmentView =
   | { kind: "image"; name: string; size: number; width?: number; height?: number; previewUrl?: string; original: boolean }
   | { kind: "file"; name: string; size: number; mime: string }
   | { kind: "video"; name: string; size: number; state: "unsupported-in-messaging" | "ready"; mime?: string; previewUrl?: string }
-  | { kind: "voice"; durationSec: number; waveform: number[] }
+  | { kind: "voice"; name: string; size: number; mime: string; durationSec: number; waveform?: number[]; previewUrl?: string }
   | { kind: "gif"; name: string; previewUrl?: string }
   | { kind: "location"; lat: number; lng: number; accuracyM?: number; label?: string };
 

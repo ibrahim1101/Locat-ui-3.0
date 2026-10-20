@@ -1,5 +1,13 @@
 # Locat UI3 engineering handoff — 2026-10-20
 
+## Encrypted voice messages — local validation complete, hosted CI pending
+
+The Chat microphone action now captures real audio locally. The sender can stop, replay, record again, discard, or explicitly send; capture is limited to 60 seconds and 2,900,000 bytes. Audio is encrypted in the browser before Matrix media upload and sent as encrypted `m.audio` metadata. Recipients request a local decrypted preview from the message bubble; native playback controls are provided without autoplay. Unsupported recording, permission denial, size overflow, invalid duration/MIME and uncertain send paths are handled explicitly. No audio library or persistent plaintext recording was added.
+
+Local validation: TypeScript, ESLint, all **226 frontend / 104 server tests**, and production build pass. Focused recorder/session/composer tests pass; Playwright lists **7 tests**, including the new Chromium-only two-account audio path. The pinned isolated Synapse environment was unavailable in this checkout, so no local real-Matrix/browser success is claimed. The generated Matrix bundle remains above Vite's 500 kB advisory threshold. The source and this handoff are ready for hosted CI; update this entry with exact workflow IDs/results after they complete.
+
+During implementation, an invalid JSX close, fixture voice type updates, and a Vitest browser-audio URL shim were found and fixed. No verification rules were skipped. Public deployment, database migration, release and main-branch merge were not performed.
+
 ## Current attachment UI checkpoint — 2026-10-20
 
 The nested Chat composer now offers Photo, Document or file, Video, Location & schedule, and Stickers & doodles by intent. Images open a themed local review sheet with original and three resize choices; transformation happens locally, preserves the filename/type, and no bytes upload until the user confirms. Video opens a local non-autoplay review and sends original bytes only after confirmation. Both use the existing browser-side Matrix encryption, authenticated media download, uncertain-send protections, and 2,900,000-byte cap. Supported image/video previews are decrypted on demand in message bubbles.

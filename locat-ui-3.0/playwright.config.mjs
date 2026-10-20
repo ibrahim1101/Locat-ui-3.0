@@ -4,5 +4,5 @@ export default defineConfig({
  outputDir:'test-results/browser-artifacts',
  timeout:120000,expect:{timeout:15000},
  reporter:[['line'],['json',{outputFile:process.env.LOCAT_BROWSER_REPORT??'test-results/browser-results.json'}]],
- use:{browserName:process.env.LOCAT_BROWSER_ENGINE==='firefox'?'firefox':'chromium',headless:true,serviceWorkers:'block',actionTimeout:15000,navigationTimeout:20000},
+ use:{browserName:process.env.LOCAT_BROWSER_ENGINE==='firefox'?'firefox':'chromium',headless:true,serviceWorkers:'block',actionTimeout:15000,navigationTimeout:20000,launchOptions:{args:process.env.LOCAT_BROWSER_ENGINE==='firefox'?[]:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']}},
 });

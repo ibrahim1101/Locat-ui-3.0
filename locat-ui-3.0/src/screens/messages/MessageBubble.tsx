@@ -28,10 +28,8 @@ function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attac
         {onDownload?<button type="button" onClick={onDownload} className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-black/10 focus-visible:outline-solid focus-visible:outline-2" aria-label={`Download ${a.name}`}><Download className="size-4 opacity-80" /></button>:<Download className="size-4 shrink-0 opacity-70" aria-label="Download" />}
       </div>);
     case "voice": return (
-      <div className="flex w-[min(64vw,260px)] items-center gap-3">
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-full", mine ? "bg-ember-ink/20" : "bg-ember text-ember-ink")}><Play className="size-4 fill-current" /></span>
-        <span className="flex h-8 flex-1 items-center gap-[3px]" aria-label="Voice message waveform">{a.waveform.map((h, i) => <span key={i} className="w-[3px] flex-1 rounded-full bg-current opacity-60" style={{ height: `${(h / 12) * 100}%` }} />)}</span>
-        <span className="text-2xs tabular opacity-80">{formatDuration(a.durationSec)}</span>
+      <div className="w-[min(68vw,300px)] space-y-2">
+        {a.previewUrl ? <audio src={a.previewUrl} controls preload="metadata" className="w-full" aria-label={`Voice message ${a.name ?? ""}`} /> : <button type="button" onClick={onDownload} disabled={!onDownload} className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-s3 px-3 text-left hover:bg-s3/80 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ember" aria-label={`Load voice message ${a.name ?? ""}`}><span className={cn("grid size-9 shrink-0 place-items-center rounded-full", mine ? "bg-ember-ink/20" : "bg-ember text-ember-ink")}><Play className="size-4 fill-current" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Load voice message</span><span className="block text-xs opacity-70">{formatDuration(a.durationSec)}{a.size ? ` · ${formatBytes(a.size)}` : ""} · encrypted</span></span></button>}
       </div>);
     case "location": return (
       <div className="-mx-1 -mt-1 mb-1 w-[min(64vw,260px)] overflow-hidden rounded-xl">

@@ -36,6 +36,15 @@ it('uploads ciphertext and sends only an encrypted Matrix file event after devic
  expect(sendEvent).toHaveBeenCalledOnce();const event=sendEvent.mock.calls[0][2];expect(event).toMatchObject({msgtype:'m.file',body:'private.png',info:{mimetype:'image/png',size:plain.length},file:{url:'mxc://media.test/file-id',v:'v2',key:{alg:'A256CTR'}}});expect(JSON.stringify(event)).not.toContain('a confidential original photo');expect(discard).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();
 });
 
+it('sends a reviewed voice recording as encrypted m.audio metadata with a bounded duration',async()=>{
+ vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);const plain=new TextEncoder().encode('voice bytes');const file=new File([plain],'Voice message.webm',{type:'audio/webm'});
+ await expect(session.sendAttachment(file,{durationSec:12})).resolves.toEqual({eventId:'$file'});
+ const uploaded=new Uint8Array(await ((mediaFetch.mock.calls[0]![1] as RequestInit).body as Blob).arrayBuffer());expect(uploaded).not.toEqual(plain);
+ expect(sendEvent.mock.calls[0]![2]).toMatchObject({msgtype:'m.audio',body:'Voice message.webm',info:{mimetype:'audio/webm',size:plain.length,duration:12_000},file:{url:'mxc://media.test/file-id',key:{alg:'A256CTR'}}});
+ await expect(session.sendAttachment(file,{durationSec:61})).rejects.toThrow('supported audio');
+ await expect(session.sendAttachment(new File([plain],'bad.txt',{type:'text/plain'}),{durationSec:12})).rejects.toThrow('supported audio');
+});
+
 it('keeps an attachment acknowledgement uncertainty durable and blocks duplicate composition',async()=>{
  vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);sendEvent.mockRejectedValueOnce(new Error('Connection interrupted after upload'));
  const file=new File([new TextEncoder().encode('private file')],'private.txt',{type:'text/plain'});let snapshot:ConversationSnapshot|undefined;session.subscribe(value=>{snapshot=value;});
@@ -50,6 +59,13 @@ it('projects encrypted file events and verifies downloaded ciphertext before ret
  await vi.waitFor(()=>expect(snapshot?.messages).toMatchObject([{id:'$encrypted-file',attachment:{name:'image.png',size:plain.length,mime:'image/png'}}]));
  mediaUrl.mockReturnValue('https://matrix.test/_matrix/client/v1/media/download/media.test/opaque?allow_redirect=true');mediaFetch.mockResolvedValueOnce(new Response(encrypted.ciphertext));
  const downloaded=await session.downloadAttachment(file);expect(new TextDecoder().decode(await downloaded.arrayBuffer())).toBe('original attachment');expect(mediaUrl).toHaveBeenCalledWith(file.url,undefined,undefined,undefined,false,false,true);expect(mediaFetch).toHaveBeenCalledWith(expect.stringContaining('/_matrix/client/v1/media/download/media.test/opaque?allow_redirect=false'),{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
+});
+
+it('projects only bounded encrypted Matrix audio attachments with valid duration metadata',async()=>{
+ vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);const encrypted=await encryptMatrixAttachment(new TextEncoder().encode('audio bytes')),file={...encrypted.file,url:'mxc://media.test/voice'};
+ const makeEvent=(duration:number,size:number,mimetype='audio/webm')=>({getWireType:()=> 'm.room.encrypted',getId:()=> '$voice'+duration+size+encodeURIComponent(mimetype),getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>false,shouldAttemptDecryption:()=>false,isDecryptionFailure:()=>false,getContent:()=>({msgtype:'m.audio',body:'Voice message.webm',info:{size,mimetype,duration},file}),getType:()=> 'm.room.message',getTs:()=>123});
+ events=[makeEvent(12_000,10),makeEvent(0,10),makeEvent(61_000,10),makeEvent(12_000,2_900_001),makeEvent(12_000,10,'video/webm')];let snapshot:ConversationSnapshot|undefined;session.subscribe(value=>{snapshot=value;});
+ await vi.waitFor(()=>expect(snapshot?.messages).toMatchObject([{attachment:{name:'Voice message.webm',size:10,mime:'audio/webm',durationSec:12}}]));expect(snapshot?.messages).toHaveLength(1);
 });
 
 it('refuses encrypted media URLs that resolve outside the configured homeserver',async()=>{
