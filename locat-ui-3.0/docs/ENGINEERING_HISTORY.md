@@ -14,7 +14,7 @@ The sender can edit an owned decrypted text message from its nested message acti
 
 ## Device app lock
 
-Account → Security now includes a nested device-local app lock. Passcodes are salted and derived with PBKDF2-SHA-256; settings control inactivity timeout and background locking, and users can lock immediately. The lock gates the app UI while leaving the server session intact. Browser storage is not encrypted by this feature, and biometrics remain disabled pending verified platform authentication. Focused tests cover passcode verification, setting/policy lifecycle, and hiding/revealing app content through the gate. The built-browser foundation flow now additionally checks reload persistence, wrong-passcode rejection, and correct unlock without storing the passcode in the verifier.
+Account → Security now includes a nested device-local app lock. Passcodes are salted and derived with PBKDF2-SHA-256; settings control inactivity timeout and background locking, and users can lock immediately. Lock signals clear other open same-origin app tabs as well. The lock gates the app UI while leaving the server session intact. Browser storage is not encrypted by this feature, and biometrics remain disabled pending verified platform authentication. Focused tests cover passcode verification, setting/policy lifecycle, and hiding/revealing app content through the gate. The built-browser foundation flow now additionally checks reload persistence, wrong-passcode rejection, and correct unlock without storing the passcode in the verifier.
 
 ## Validation and publication repair
 

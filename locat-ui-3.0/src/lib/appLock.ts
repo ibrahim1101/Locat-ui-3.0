@@ -6,6 +6,7 @@
 const CONFIG_KEY = "locat-app-lock-v1";
 const UNLOCKED_KEY = "locat-app-lock-unlocked";
 const ACTIVITY_KEY = "locat-app-lock-last-activity";
+export const LOCK_SIGNAL_KEY = "locat-app-lock-lock-signal";
 
 export const PBKDF2_ITERATIONS = 310_000;
 export const MIN_PASSCODE_LENGTH = 6;
@@ -95,7 +96,10 @@ export function updatePolicy(patch: Partial<Pick<AppLockConfig, "autoLockOption"
   const next = { ...config, ...patch }; writeConfig(next, storage); return next;
 }
 export function markUnlocked(session = browserStorage("sessionStorage")) { try { session?.setItem(UNLOCKED_KEY, "1"); session?.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* gate keeps its in-memory unlock state for this view */ } }
-export function markLocked(session = browserStorage("sessionStorage")) { try { session?.removeItem(UNLOCKED_KEY); session?.removeItem(ACTIVITY_KEY); } catch { /* gate remains locked in memory */ } }
+export function markLocked(session = browserStorage("sessionStorage"), signal: AppLockStorage | null | undefined = browserStorage("localStorage")) {
+  try { session?.removeItem(UNLOCKED_KEY); session?.removeItem(ACTIVITY_KEY); } catch { /* gate remains locked in memory */ }
+  try { if (signal) signal.setItem(LOCK_SIGNAL_KEY, `${Date.now()}:${Math.random()}`); } catch { /* a blocked storage event cannot prevent the local lock */ }
+}
 export function recordActivity(session = browserStorage("sessionStorage")) { try { if (session?.getItem(UNLOCKED_KEY) === "1") session.setItem(ACTIVITY_KEY, String(Date.now())); } catch { /* next mount requires an unlock */ } }
 export function currentState(storage = browserStorage("localStorage"), session = browserStorage("sessionStorage")) {
   const config = readConfig(storage);

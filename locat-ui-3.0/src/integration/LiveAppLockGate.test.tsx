@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LiveAppLockGate } from "./LiveAppLockGate";
 import { LiveAppLockSettings } from "./LiveAppLockSettings";
+import { LOCK_SIGNAL_KEY } from "@/lib/appLock";
 
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.stubGlobal("crypto", webcrypto); });
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
@@ -22,4 +23,7 @@ it("sets a device passcode, locks the nested app UI, and unlocks after verificat
   fireEvent.change(screen.getByLabelText("Device passcode"), { target: { value: "private-device-passphrase" } });
   fireEvent.click(screen.getByRole("button", { name: "Unlock Locat" }));
   await waitFor(() => expect(screen.getByText("Private account content")).toBeVisible(), { timeout: 5_000 });
+  window.dispatchEvent(new StorageEvent("storage", { key: LOCK_SIGNAL_KEY, newValue: "remote-lock" }));
+  await screen.findByRole("dialog", { name: "Locat is locked" });
+  expect(screen.queryByText("Private account content")).toBeNull();
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Lock } from "lucide-react";
-import { AUTO_LOCK_OPTIONS, currentState, markLocked, markUnlocked, recordActivity, shouldAutoLock, verifyPasscode } from "@/lib/appLock";
+import { AUTO_LOCK_OPTIONS, currentState, LOCK_SIGNAL_KEY, markLocked, markUnlocked, recordActivity, shouldAutoLock, verifyPasscode } from "@/lib/appLock";
 import { LocatMark, Button, TextField } from "@/ui";
 import { APP_LOCK_CHANGE_EVENT } from "./appLockEvents";
 
@@ -19,7 +19,10 @@ export function LiveAppLockGate({ children }: { children: ReactNode }) {
       if (next.configured && requested === "unlocked") next.unlocked = true;
       setState(next);
     };
-    const storageChanged = (event: StorageEvent) => { if (event.key === "locat-app-lock-v1" || event.key === null) bump(); };
+    const storageChanged = (event: StorageEvent) => {
+      if (event.key === LOCK_SIGNAL_KEY && event.newValue) { markLocked(undefined, null); setState({ ...currentState(), unlocked: false }); return; }
+      if (event.key === "locat-app-lock-v1" || event.key === null) bump();
+    };
     window.addEventListener(APP_LOCK_CHANGE_EVENT, changed);
     window.addEventListener("storage", storageChanged);
     return () => { window.removeEventListener(APP_LOCK_CHANGE_EVENT, changed); window.removeEventListener("storage", storageChanged); };
