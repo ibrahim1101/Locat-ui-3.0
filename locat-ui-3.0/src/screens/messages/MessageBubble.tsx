@@ -74,7 +74,7 @@ export const MessageBubble = memo(function MessageBubble({ m, grouped, showAutho
             {m.pinned && <Pin className="size-3" aria-label="Pinned" />}{m.editedAt && <span>edited</span>}{clockTime(m.createdAt)}{m.mine && <span className={cn(m.mine && m.delivery === "read" && "[&_svg]:text-ember-ink")}><DeliveryIcon d={m.delivery} /></span>}
           </span>
         </div>
-        {m.reactions?.length ? <div className={cn("-mt-1.5 flex gap-1", m.mine ? "justify-end pr-2" : "pl-2")}>{m.reactions.map((r) => <span key={r.emoji} className={cn("rounded-full bg-s3 px-1.5 py-0.5 text-xs hairline", r.mine && "shadow-[inset_0_0_0_1px_rgb(var(--ember))]")}>{r.emoji}{r.count > 1 && <span className="ml-0.5 text-2xs">{r.count}</span>}</span>)}</div> : null}
+        {m.reactions?.length ? <div className={cn("-mt-1.5 flex gap-1", m.mine ? "justify-end pr-2" : "pl-2")}>{m.reactions.map((r) => <span key={r.emoji} data-testid={`reaction-${m.id}-${r.emoji}`} aria-label={`${r.emoji} reaction, ${r.count}${r.mine ? ", yours" : ""}`} className={cn("rounded-full bg-s3 px-1.5 py-0.5 text-xs hairline", r.mine && "shadow-[inset_0_0_0_1px_rgb(var(--ember))]")}>{r.emoji}{r.count > 1 && <span className="ml-0.5 text-2xs">{r.count}</span>}</span>)}</div> : null}
         {m.delivery === "failed" && <button onClick={() => onRetry(m)} className="mt-1 flex items-center gap-1 text-2xs font-semibold text-danger" data-testid={`retry-${m.id}`}><RotateCw className="size-3" />Not delivered · Retry</button>}
         {m.delivery === "queued-offline" && <p className="mt-1 text-right text-2xs text-warn">Encrypted and waiting in outbox</p>}
         {m.delivery === "preview-local" && <p className="mt-1 text-right text-2xs text-planned">Preview only · not encrypted or sent</p>}
