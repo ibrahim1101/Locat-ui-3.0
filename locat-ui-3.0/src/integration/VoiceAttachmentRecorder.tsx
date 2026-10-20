@@ -8,26 +8,26 @@ type Review={file:File;durationSec:number;url:string};
 
 /** Records locally, shows a playback review, and uploads only after explicit confirmation. */
 export function VoiceAttachmentRecorder({onClose,onSend}:{onClose():void;onSend(file:File,durationSec:number):Promise<void>}){
- const streamRef=useRef<MediaStream|null>(null),recorderRef=useRef<MediaRecorder|null>(null),chunks=useRef<BlobPart[]>([]),startedAt=useRef(0),mounted=useRef(true),timerRef=useRef<number|undefined>(undefined);
+ const streamRef=useRef<MediaStream|null>(null),recorderRef=useRef<MediaRecorder|null>(null),chunks=useRef<BlobPart[]>([]),recordedBytes=useRef(0),oversized=useRef(false),startedAt=useRef(0),mounted=useRef(true),timerRef=useRef<number|undefined>(undefined);
  const [recording,setRecording]=useState(false),[seconds,setSeconds]=useState(0),[review,setReview]=useState<Review|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const stopTracks=()=>{for(const track of streamRef.current?.getTracks()??[])track.stop();streamRef.current=null;};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;window.clearInterval(timerRef.current);if(recorderRef.current?.state==='recording')recorderRef.current.stop();stopTracks();};},[]);
  useEffect(()=>()=>{if(review)URL.revokeObjectURL(review.url);},[review]);
  function finishRecording(){
   const recorder=recorderRef.current;if(!recorder||recorder.state==='inactive')return;
-  window.clearInterval(timerRef.current);setRecording(false);stopTracks();recorder.stop();
+  window.clearInterval(timerRef.current);setRecording(false);recorder.stop();stopTracks();
  }
  async function startRecording(){
-  setError('');setReview(null);setSeconds(0);chunks.current=[];
+  setError('');setReview(null);setSeconds(0);chunks.current=[];recordedBytes.current=0;oversized.current=false;
   if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setError('Voice recording is not supported by this browser.');return;}
   try{
    const stream=await navigator.mediaDevices.getUserMedia({audio:true});streamRef.current=stream;
    const mimeType=MIME_TYPES.find(type=>MediaRecorder.isTypeSupported(type));
    const recorder=new MediaRecorder(stream,mimeType?{mimeType}:undefined);recorderRef.current=recorder;startedAt.current=Date.now();
-   recorder.ondataavailable=event=>{if(event.data.size)chunks.current.push(event.data);};
+   recorder.ondataavailable=event=>{if(!event.data.size)return;recordedBytes.current+=event.data.size;if(recordedBytes.current>MAX_BYTES){oversized.current=true;chunks.current=[];recordedBytes.current=0;if(mounted.current)setError('This recording exceeded 2.9 MB. Make a shorter recording and try again.');finishRecording();return;}chunks.current.push(event.data);};
    recorder.onerror=()=>{if(mounted.current){setError('Recording stopped unexpectedly. You can try again.');setRecording(false);}stopTracks();};
    recorder.onstop=()=>{
-    stopTracks();if(!mounted.current)return;
+    stopTracks();if(!mounted.current)return;if(oversized.current){chunks.current=[];return;}
     const durationSec=Math.min(MAX_SECONDS,Math.max(1,Math.ceil((Date.now()-startedAt.current)/1000)));
     const mime=recorder.mimeType||mimeType||'audio/webm';const blob=new Blob(chunks.current,{type:mime});chunks.current=[];
     if(blob.size===0){setError('No audio was captured. Check microphone access and try again.');return;}

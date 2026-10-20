@@ -29,3 +29,18 @@ it('explains microphone denial and never attempts an upload',async()=>{
  const onSend=vi.fn();render(<VoiceAttachmentRecorder onClose={()=>{}} onSend={onSend}/>);fireEvent.click(screen.getByRole('button',{name:'Start recording'}));
  expect(await screen.findByRole('alert')).toHaveTextContent('Microphone access was denied');expect(onSend).not.toHaveBeenCalled();
 });
+
+it('discards a recording as soon as captured audio exceeds the encrypted attachment limit',async()=>{
+ const stop=vi.fn(),stream={getTracks:()=>[{stop}]};
+ class OversizeRecorder{
+  state='inactive';mimeType='audio/webm';ondataavailable?: (event:{data:Blob})=>void;onstop?:()=>void;
+  static isTypeSupported=vi.fn(()=>true);constructor(){}
+  start(){this.state='recording';}
+  stop(){this.state='inactive';this.ondataavailable?.({data:new Blob([new Uint8Array(2_900_001)],{type:this.mimeType})});this.onstop?.();}
+ }
+ vi.stubGlobal('MediaRecorder',OversizeRecorder);vi.stubGlobal('navigator',{...navigator,mediaDevices:{getUserMedia:vi.fn(async()=>stream)}});
+ vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:oversize');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+ const onSend=vi.fn(async(_file:File,_durationSec:number)=>{});render(<VoiceAttachmentRecorder onClose={()=>{}} onSend={onSend}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Start recording'}));await screen.findByText('Recording on this device');fireEvent.click(screen.getByRole('button',{name:'Stop recording'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('exceeded 2.9 MB');expect(onSend).not.toHaveBeenCalled();expect(stop).toHaveBeenCalledOnce();expect(screen.queryByLabelText('Preview voice recording')).not.toBeInTheDocument();
+});
