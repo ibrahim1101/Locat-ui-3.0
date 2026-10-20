@@ -2,7 +2,7 @@
 
 Current boundaries: exact Host/Origin, scrypt authentication, hashed session tokens and HttpOnly SameSite cookies; Secure on direct TLS and explicit trusted proxy termination. TLS is mandatory outside loopback development. Proxy trust is socket IP plus fixed origin; forwarded headers are ignored. Accounts and module records are authorized on each request. Browser compromise remains a risk to client keys; server-readable profiles/shared-media metadata are not private E2EE.
 
-See PRIVATE_STORAGE.md, LINK_INTEGRATION.md and REMOTE_INTEGRATION.md for experimental cryptographic details/limits. E2EE_SECURITY_MODEL.md gates messaging. No independent security audit or public-beta readiness is claimed. Quotas/rate limits are finite implementation controls, not complete internet abuse defenses. Public deployment requires the separate acceptance and authorization gates in CLOUDFLARE_DEPLOYMENT.md and CONNECT_TEST_PLAN.md.
+See PRIVATE_STORAGE.md and LINK_INTEGRATION.md for current feature boundaries. E2EE_SECURITY_MODEL.md gates messaging. No independent security audit or public-beta readiness is claimed. Quotas/rate limits are finite implementation controls, not complete internet abuse defenses. Public deployment requires the separate acceptance and authorization gates in CLOUDFLARE_DEPLOYMENT.md and CONNECT_TEST_PLAN.md.
 
 
 Durable managed Matrix cleanup is implemented with additive schema 13 and transaction-coupled Link revocation; exact scope, worker lifecycle and evidence are in MATRIX_DEVICE_REVOCATION.md. It does not certify remote wiping, account-wide upstream sign-out, unbound-token inventory or full recovery.
@@ -14,7 +14,7 @@ Managed setup now records deterministic device intent before upstream issuance u
 Password-confirmed other-session sign-out and transactional password-change authorization are implemented; see SESSION_SECURITY.md for local grant scope, audit atomicity and acceptance evidence.
 
 
-Account-owned security audit search and cursor pagination are implemented in Sentinel; see ACCOUNT_ACTIVITY.md. This covers retained audit records rather than the full cross-module Timeline roadmap.
+Account-owned security audit search and cursor pagination remain available in Settings → Security; see ACCOUNT_ACTIVITY.md. SentinelLab and its incident integrations are retired. Account activity covers retained audit records rather than the full cross-module Timeline roadmap.
 
 
 Account audit date windows and bounded loaded-result JSON export are implemented; ACCOUNT_ACTIVITY.md defines the readable-file scope and excludes full account/private-key backup or signed-evidence claims.
@@ -30,4 +30,4 @@ Private-store passphrase changes rewrap the existing master key in the browser. 
 
 All private-store HTTP mutations now check their live owning session under SQLite BEGIN IMMEDIATE and commit data plus a single metadata-only audit together. Failed audits roll back configuration/entry changes. Internal maintenance APIs are distinct from the authenticated router; see PRIVATE_STORAGE.md.
 
-Sentinel ingestion rechecks integration-token revocation inside its write transaction. Token/user incident mutations recheck live owning sessions after body reading and under the SQLite write lock, and commit metadata-only audit events atomically. SENTINEL_INCIDENTS.md documents ordering, limits and remaining acceptance.
+Schema 18 removes retired Sentinel incident/token storage. Legacy backup verification can still inspect old schema versions without making those tables a current requirement. Current authenticated audit records use the account event store and remain separate from SentinelLab.

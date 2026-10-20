@@ -77,7 +77,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 17); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 18); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     const privateConfig={v:1,storeId:'11111111-1111-4111-8111-111111111111',salt:Buffer.alloc(16).toString('base64'),iterations:600000,wrappedKey:{v:1,iv:Buffer.alloc(12).toString('base64'),data:Buffer.alloc(48).toString('base64')}};
     const privateEnvelope=privateConfig.wrappedKey;const privateId='22222222-2222-4222-8222-222222222222';

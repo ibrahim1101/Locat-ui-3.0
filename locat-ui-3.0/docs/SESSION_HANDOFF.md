@@ -1,3 +1,9 @@
+## Current checkpoint — retired media, Remote and SentinelLab removed
+
+Schema 18 removes the retired Cinema/media-sharing overrides, Link Remote sessions/signals, and Sentinel incident/token/event tables. Fresh schemas no longer create them. Link no longer queries Remote tables; dormant Sentinel incident search/export helpers are deleted. SentinelLab and related integrations are retired. Settings → Security account audit history remains. The updated Live Devices copy now describes only the retained Link relay. Existing backup verification still accepts older schemas without requiring those retired tables.
+
+The same batch continues retained Chat work: nested local image resize choices, encrypted replies/reactions and their operation-serialization fixes. Local validation after combining the in-progress branch work: `npm run check`, `npm run lint`, `npm run test:all` (**250 frontend / 108 backend tests**) and `npm run build` pass. The browser test list contains seven scenarios. Hosted acceptance for this exact merged commit is pending. The merge also retains the current authority-pin repair commits from the remote branch. No service or live database was changed; installing the updated server applies the schema 18 deletion.
+
 ## Verified Chat checkpoint — encrypted reactions, replies and image attachments
 
 Source **ea600dd9b1204ee2a1eb9e5c3d1667695bcb585b** on `rework/locat-core-scope` passed both hosted workflows: Locat core **39402937803** (all five jobs successful) and Locat UI3 **39402937743** (job **118561847465** successful). Core jobs: connector **118561847057**, macOS **118561847367**, Ubuntu **118561847460**, browser **118561847467**, and Windows **118561847473**.

@@ -8,7 +8,8 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DATABASE_SCHEMA_VERSION} from './database.mjs';
 const MAX_BYTES=2*1024*1024*1024;
-const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides'],['linkProofChallenges','linkProofTokens']];
+const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides'],['linkProofChallenges','linkProofTokens'],[]];
+const retiredTables=new Set(['sentinelTokens','sentinelIncidents','sentinelEvents','remoteSessions','remoteSignals','mediaShareOverrides']);
 const columns={
  mediaShareOverrides:['libraryId','ownerId','friendId','allowed','updatedAt'],
  linkProofChallenges:['id','userId','deviceId','sessionHash','secret','expiresAt'],linkProofTokens:['tokenHash','userId','deviceId','sessionHash','expiresAt'],
@@ -46,13 +47,14 @@ export async function withVerifiedServerBackup(filename,{expectedSha256}={},cons
   if(sql.prepare('PRAGMA foreign_key_check').get())throw new Error('SQLite foreign-key check failed');
   const schemaVersion=sql.prepare('PRAGMA user_version').get().user_version;if(schemaVersion<1||schemaVersion>DATABASE_SCHEMA_VERSION)throw new Error('Backup schema version is unsupported');
   const tables=new Set(sql.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all().map(row=>row.name));
-  for(const name of groups.slice(0,schemaVersion).flat())if(!tables.has(name))throw new Error('Backup is missing a required Locat table');
-  for(const name of groups.slice(0,schemaVersion).flat()){
+  const requiredTables=groups.slice(0,schemaVersion).flat().filter(name=>!retiredTables.has(name));
+  for(const name of requiredTables)if(!tables.has(name))throw new Error('Backup is missing a required Locat table');
+  for(const name of requiredTables){
    const actual=new Set(sql.prepare('PRAGMA table_info('+name+')').all().map(row=>row.name)),required=[...columns[name]];
    if(name==='users'&&schemaVersion>=4)required.push('lcCode','bio');if(name==='users'&&schemaVersion>=10)required.push('profileVisibility','usernameVisibility','allowContactRequests');
    for(const column of required)if(!actual.has(column))throw new Error('Backup is missing required Locat columns');
   }
-  const counts={};for(const name of ['users','envelopes','privateObjects','linkDevices','matrixBindings','mediaShareOverrides'])if(tables.has(name))counts[name]=sql.prepare('SELECT COUNT(*) AS n FROM '+name).get().n;
+  const counts={};for(const name of ['users','envelopes','privateObjects','linkDevices','matrixBindings'])if(tables.has(name))counts[name]=sql.prepare('SELECT COUNT(*) AS n FROM '+name).get().n;
   const report={ok:true,schemaVersion,sizeBytes:bytes,sha256,expectedHashMatched:expectedSha256?true:null,integrity:'ok',foreignKeys:'ok',schemaCheck:'required-tables-and-columns',counts,scope:'standalone-locat-sqlite',checkedAt:new Date().toISOString()};
   sql.close();sql=undefined;
   return await consume(report,snapshot);

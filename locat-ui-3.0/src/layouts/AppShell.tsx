@@ -65,7 +65,7 @@ export function AppShell() {
       {!compact && <Sidebar rail={rail} onToggle={() => setRail(!rail)} onCommand={() => setCmd(true)} />}
       <div className="flex min-w-0 flex-1 flex-col">
         <ConnectionStrip />
-        <main id="main" className="min-h-0 flex-1" key={`${mod?.id}:${prefs.largeLibraries}`}>
+        <main id="main" className="min-h-0 flex-1" key={`${mod?.id}:${prefs.largeConversation}`}>
           <Suspense fallback={<Loading />}>
             {mod ? <ModuleGate id={mod.id}><Outlet /></ModuleGate> : <Outlet />}
           </Suspense>

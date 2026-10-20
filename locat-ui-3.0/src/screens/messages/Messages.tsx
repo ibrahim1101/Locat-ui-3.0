@@ -28,7 +28,7 @@ export default function Messages() {
   const report = useReport();
   const id = pathname.split("/")[2];
   const [conversations, setConversations] = useState<ConversationView[]>(FIXTURE_CONVERSATIONS);
-  const [messages, setMessages] = useState<MessageView[]>(() => (prefs.largeLibraries ? [...FIXTURE_MESSAGES.filter((m) => m.conversationId !== "c-studio"), ...makeMessages("c-studio", LARGE.messages)] : FIXTURE_MESSAGES));
+  const [messages, setMessages] = useState<MessageView[]>(() => (prefs.largeConversation ? [...FIXTURE_MESSAGES.filter((m) => m.conversationId !== "c-studio"), ...makeMessages("c-studio", LARGE.messages)] : FIXTURE_MESSAGES));
   const [sheetState, setSheetState] = useState<"contacts" | "new" | "scheduled" | "info" | null>(null);
   const sheet = params.has("compose") ? "new" : sheetState;
   const setSheet = (s: typeof sheetState) => { setSheetState(s); if (params.has("compose")) setParams({}, { replace: true }); };

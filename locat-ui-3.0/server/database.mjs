@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=17;
+export const DATABASE_SCHEMA_VERSION=18;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -68,13 +68,6 @@ export function openDatabase(filename) {
       sql.exec('PRAGMA user_version = 4; COMMIT;');
     } catch (error) { sql.exec('ROLLBACK'); throw error; }
   }
-  if (version < 5) sql.exec(`BEGIN IMMEDIATE;
-    CREATE TABLE sentinelTokens (id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id), hash TEXT NOT NULL UNIQUE, name TEXT NOT NULL, prefix TEXT NOT NULL, createdAt INTEGER NOT NULL, lastUsedAt INTEGER, revokedAt INTEGER);
-    CREATE TABLE sentinelIncidents (id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES users(id), source TEXT NOT NULL, fingerprint TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, severity TEXT NOT NULL, status TEXT NOT NULL, occurrences INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, UNIQUE(userId,source,fingerprint));
-    CREATE INDEX sentinel_incidents_owner ON sentinelIncidents(userId,updatedAt);
-    CREATE TABLE sentinelEvents (id INTEGER PRIMARY KEY AUTOINCREMENT, incidentId TEXT NOT NULL REFERENCES sentinelIncidents(id), action TEXT NOT NULL, note TEXT NOT NULL, createdAt INTEGER NOT NULL);
-    CREATE INDEX sentinel_events_incident ON sentinelEvents(incidentId,id);
-    PRAGMA user_version = 5; COMMIT;`);
   if (version < 6) sql.exec(`BEGIN IMMEDIATE;
     CREATE TABLE privateStores (userId TEXT NOT NULL REFERENCES users(id), module TEXT NOT NULL CHECK(module IN ('vault','secrets')), config TEXT NOT NULL, PRIMARY KEY(userId,module));
     CREATE TABLE privateObjects (userId TEXT NOT NULL, module TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL, envelope TEXT NOT NULL, bytes INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(userId,module,id), FOREIGN KEY(userId,module) REFERENCES privateStores(userId,module));
@@ -88,12 +81,6 @@ export function openDatabase(filename) {
     CREATE INDEX link_payload_owner ON linkPayloads(userId,createdAt);
     CREATE TABLE linkPayloadChunks (payloadId TEXT NOT NULL REFERENCES linkPayloads(id), seq INTEGER NOT NULL, envelope TEXT NOT NULL, PRIMARY KEY(payloadId,seq));
     PRAGMA user_version = 8; COMMIT;`);
-  if (version < 9) sql.exec(`BEGIN IMMEDIATE;
-    CREATE TABLE remoteSessions (id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),pairId TEXT NOT NULL,viewer INTEGER NOT NULL REFERENCES linkDevices(id),host INTEGER NOT NULL REFERENCES linkDevices(id),status TEXT NOT NULL CHECK(status IN ('pending','active','denied','closed','expired')),createdAt INTEGER NOT NULL,expiresAt INTEGER NOT NULL,CHECK(viewer!=host));
-    CREATE INDEX remote_sessions_owner ON remoteSessions(userId,createdAt);
-    CREATE TABLE remoteSignals (sequence INTEGER PRIMARY KEY AUTOINCREMENT,sessionId TEXT NOT NULL REFERENCES remoteSessions(id),signalId TEXT NOT NULL UNIQUE,fromDevice INTEGER NOT NULL REFERENCES linkDevices(id),kind TEXT NOT NULL CHECK(kind IN ('offer','answer','candidate')),envelope TEXT NOT NULL);
-    CREATE INDEX remote_signals_session ON remoteSignals(sessionId,sequence);
-    PRAGMA user_version = 9; COMMIT;`);
   if (version < 10) sql.exec(`BEGIN IMMEDIATE;
     ALTER TABLE users ADD COLUMN profileVisibility TEXT NOT NULL DEFAULT 'everyone';
     ALTER TABLE users ADD COLUMN usernameVisibility TEXT NOT NULL DEFAULT 'everyone';
@@ -121,9 +108,6 @@ export function openDatabase(filename) {
   if(version<15)sql.exec(`BEGIN IMMEDIATE;
     CREATE TABLE matrixConversations(lowId TEXT NOT NULL REFERENCES users(id),highId TEXT NOT NULL REFERENCES users(id),operationId TEXT NOT NULL UNIQUE,status TEXT NOT NULL CHECK(status IN ('pending','ready')),roomId TEXT UNIQUE,createdAt INTEGER NOT NULL,PRIMARY KEY(lowId,highId),CHECK(lowId<highId));
     PRAGMA user_version=15;COMMIT;`);
-  if(version<16)sql.exec(`BEGIN IMMEDIATE;
-    CREATE TABLE mediaShareOverrides(libraryId TEXT NOT NULL,ownerId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),allowed INTEGER NOT NULL CHECK(allowed IN (0,1)),updatedAt INTEGER NOT NULL,PRIMARY KEY(libraryId,ownerId,friendId),CHECK(ownerId!=friendId));
-    PRAGMA user_version=16;COMMIT;`);
   if(version<17)sql.exec(`BEGIN IMMEDIATE;
     CREATE TABLE linkProofChallenges(id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,deviceId INTEGER NOT NULL REFERENCES linkDevices(id) ON DELETE CASCADE,sessionHash TEXT NOT NULL,secret BLOB NOT NULL CHECK(length(secret)=32),expiresAt INTEGER NOT NULL);
     CREATE INDEX link_proof_challenge_expiry ON linkProofChallenges(expiresAt);
@@ -131,6 +115,14 @@ export function openDatabase(filename) {
     CREATE INDEX link_proof_token_expiry ON linkProofTokens(expiresAt);
     CREATE INDEX link_proof_token_device ON linkProofTokens(userId,deviceId);
     PRAGMA user_version=17;COMMIT;`);
+  if(version<18)sql.exec(`BEGIN IMMEDIATE;
+    DROP TABLE IF EXISTS sentinelEvents;
+    DROP TABLE IF EXISTS sentinelIncidents;
+    DROP TABLE IF EXISTS sentinelTokens;
+    DROP TABLE IF EXISTS remoteSignals;
+    DROP TABLE IF EXISTS remoteSessions;
+    DROP TABLE IF EXISTS mediaShareOverrides;
+    PRAGMA user_version=18;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);

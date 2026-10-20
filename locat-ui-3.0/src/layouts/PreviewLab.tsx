@@ -37,8 +37,8 @@ export function PreviewLab() {
         <Section title="Identity">
           <div className="px-4"><Switch label="Administrator role" checked={!!s.user?.isAdmin} onChange={(v) => s.user && s.setUser({ ...s.user, isAdmin: v })} disabledReason={s.user ? null : "No account in local mode"} /></div>
         </Section>
-        <Section title="Data volume">
-          <div className="px-4"><Switch label="Large libraries" description="5,000 messages in Studio Night, 10,000 songs, 20,000 photos, 2,000 videos" checked={s.prefs.largeLibraries} onChange={(v) => s.setPrefs({ largeLibraries: v })} testId="toggle-large-libraries" /></div>
+        <Section title="Conversation scale">
+          <div className="px-4"><Switch label="Large conversation" description="5,000 generated messages in Studio Night" checked={s.prefs.largeConversation} onChange={(v) => s.setPrefs({ largeConversation: v })} testId="toggle-large-conversation" /></div>
         </Section>
         <Section title="Platform">
           <div className="p-3"><Segmented<PlatformKind> label="Platform" value={s.platform.kind} onChange={(k) => s.setPlatform({ ...s.platform, kind: k, os: k === "capacitor-android" ? "android" : k === "tauri-desktop" ? "windows" : "unknown" })}

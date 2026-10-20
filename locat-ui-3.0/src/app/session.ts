@@ -10,8 +10,8 @@ export type Preferences = {
   startup: "messages" | "home"; density: "comfortable" | "compact";
   sendReadReceipts: boolean;
   typingIndicators: boolean;
-  /** Preview only: swap in generated stress fixtures (5k messages, 10k songs, 20k photos, 2k videos). */
-  largeLibraries: boolean;
+  /** Preview only: swap in a generated 5,000-message conversation. */
+  largeConversation: boolean;
 };
 
 export type SessionValue = {
