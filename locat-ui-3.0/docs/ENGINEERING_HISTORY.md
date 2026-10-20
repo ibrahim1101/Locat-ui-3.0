@@ -408,3 +408,10 @@ An unreadable old-origin pin previously stopped the profile scan, while the visi
 Focused tests: **9 passed**. Full local typecheck/lint/test/build/diff-check passed (**249 frontend /107 server tests**). Source `fb1d7fe049e2159775b7e7ffea4762a6893ef013` passed UI3 workflow `39416980325` / job `118608271336` and all five core jobs in workflow `39416980238` (`118608271293`, `118608271704`, `118608271720`, `118608271754`, `118608271839`). Every OS passed 249 frontend tests and build/type/lint; Ubuntu's pinned SDK 44.0.0 / Synapse 1.163.0 acceptance passed. Browser: **7 Chromium (8.2m), 7 Firefox (8.5m), 3 repeats (17.2s)**. The strengthened regression confirms a valid clone pin survives cleanup and still triggers the stronger confirmation.
 
 This only repairs malformed browser-profile metadata; it does not provide protected storage, restore cleared pins or prove a single active writer.
+
+
+### P2 authority-pin repair — built-browser acceptance — 2026-10-20
+
+The built-browser foundation test now seeds both an invalid local authority pin and a valid same-UUID pin at another origin. In Chromium and Firefox, it verifies that the malformed record blocks pinning, explicit cleanup removes only the invalid record, the valid clone pin is preserved, and the clone warning plus sole-writable-owner checkbox still gate the new pin.
+
+Exact browser source `76e43da803ab46e67de3fa68ff6311b030f88ba9` passed UI3 `39419456890` / job `118616483037` and all core workflow `39419456980` jobs: macOS `118616482977`, browser `118616483059`, connector `118616483146`, Windows `118616483177`, Ubuntu `118616483286`. Browser: **7 Chromium (8.4m), 7 Firefox (8.9m), 3 private-store repeats (25.0s)**. Earlier runtime acceptance for malformed pin repair remains `fb1d7fe` / core `39416980238`; this follow-up changes browser acceptance only.
