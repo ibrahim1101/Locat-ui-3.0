@@ -44,6 +44,10 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   },{ownerId:registered.user.id,ownerName:username,ownerPassword:password});
   expect(incoming).toEqual({stage:'owner sign-in',status:200});
   await page.goto(fixture.origin+'/home');
+  await expect(page.getByText('Preview sample data')).toHaveCount(0);
+  await expect(page.getByText(/Recent conversations will appear here/)).toBeVisible();
+  await expect(page.getByText('Mira Okafor')).toHaveCount(0);
+  await expect(page.getByText('Studio Desktop')).toHaveCount(0);
   const homeSummary=page.getByRole('region',{name:'Contact summary'});
   await expect(homeSummary.getByText('Accepted contacts')).toBeVisible();
   await expect(homeSummary.getByText('Incoming requests')).toBeVisible();
