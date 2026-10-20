@@ -12,6 +12,7 @@ it('commits ciphertext before transmission and reopens only in the same device/a
 it('retains a non-replayable attachment marker after an uncertain acknowledgement',async()=>{
  const outbox=createMatrixOutbox('scope','DEVICE','YWJj');await outbox.prepare({...descriptor(),kind:'attachment'});
  const restored=await createMatrixOutbox('scope','DEVICE','YWJj').load();expect(restored).toMatchObject({kind:'attachment',transaction,attempts:0});expect(restored).not.toHaveProperty('body');
+ await outbox.beforeSend(roomId,transaction,body);const attempted=await createMatrixOutbox('scope','DEVICE','YWJj').load();expect(attempted).toMatchObject({kind:'attachment',transaction,attempts:1});expect(attempted).not.toHaveProperty('body');
  await expect(outbox.prepare(descriptor())).rejects.toThrow('pending');await outbox.complete(transaction);expect(await outbox.load()).toBeUndefined();
 });
 it('rejects plaintext, changed keys, ciphertext, room and transaction without changing the original record',async()=>{

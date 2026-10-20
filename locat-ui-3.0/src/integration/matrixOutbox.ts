@@ -23,7 +23,7 @@ export function createMatrixOutbox(scope:string,deviceId:string,senderKey:string
  return {
   load:()=>access(false,row=>row),
   prepare:(value:Omit<PendingMatrixSend,'attempts'|'body'>)=>access(true,(row,store)=>{if(row)throw new Error('An uncertain encrypted send is pending. Review its original conversation first.');const fresh=validate({...value,attempts:0});store.put(fresh,'current');}),
-  beforeSend:(roomId:string,transaction:string,body:string)=>access(true,(row,store)=>{const pending=current(row,transaction);if(pending.roomId!==roomId)throw new Error('Encrypted retry room changed.');replayable(pending);validateBody(body);if(pending.body!==undefined&&pending.body!==body)throw new Error('Encrypted retry ciphertext changed.');store.put({...pending,body,attempts:pending.attempts+1},'current');}),
+  beforeSend:(roomId:string,transaction:string,body:string)=>access(true,(row,store)=>{const pending=current(row,transaction);if(pending.roomId!==roomId)throw new Error('Encrypted retry room changed.');replayable(pending);validateBody(body);if(pending.body!==undefined&&pending.body!==body)throw new Error('Encrypted retry ciphertext changed.');store.put(pending.kind==='attachment'?{...pending,attempts:pending.attempts+1}:{...pending,body,attempts:pending.attempts+1},'current');}),
   complete:(transaction:string)=>access(true,(row,store)=>{current(row,transaction);store.delete('current');}),
   check:replayable,
  };
