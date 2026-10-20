@@ -5,7 +5,7 @@ import { accountRequest } from "./accountRequest";
 type Contact = { status: "pending" | "accepted"; direction: "incoming" | "outgoing" };
 type Counts = { contacts: number; requests: number };
 
-export function LiveHomeContactSummary({ accountId, onOpenMessages }: { accountId: string; onOpenMessages(): void }) {
+export function LiveHomeContactSummary({ accountId, onOpenMessages }: { accountId: string; onOpenMessages(section: "contacts" | "requests"): void }) {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -37,7 +37,9 @@ export function LiveHomeContactSummary({ accountId, onOpenMessages }: { accountI
         <div className="rounded-2xl bg-s2 p-3"><p className="text-2xl font-extrabold tabular-nums">{counts.contacts}</p><p className="text-xs text-ink-3">Accepted contacts</p></div>
         <div className="rounded-2xl bg-s2 p-3"><p className="text-2xl font-extrabold tabular-nums">{counts.requests}</p><p className="text-xs text-ink-3">Incoming requests</p></div>
       </div>
-      <Button className="mt-3" size="sm" variant="ghost" onClick={onOpenMessages}>Open Messages</Button>
+      <Button className="mt-3" size="sm" variant="ghost" onClick={() => onOpenMessages(counts.requests ? "requests" : "contacts")}>
+        {counts.requests ? "Review requests" : "Open Messages"}
+      </Button>
     </> : error ? <div className="mt-2 space-y-2"><p role="alert" className="text-xs text-danger">{error}</p><Button size="sm" variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></div>
       : <p role="status" className="mt-3 text-xs text-ink-3">Loading contact summary…</p>}
   </section>;

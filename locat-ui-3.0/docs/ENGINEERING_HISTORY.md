@@ -50,7 +50,9 @@ The Home dashboard previously rendered preview conversation and device fixtures 
 
 The live dashboard now also loads account-owned accepted-contact and incoming-request counts through the same expected-account guard used elsewhere in live settings. It has loading, retry and cancellation states, and routes into Messages for the detailed Contacts, Requests and Find people sections. No conversation previews are inferred from contact membership.
 
-This dashboard batch passes TypeScript, ESLint, 281 frontend tests, 108 server tests and the production build. The existing Matrix crypto chunk-size advisory remains.
+When there are incoming requests, the Home summary opens Messages directly to its nested Requests section; otherwise it opens Contacts. The selected nested destination is read from the route query so the shortcut lands in the relevant view without flattening the Messages screen.
+
+This dashboard batch passes TypeScript, ESLint, 282 frontend tests, 108 server tests and the production build. The existing Matrix crypto chunk-size advisory remains.
 
 ## Active handoff and messaging status
 

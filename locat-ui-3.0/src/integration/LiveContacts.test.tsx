@@ -50,6 +50,11 @@ it('moves an accepted request into Contacts after the server confirms it',async(
  vi.stubGlobal('fetch',vi.fn(async(path:string)=>{if(path==='/api/contacts'){reads++;return reply({contacts:[{user:bob,status:reads===1?'pending':'accepted',direction:'incoming'}],blocked:[]});}return reply({ok:true});}));
  render(<MemoryRouter><LiveContacts/></MemoryRouter>);await screen.findByText('No contacts yet');fireEvent.click(screen.getByRole('button',{name:/Requests/}));fireEvent.click(await screen.findByRole('button',{name:'Accept'}));await screen.findByText('Bob · @bob');expect(screen.getByText('Friend')).toBeVisible();expect(screen.queryByText('incoming request')).toBeNull();
 });
+it('opens the nested Requests section from a Home summary shortcut',async()=>{
+ const bob={...peer,id:'b'.repeat(32)};vi.stubGlobal('fetch',vi.fn(async()=>reply({contacts:[{user:bob,status:'pending',direction:'incoming'}],blocked:[]})));
+ render(<MemoryRouter initialEntries={['/messages?section=requests']}><LiveContacts/></MemoryRouter>);
+ await screen.findByText('Bob · @bob');expect(screen.getByRole('button',{name:/Requests/})).toHaveAttribute('aria-pressed','true');expect(screen.queryByText('No contacts yet')).toBeNull();
+});
 it('excludes duplicate contact mutations before the next render',async()=>{
  let finish!:(value:Response)=>void;const fetch=vi.fn(async(_path:string,options?:RequestInit)=>options?.method==='POST'?new Promise<Response>(resolve=>{finish=resolve;}):reply({contacts:[{user:peer,status:'accepted',direction:'outgoing'}],blocked:[]}));vi.stubGlobal('fetch',fetch);render(<MemoryRouter><LiveContacts/></MemoryRouter>);const button=await screen.findByRole('button',{name:'Block'});act(()=>{button.dispatchEvent(new MouseEvent('click',{bubbles:true}));button.dispatchEvent(new MouseEvent('click',{bubbles:true}));});await waitFor(()=>expect(fetch.mock.calls.filter(([,options])=>options?.method==='POST')).toHaveLength(1));await act(async()=>{finish(reply({ok:true}));});expect(fetch.mock.calls.find(([,options])=>options?.method==='POST')?.[1]?.headers).toMatchObject({'X-Locat-Account':'a'.repeat(32)});
 });

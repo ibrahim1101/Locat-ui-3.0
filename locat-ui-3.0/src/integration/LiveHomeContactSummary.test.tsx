@@ -19,8 +19,8 @@ it("shows server-owned accepted contact and incoming request counts", async () =
   expect(screen.getByText("Incoming requests")).toBeVisible();
   expect(screen.getByText("2", { selector: "p" })).toBeVisible();
   expect(accountRequest).toHaveBeenCalledWith("/api/contacts", "account-a", undefined, expect.any(AbortSignal));
-  fireEvent.click(screen.getByRole("button", { name: "Open Messages" }));
-  expect(open).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button", { name: "Review requests" }));
+  expect(open).toHaveBeenCalledWith("requests");
 });
 
 it("offers an explicit retry after the server summary fails", async () => {
