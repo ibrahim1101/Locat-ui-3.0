@@ -92,6 +92,17 @@ it('warns about a cloned server UUID and requires operator confirmation before p
  expect(readAuthorityPin(accountId,origin)?.keyId).toBe(fixture.identity.attestation?.keyId);
 });
 
+it('rechecks browser-profile pins at the moment a first-contact pin is saved',async()=>{
+ const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.discovery),{status:200})));
+ render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
+ const pin=await screen.findByRole('button',{name:'Pin after comparison'});fireEvent.click(screen.getByRole('checkbox'));
+ writeAuthorityPin('b'.repeat(32),pinFor(signedIdentity(),'https://newly-trusted.test'));
+ fireEvent.click(pin);await screen.findByRole('alert');expect(screen.getByRole('alert')).toHaveTextContent('https://newly-trusted.test');
+ expect(readAuthorityPin(accountId,origin)).toBeNull();expect(pin).toBeDisabled();
+ const cloneConfirmation=screen.getByRole('checkbox',{name:/only active writable owner/});fireEvent.click(cloneConfirmation);fireEvent.click(pin);
+ await screen.findByText('Authority fingerprint pinned for this account in this browser.');expect(readAuthorityPin(accountId,origin)?.keyId).toBe(fixture.identity.attestation?.keyId);
+});
+
 it('blocks pinning until malformed records are explicitly removed and trust is rechecked',async()=>{
  const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test'),invalidScope='locat-ui3:authority-pin:v1:invalid-account:'+encodeURIComponent('https://scope-locat.test');localStorage.setItem(invalidKey,'not-json');
  const trusted=signedIdentity();localStorage.setItem(invalidScope,JSON.stringify({...pinFor(trusted,'https://scope-locat.test'),pinnedAt:new Date(0).toISOString()}));writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));

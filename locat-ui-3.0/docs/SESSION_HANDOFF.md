@@ -395,3 +395,9 @@ Local pin records are checked for canonical secure origin, UUID-shaped server ID
 ### P2 pin-scope clone-scan follow-up
 
 Clone scans now validate the versioned pin storage key's 32-hex account ID and canonical origin before considering a pin. An invalid scope halts the scan and routes through the explicit nested malformed-entry repair. Regression confirms invalid-scope records are removed and a valid clone pin is preserved. Focused trust tests pass 10; full local validation passed (250 frontend / 107 server tests, typecheck, lint and build); hosted acceptance for this follow-up is pending.
+
+### P2 stale authority-pin scan recheck
+
+The nested trust disclosure previously scanned profile pins when opened, leaving a window for another tab to add or corrupt a pin before the user confirmed a first-contact fingerprint. Pin save now rechecks malformed records and same-UUID pins immediately before writing. A changed clone set clears the user's confirmation and requires review of the updated warning; newly malformed data blocks pinning and routes through the existing explicit repair path. The Obsidian Ember nested settings UI and trust semantics remain intact.
+
+Focused trust suite: **11 passed**. Full local validation: **251 frontend / 107 server tests**, typecheck, lint and production build passed; `git diff --check` is required before publication. Hosted core/UI3 acceptance is pending. This closes only the stale in-profile scan window at pin-write time; it does not coordinate across profiles/devices, authenticate localStorage against XSS/profile editing, or establish global single-writer ownership. Next: observe/fix this source CI, then proceed with account/history recovery and protected storage prerequisites without claiming recovery or global clone detection complete.
