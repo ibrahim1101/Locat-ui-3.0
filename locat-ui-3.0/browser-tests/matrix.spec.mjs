@@ -119,7 +119,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     const encrypted=bob.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/send/m.room.encrypted/'),{timeout:30000});
     await bob.page.getByLabel('Message',{exact:true}).fill(replyText);await bob.page.getByRole('button',{name:'Send',exact:true}).click();
     const request=await encrypted;expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
-    expect(wire.slice(wireBefore).join('')).not.toContain(replyText);
+    expect(wire.slice(wireBefore).join('')).not.toContain(replyText);expect(wire.slice(wireBefore).join('')).not.toContain(eventId);
     const replyId=await bob.page.getByRole('article',{name:'You: '+replyText}).getAttribute('id');expect(replyId).toMatch(/^msg-\$/);
     await expect(alice.page.getByRole('article',{name:'Contact: '+replyText})).toBeVisible({timeout:30000});
     await expect(alice.page.getByTestId('reply-ref-'+replyId.slice(4))).toContainText(markers[0],{timeout:30000});
