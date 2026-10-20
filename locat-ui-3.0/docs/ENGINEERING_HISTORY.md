@@ -363,3 +363,23 @@ Hosted browser acceptance passed **7 Chromium tests (8.0m)**, **7 Firefox tests 
 The current conversation wire format uses encrypted Locat-specific reaction and reply payload fields inside `m.room.message`. It does not use standard cleartext `m.reaction` annotation or `m.in_reply_to` envelope metadata, preventing target IDs and reaction choices from appearing outside Megolm ciphertext. Local check/lint, **241 frontend / 104 backend tests**, build, browser syntax/discovery and real SDK44/Synapse1.163 acceptance passed. Build still reports the existing large Matrix crypto chunk advisory.
 
 This acceptance supersedes the earlier pending reaction/reply entries above; those failures remain recorded as historical diagnostics. Physical Safari/Android/Windows/Pi, actual browser IndexedDB persistence, full identity/key recovery, independent security review, federation, real TURN, public deployment and complete all-49/A–AM work remain open. No main merge, public deployment, release or production database change occurred.
+
+
+## 2026-10-20 — P2 global identity signatures and planned rotation
+
+Added optional Ed25519 server identity claims and client-side verification. `LOCAT_IDENTITY_SIGNING_KEY_FILE` points to a protected external PKCS#8 key; public SPKI DER fingerprints are SHA-256/base64url. The server signs `locat.server.v1` discovery and `locat.account.v1` identity claims that bind canonical origin, server ID, immutable account ID and LC code. The public discovery capability is true only when the key and valid origin are configured. Key material is excluded from responses and diagnostics. `tools/generate-server-identity-key.mjs` creates an owner-only key without overwriting existing files.
+
+The browser fetches/verifies proof only when nested identity trust details are opened, using WebCrypto Ed25519 and strict origin/account/key binding. Users must compare a first-contact fingerprint out of band and explicitly confirm before a profile-local pin is written. Pins are keyed by exact origin and account ID, editable and clearable. Invalid proofs are rejected; a changed key never silently replaces a pin. These public local pins are not secure against profile tampering or XSS. Federation and remote search remain disabled.
+
+Planned rotation adds optional bounded `LOCAT_IDENTITY_ROTATION_FILE`, validated at startup against the previously trusted signature, exact origin/server ID and configured new public key. `tools/create-server-identity-rotation.mjs` creates a signed manifest from protected old/new private keys and refuses overwrites. Browser clients offer explicit acceptance of the signed transition; no automatic pin replacement occurs. Missing/lost-key transitions still require out-of-band fingerprint verification and manual repinning.
+
+Local focused identity tests, TypeScript, lint, the full suite (**245 frontend /107 server tests**), production build, manual CLI permission/signature/overwrite checks and diff validation passed. Hosted UI3 run **39409164538** passed on source `ebf5f24f9487537276292fe1a510fee47e3e89c7`. At the time of this note, core workflow **39409164539** has connector, Ubuntu (including real Synapse acceptance) and macOS successful; Windows test suite and hosted browser-foundation acceptance are still running. Update this evidence once the run finishes.
+
+Not implemented or claimed: full account/history recovery, cross-origin clone detection, platform secure stores, independent security review, federation or domain ownership proof.
+
+
+### P2 local clone warning — 2026-10-20
+
+Added `findPinnedAuthorityClones`, which scans saved browser-profile authority pins across Locat accounts for a matching server UUID trusted at another origin. The nested identity disclosure reports the other origin and blocks first-contact/changed-key pinning until the user compares the fingerprint with the authority operator and confirms this is the only active writable owner. No network lookup or federation was introduced. This only detects a clone already represented by a pin in the same browser profile; it cannot coordinate single-writer ownership or establish global uniqueness.
+
+Regression covers cross-account same-UUID detection, nonmatching UUID isolation, warning text and required explicit confirmation. Local focused tests (**7 passed**), full frontend/server suites (**247 / 107 passed**), typecheck, lint, production build and diff check pass. The first UI assertion used an outdated checkbox-name matcher; it was corrected after confirming the UI rendered the expected operator-confirmation text. Hosted acceptance for this follow-up is pending. The base identity source `ebf5f24` remains separately under hosted CI observation.

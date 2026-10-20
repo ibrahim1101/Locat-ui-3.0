@@ -2,7 +2,7 @@ import {createHash,generateKeyPairSync,sign,type KeyObject} from 'node:crypto';
 import {afterEach,expect,it,vi} from 'vitest';
 import {fireEvent,render,screen,waitFor} from '@testing-library/react';
 import type {QualifiedAccountIdentity} from '../contracts/auth';
-import {compareAuthorityPin,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin} from './globalIdentityTrust';
+import {compareAuthorityPin,findPinnedAuthorityClones,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin} from './globalIdentityTrust';
 import {GlobalIdentityTrustDisclosure} from './GlobalIdentityTrustDisclosure';
 
 const origin='https://locat.test',serverId='123e4567-e89b-42d3-a456-426614174000',accountId='a'.repeat(32);
@@ -47,6 +47,13 @@ it('keeps authority pins scoped to account and exact origin and never auto-repla
  expect(readAuthorityPin(accountId,origin)?.keyId).toBe('key-one');removeAuthorityPin(accountId,origin);expect(readAuthorityPin(accountId,origin)).toBeNull();
 });
 
+it('finds the same pinned server UUID at another origin across accounts',()=>{
+ writeAuthorityPin('b'.repeat(32),{origin:'https://old-locat.test',serverId,keyId:'key-one',publicKey:'public-one'});
+ writeAuthorityPin('c'.repeat(32),{origin:'https://locat.test',serverId:'different-server',keyId:'key-two',publicKey:'public-two'});
+ expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://old-locat.test']);
+ expect(findPinnedAuthorityClones('different-server',origin)).toEqual([]);
+});
+
 it('requires a separate fingerprint confirmation for first contact and changed keys',async()=>{
  const first=signedIdentity(),fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify(first.discovery),{status:200}));vi.stubGlobal('fetch',fetch);
  const view=render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={first.identity}/>);
@@ -55,6 +62,16 @@ it('requires a separate fingerprint confirmation for first contact and changed k
  view.unmount();const changed=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(changed.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={changed.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));const replace=await screen.findByRole('button',{name:'Replace pin after comparison'});expect(readAuthorityPin(accountId,origin)?.keyId).toBe(first.identity.attestation?.keyId);expect(replace).toBeDisabled();
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(replace);await screen.findByText('Authority fingerprint pinned for this account in this browser.');await waitFor(()=>expect(readAuthorityPin(accountId,origin)?.keyId).toBe(changed.identity.attestation?.keyId));
+});
+
+it('warns about a cloned server UUID and requires operator confirmation before pinning another origin',async()=>{
+ const existing:AuthorityPin={origin:'https://old-locat.test',serverId,keyId:'previous-key',publicKey:'previous-public',pinnedAt:new Date(0).toISOString()};writeAuthorityPin('b'.repeat(32),existing);
+ const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.discovery),{status:200})));
+ render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
+ await screen.findByRole('alert');expect(screen.getByText(/This server UUID is already pinned at another origin/)).toHaveTextContent('https://old-locat.test');
+ const confirmation=screen.getByRole('checkbox',{name:/only active writable owner/}),pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(pin).toBeDisabled();
+ fireEvent.click(confirmation);fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
+ expect(readAuthorityPin(accountId,origin)?.keyId).toBe(fixture.identity.attestation?.keyId);
 });
 
 it('accepts a key only after an explicit signed rotation click from the pinned old key',async()=>{

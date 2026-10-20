@@ -28,6 +28,19 @@ export function writeAuthorityPin(accountId:string,pin:Omit<AuthorityPin,'pinned
  storage.setItem(pinKey(accountId,pin.origin),JSON.stringify({...pin,pinnedAt:new Date().toISOString()}));
 }
 export function removeAuthorityPin(accountId:string,origin:string,storage:Storage=localStorage){storage.removeItem(pinKey(accountId,origin));}
+/** Detect a server UUID already trusted at another origin in this browser profile. */
+export function findPinnedAuthorityClones(serverId:string,origin:string,storage:Storage=localStorage):string[]{
+ const origins=new Set<string>();
+ for(let index=0;index<storage.length;index++){
+  const key=storage.key(index);if(!key?.startsWith(pinPrefix))continue;
+  const raw=storage.getItem(key);if(raw===null)continue;
+  let pin:AuthorityPin;
+  try{pin=JSON.parse(raw) as AuthorityPin;}catch{throw new Error('A saved authority pin is unreadable. Clear the invalid pin before checking for cloned server identities.');}
+  if(!pin||typeof pin.serverId!=='string'||typeof pin.origin!=='string'||typeof pin.keyId!=='string'||typeof pin.publicKey!=='string'||typeof pin.pinnedAt!=='string')throw new Error('A saved authority pin is invalid. Clear the invalid pin before checking for cloned server identities.');
+  if(pin.serverId===serverId&&pin.origin!==origin)origins.add(pin.origin);
+ }
+ return [...origins].sort();
+}
 export function compareAuthorityPin(pin:AuthorityPin|null,verified:Omit<AuthorityPin,'pinnedAt'>):'first-contact'|'matches'|'changed'{
  return pin===null?'first-contact':samePin(pin,verified)?'matches':'changed';
 }
