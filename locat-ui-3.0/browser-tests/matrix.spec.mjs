@@ -98,7 +98,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
   await test.step('Send and decrypt through the actual composer',async()=>{await alice.page.getByLabel('Message',{exact:true}).fill(markers[0]);await alice.page.getByRole('button',{name:'Send',exact:true}).click();await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toBeVisible({timeout:30000});await expect(alice.page.getByRole('log',{name:'Messages',exact:true}).getByText(markers[0],{exact:true})).toBeVisible();});
   await test.step('Upload an encrypted attachment and verify recipient download integrity',async()=>{
    const name='private-note-'+randomBytes(6).toString('hex')+'.txt',secret='LOCAT_ATTACHMENT_PLAINTEXT_'+randomBytes(24).toString('hex'),plain=Buffer.from(secret,'utf8');
-   await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('menuitem',{name:'Document or file · up to 2.9 MB',exact:true}).click();
+   await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('menuitem',{name:'Photo, file or video',exact:true}).click();await alice.page.getByRole('menuitem',{name:'Document or file · up to 2.9 MB',exact:true}).click();
    const uploadRequest=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/upload'));
    const uploadResponse=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'));
    await alice.page.locator('[data-testid="live-conversation"] input[type="file"]').setInputFiles({name,mimeType:'text/plain',buffer:plain});
