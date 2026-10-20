@@ -1,6 +1,7 @@
 import type { OperationResult } from "../contracts/common";
+import type { QualifiedAccountIdentity } from "../contracts/auth";
 
-export type AuthenticatedAccount = { id: string; username: string; displayName: string; lcCode?: string; bio?: string; globalIdentity?: {serverId:string;authority:string;address:string;accountUri:string}|null };
+export type AuthenticatedAccount = { id: string; username: string; displayName: string; lcCode?: string; bio?: string; globalIdentity?: QualifiedAccountIdentity|null };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {

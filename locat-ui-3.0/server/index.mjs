@@ -6,7 +6,7 @@ import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
 import { createMatrixGateway } from './matrixGateway.mjs';
 import { matrixProvider, createMatrixBindingHandler } from './matrixBinding.mjs';
 import { iceConfiguration } from './ice.mjs';
-import { accountIdentity, localDiscoveryQuery } from './globalIdentity.mjs';
+import { accountIdentity, localDiscoveryQuery, serverIdentityAttestation } from './globalIdentity.mjs';
 import { attachRealtime } from './realtime.mjs';
 /**
  * Locat 3.0 development authentication service.
@@ -66,7 +66,7 @@ async function authenticatedBody(req,user,maximum){
   return input;
 }
 function visibleTo(user,viewerId,policy) { return user.id===viewerId || (!db.blocked(user.id,viewerId) && (policy==='everyone' || policy==='contacts' && db.acceptedContact(user.id,viewerId))); }
-function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,globalIdentity:accountIdentity(user,config.origin,db.serverId),bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
+function publicUser(user,viewerId=user.id) { return { id:user.id,username:visibleTo(user,viewerId,user.usernameVisibility)?user.username:'',displayName:user.displayName,lcCode:'LC-'+user.lcCode,globalIdentity:accountIdentity(user,config.origin,db.serverId,config.identitySigningKey),bio:visibleTo(user,viewerId,user.profileVisibility)?user.bio:'' }; }
 function cookie(req) {
   const match = /(?:^|;\s*)locat_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? "");
   return match?.[1] ?? null;
@@ -101,7 +101,8 @@ async function handle(req, res) {
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
-    capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true},
+    identity:serverIdentityAttestation(config.origin,db.serverId,config.identitySigningKey),
+    capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true,authenticatedIdentity:!!(config.identitySigningKey&&config.origin)},
   },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });
   if (url.pathname === "/api/diagnostics" && req.method === "GET") {

@@ -39,6 +39,11 @@ describe("live account settings", () => {
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
     expect(current).toHaveValue(""); expect(next).toHaveValue("");
   });
+  it('keeps authority-signature details nested and labels the key unverified by this client',async()=>{
+    const original=session.user,keyId='identity-fingerprint-123',writeText=vi.fn().mockResolvedValue(undefined);session.user={id:'a'.repeat(32),displayName:'Alice',globalIdentity:{serverId:'server-a',authority:'locat.test',address:'LC-1234@locat.test',accountUri:'locat://locat.test/account/'+ 'a'.repeat(32),attestation:{kind:'locat.account.v1',version:1,serverId:'server-a',origin:'https://locat.test',accountId:'a'.repeat(32),lcCode:'1234',keyId,publicKey:'public',signature:'signature'}}} as typeof session.user;
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({ok:true,json:async()=>({sessions:[]})}));Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
+    try{render(<LiveAccountSettings/>);expect(screen.getByText('LC-1234@locat.test')).toBeVisible();const disclosure=screen.getByText(/Authority signing details/).closest('details');expect(disclosure).not.toHaveAttribute('open');fireEvent.click(screen.getByText(/Authority signing details/));expect(await screen.findByText(/This client has not verified the signature or domain ownership/)).toBeVisible();expect(screen.getByText((_,element)=>element?.tagName==='P'&&element.textContent?.includes(keyId)===true)).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'Copy signing-key fingerprint'}));await waitFor(()=>expect(writeText).toHaveBeenCalledWith(keyId));}finally{session.user=original;}
+  });
 });
 
 it('stages other-session sign-out and submits only after password confirmation',async()=>{

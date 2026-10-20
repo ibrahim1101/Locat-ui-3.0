@@ -1,4 +1,7 @@
 import { isIP } from 'node:net';
+import { constants, lstatSync, readFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { createPrivateKey } from 'node:crypto';
 /** Deployment configuration is explicit; non-loopback listeners require real TLS. */
 export function serverConfig(env = process.env) {
   const host = env.LOCAT_HOST ?? '127.0.0.1';
@@ -17,6 +20,22 @@ export function serverConfig(env = process.env) {
   if(proxyClientIpHeader&&!['cf-connecting-ip','x-forwarded-for'].includes(proxyClientIpHeader))throw new Error('LOCAT_PROXY_CLIENT_IP_HEADER must be cf-connecting-ip or x-forwarded-for');
   if(proxyClientIpHeader&&!proxy)throw new Error('LOCAT_PROXY_CLIENT_IP_HEADER requires proxy termination');
   const secure = tls || proxy;
+  let identitySigningKey;
+  if (env.LOCAT_IDENTITY_SIGNING_KEY_FILE) {
+    const keyPath=env.LOCAT_IDENTITY_SIGNING_KEY_FILE;
+    if(!isAbsolute(keyPath))throw new Error('LOCAT_IDENTITY_SIGNING_KEY_FILE must be an absolute path');
+    let metadata,pem;
+    try {
+      metadata=lstatSync(keyPath);
+      if(metadata.isSymbolicLink()||!metadata.isFile())throw new Error('not a regular file');
+      if(process.platform!=='win32'&&(metadata.mode&0o077)!==0)throw new Error('permissions are too broad');
+      pem=readFileSync(keyPath);
+      identitySigningKey=createPrivateKey(pem);
+    } catch {
+      throw new Error('LOCAT_IDENTITY_SIGNING_KEY_FILE must name a readable regular Ed25519 private-key file with owner-only permissions');
+    }
+    if(identitySigningKey.asymmetricKeyType!=='ed25519')throw new Error('LOCAT_IDENTITY_SIGNING_KEY_FILE must contain an Ed25519 private key');
+  }
   let origin;
   if (env.LOCAT_PUBLIC_ORIGIN) {
     let url;
@@ -28,7 +47,7 @@ export function serverConfig(env = process.env) {
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host);
   if (!loopback && (!secure || !origin)) throw new Error('Non-loopback serving requires TLS and LOCAT_PUBLIC_ORIGIN');
   if (secure && !origin) throw new Error('TLS serving requires LOCAT_PUBLIC_ORIGIN');
-  return { host, port, key, cert, tls, secure, proxy, proxyPeers, proxyClientIpHeader, origin, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
+  return { host, port, key, cert, tls, secure, proxy, proxyPeers, proxyClientIpHeader, origin, identitySigningKey, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
 }
 function normalizeIp(value){return typeof value==='string'?value.replace(/^::ffff:/,''):'';}
 /** Trust one canonical client IP header only through an explicitly trusted proxy peer. */

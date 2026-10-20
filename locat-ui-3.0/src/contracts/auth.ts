@@ -1,8 +1,11 @@
 import type { OperationResult } from "./common";
 
+export type AccountIdentityAttestation = {kind:'locat.account.v1';version:1;serverId:string;origin:string;accountId:string;lcCode:string;keyId:string;publicKey:string;signature:string};
+export type QualifiedAccountIdentity = {serverId:string;authority:string;address:string;accountUri:string;attestation?:AccountIdentityAttestation};
+
 /** Display-only projection of Locat `SessionUser` (src/state/auth.tsx). */
 export type SessionUserView = {
-  globalIdentity?: {serverId:string;authority:string;address:string;accountUri:string}|null;
+  globalIdentity?: QualifiedAccountIdentity|null;
   id: string;
   username: string;
   displayName: string;

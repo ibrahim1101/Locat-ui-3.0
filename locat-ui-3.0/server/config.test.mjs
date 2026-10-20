@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { serverConfig, requestClientAddress, requestOrigin } from './config.mjs';
+import { generateKeyPairSync } from 'node:crypto';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 test('LAN serving fails closed without TLS and an explicit public origin', () => {
   assert.throws(() => serverConfig({ LOCAT_HOST: '0.0.0.0' }), /TLS/);
   assert.throws(() => serverConfig({ LOCAT_TLS_KEY: 'key' }), /both/);
@@ -39,4 +43,18 @@ test('proxy client attribution requires an exact trusted peer and one valid conf
   assert.equal(requestClientAddress(request('::ffff:127.0.0.1','2001:db8::5'),config),'2001:db8::5');
   assert.equal(requestClientAddress(request('127.0.0.1','forged, 192.0.2.1'),config),'127.0.0.1');
   assert.equal(requestClientAddress(request('172.30.0.9','192.0.2.1'),config),'172.30.0.9');
+});
+
+test('optional authority signing key is a protected absolute Ed25519 file and never required for local startup',()=>{
+ assert.equal(serverConfig({}).identitySigningKey,undefined);
+ const dir=mkdtempSync(join(tmpdir(),'locat-identity-key-'));
+ try{
+  const path=join(dir,'identity.pem'),pair=generateKeyPairSync('ed25519');
+  writeFileSync(path,pair.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});chmodSync(path,0o600);
+  assert.equal(serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:path}).identitySigningKey.asymmetricKeyType,'ed25519');
+  assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:'relative.pem'}),/absolute path/);
+  const other=join(dir,'wrong.pem'),rsa=generateKeyPairSync('rsa',{modulusLength:2048});writeFileSync(other,rsa.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});chmodSync(other,0o600);
+  assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:other}),/Ed25519/);
+  const alias=join(dir,'alias.pem');try{symlinkSync(path,alias);assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:alias}),/regular Ed25519/);}catch(error){if(error.code!=='EPERM'&&error.code!=='EACCES')throw error;}
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });

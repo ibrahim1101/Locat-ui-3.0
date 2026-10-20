@@ -1,8 +1,28 @@
-/** Address qualification only. Not federation or cryptographic identity verification. */
-export function accountIdentity(user,origin,serverId){
+import { createHash, createPublicKey, sign } from 'node:crypto';
+
+function publicKeyDetails(privateKey){
+ if(!privateKey)return null;
+ if(privateKey.asymmetricKeyType!=='ed25519')throw new TypeError('Identity key must be Ed25519');
+ const der=createPublicKey(privateKey).export({type:'spki',format:'der'});
+ return {keyId:createHash('sha256').update(der).digest('base64url'),publicKey:der.toString('base64url')};
+}
+function signedClaims(kind,claims,privateKey){
+ const details=publicKeyDetails(privateKey);if(!details)return null;
+ const canonical=JSON.stringify([kind,...Object.values(claims)]);
+ return {kind,...claims,...details,signature:sign(null,Buffer.from(canonical),privateKey).toString('base64url')};
+}
+/** Address qualification alone is not authority authentication or federation. */
+export function serverIdentityAttestation(origin,serverId,privateKey){
+ if(!origin||!privateKey)return null;
+ return signedClaims('locat.server.v1',{version:1,serverId,origin:new URL(origin).origin},privateKey);
+}
+/** The signature binds an account's immutable local ID and LC code to one authority key. */
+export function accountIdentity(user,origin,serverId,privateKey){
  if(!origin)return null;
  const authority=new URL(origin).host;
- return {serverId,authority,address:`LC-${user.lcCode}@${authority}`,accountUri:`locat://${authority}/account/${user.id}`};
+ const result={serverId,authority,address:`LC-${user.lcCode}@${authority}`,accountUri:`locat://${authority}/account/${user.id}`};
+ const attestation=signedClaims('locat.account.v1',{version:1,serverId,origin:new URL(origin).origin,accountId:user.id,lcCode:user.lcCode},privateKey);
+ return attestation?{...result,attestation}:result;
 }
 export function localDiscoveryQuery(input,origin){
  const query=input.trim().toLowerCase();

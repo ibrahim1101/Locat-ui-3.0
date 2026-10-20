@@ -48,6 +48,12 @@ Authenticated `GET /api/auth/sessions` lists only the current account's active s
 
 `POST /api/profile` accepts `{displayName}`. `POST /api/auth/password` accepts `{currentPassword,newPassword}`, verifies the current password and transactionally revokes all sessions. The live signed-in screen exposes these controls. Current feature-specific status and native limitations are tracked in ../docs/SESSION_HANDOFF.md.
 
+## Optional global identity signing
+
+Qualified `LC-code@authority` addresses remain descriptive unless the operator configures a stable Ed25519 signing key. Generate a new file with `node tools/generate-server-identity-key.mjs /absolute/path/locat-identity.pem`, then set `LOCAT_IDENTITY_SIGNING_KEY_FILE` to that absolute path before starting the server. Startup fails closed for non-regular, symlinked, broad-permission or non-Ed25519 files on POSIX. On Windows, protect the file with an owner-only ACL. The key stays outside SQLite, user backups and diagnostics; back it up separately under operator control.
+
+With a configured key, `GET /.well-known/locat` publishes a domain-separated signed `(kind, version, serverId, canonical origin)` claim, and account responses publish signed `(kind, version, serverId, canonical origin, immutable account ID, LC code)` claims. Without a key, discovery reports `authenticatedIdentity: false`; ordinary local operation is unchanged. Signatures establish only that the key signed those fields. Current clients do not yet verify or pin the signatures, prove domain ownership or support key rotation/recovery. Federation remains disabled. Read ../docs/GLOBAL_IDENTITY_THREAT_MODEL.md before enabling this optional capability.
+
 ## Backup and recovery
 
 Run `npm run backup:server -- ./server/data/backups/manual.sqlite` from the app directory. Choose a new filename each time; existing backups are never overwritten. SQLite's online backup API creates a consistent snapshot even with WAL enabled. Backups contain password hashes, session hashes and ciphertext: restrict access just like the live database.

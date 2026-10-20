@@ -9,12 +9,14 @@ import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
+import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
 const exec = promisify(execFile);
 test('HTTPS serves the built shell safely and issues Secure authenticated cookies', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'locat-host-'));
   let child;
   try {
-    const key = join(dir, 'key.pem'), cert = join(dir, 'cert.pem'), web = join(dir, 'web');
+    const key = join(dir, 'key.pem'), cert = join(dir, 'cert.pem'), identityKey = join(dir, 'identity.pem'), web = join(dir, 'web');
+    const identityPair=generateKeyPairSync('ed25519'),identityPem=identityPair.privateKey.export({format:'pem',type:'pkcs8'});await writeFile(identityKey,identityPem,{mode:0o600});
     await mkdir(join(web, 'assets'), { recursive: true });
     await writeFile(join(web, 'index.html'), '<title>Locat test shell</title>');
     await writeFile(join(web,'assets','crypto.wasm'),Buffer.from([0,97,115,109,1,0,0,0]));
@@ -25,7 +27,7 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     const reservation = createServer(); await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
     const port = reservation.address().port; await new Promise(resolve => reservation.close(resolve));
     const origin = 'https://127.0.0.1:' + port, ca = await readFile(cert);
-    child = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, LOCAT_HOST: '127.0.0.1', LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: join(dir, 'app.sqlite'), LOCAT_TLS_KEY: key, LOCAT_TLS_CERT: cert, LOCAT_PUBLIC_ORIGIN: origin, LOCAT_STATIC_DIR: web, LOCAT_MEDIA_AUTHORIZED_ROOTS: '' }, stdio: 'ignore' });
+    child = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, LOCAT_HOST: '127.0.0.1', LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: join(dir, 'app.sqlite'), LOCAT_TLS_KEY: key, LOCAT_TLS_CERT: cert, LOCAT_PUBLIC_ORIGIN: origin, LOCAT_IDENTITY_SIGNING_KEY_FILE: identityKey, LOCAT_STATIC_DIR: web, LOCAT_MEDIA_AUTHORIZED_ROOTS: '' }, stdio: 'ignore' });
     function request(path, method = 'GET', data, extra = {}) {
       return new Promise((resolve, reject) => {
         const req = httpsRequest(origin + path, { ca, servername: "localhost", method, headers: { Origin: origin, 'Content-Type': 'application/json', ...extra } }, res => {
@@ -36,6 +38,11 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     let ready = false;
     for (let i = 0; i < 60; i++) { try { if ((await request('/api/ready')).status === 200) { ready = true; break; } } catch {} if (child.exitCode !== null) throw new Error('TLS server exited'); await new Promise(resolve => setTimeout(resolve, 50)); }
     assert.ok(ready);
+    const discovery=JSON.parse((await request('/.well-known/locat')).body),serverProof=discovery.identity;
+    assert.equal(discovery.capabilities.authenticatedIdentity,true);assert.equal(serverProof.origin,origin);assert.equal(serverProof.serverId,discovery.serverId);assert.equal(JSON.stringify(discovery).includes(identityPem),false);
+    const identityPublicKey=createPublicKey({key:Buffer.from(serverProof.publicKey,'base64url'),format:'der',type:'spki'});
+    const signatureValid=(claims,signature)=>verify(null,Buffer.from(JSON.stringify(claims)),identityPublicKey,Buffer.from(signature,'base64url'));
+    assert.equal(signatureValid([serverProof.kind,serverProof.version,serverProof.serverId,serverProof.origin],serverProof.signature),true);
     const shell = await request('/files/secrets'); assert.equal(shell.status, 200); assert.match(shell.body, /Locat test shell/); assert.match(shell.headers['content-security-policy'], /frame-ancestors 'none'/);
     const wasm=await request('/assets/crypto.wasm');assert.equal(wasm.status,200);assert.equal(wasm.headers['content-type'],'application/wasm');assert.ok(shell.headers['content-security-policy'].includes("'wasm-unsafe-eval'"));assert.ok(!shell.headers['content-security-policy'].includes("'unsafe-eval'"));
     assert.equal((await request('/assets/app.js')).status, 200);
@@ -48,7 +55,10 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     const login = await request('/api/auth/login', 'POST', credentials);
     assert.equal(login.status, 200); assert.match(login.headers['set-cookie'][0], /; Secure/);
     const cookie = login.headers['set-cookie'][0].split(';')[0];
-    assert.equal((await request('/api/auth/me', 'GET', undefined, { Cookie: cookie })).status, 200);
+    const me=await request('/api/auth/me', 'GET', undefined, { Cookie: cookie });assert.equal(me.status,200);
+    const accountProof=JSON.parse(me.body).user.globalIdentity.attestation;assert.equal(accountProof.accountId,JSON.parse(me.body).user.id);assert.equal(accountProof.lcCode,JSON.parse(me.body).user.lcCode.replace('LC-',''));
+    assert.equal(accountProof.keyId,serverProof.keyId);assert.equal(signatureValid([accountProof.kind,accountProof.version,accountProof.serverId,accountProof.origin,accountProof.accountId,accountProof.lcCode],accountProof.signature),true);
+    const diagnostics=await request('/api/diagnostics','GET',undefined,{Cookie:cookie});assert.equal(diagnostics.status,200);assert.equal(diagnostics.body.includes(identityPem),false);
   } finally {
     if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await once(child, 'exit'); }
     await rm(dir, { recursive: true, force: true });
@@ -67,7 +77,7 @@ test('explicit proxy termination retains Host/Origin checks and Secure cookies o
     });req.on('error',reject);req.end(data?JSON.stringify(data):undefined);
   });
   let ready=false;for(let i=0;i<60;i++){try{if((await request('/api/ready')).ok){ready=true;break;}}catch{}if(child.exitCode!==null)throw new Error('Proxy-mode server exited');await new Promise(resolve=>setTimeout(resolve,50));}assert.ok(ready);
-  const info=await (await request('/.well-known/locat')).json();assert.equal(info.origin,origin);
+  const info=await (await request('/.well-known/locat')).json();assert.equal(info.origin,origin);assert.equal(info.identity,null);assert.equal(info.capabilities.authenticatedIdentity,false);
   assert.equal((await request('/api/ready','GET',undefined,{Host:'evil.test','X-Forwarded-Host':'locat.test','X-Forwarded-Proto':'https'})).status,403);
   const credentials={username:'alice',displayName:'Alice',password:'long-test-password-123'};
   assert.equal((await request('/api/auth/register','POST',credentials,{Origin:'https://evil.test'})).status,403);
