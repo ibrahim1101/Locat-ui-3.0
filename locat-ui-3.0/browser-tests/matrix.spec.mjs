@@ -120,7 +120,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     await bob.page.getByLabel('Message',{exact:true}).fill(replyText);await bob.page.getByRole('button',{name:'Send',exact:true}).click();
     const request=await encrypted;expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
     expect(wire.slice(wireBefore).join('')).not.toContain(replyText);expect(wire.slice(wireBefore).join('')).not.toContain(eventId);
-    const replyId=await bob.page.getByRole('article',{name:'You: '+replyText}).getAttribute('id');expect(replyId).toMatch(/^msg-\$/);
+    const replyId=await bob.page.getByRole('article',{name:'You: '+replyText}).locator('..').getAttribute('id');expect(replyId).toMatch(/^msg-\$/);
     await expect(alice.page.getByRole('article',{name:'Contact: '+replyText})).toBeVisible({timeout:30000});
     await expect(alice.page.getByTestId('reply-ref-'+replyId.slice(4))).toContainText(markers[0],{timeout:30000});
     expect(eventId).toMatch(/^\$/);await fixture.assertNoMessagePlaintext([replyText]);
@@ -144,16 +144,17 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
   });
   await test.step('Review and send a local photo, then preview the decrypted image',async()=>{
    const name='private-photo-'+randomBytes(6).toString('hex')+'.png',bytes=await alice.page.evaluate(async()=>{
-    const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;const context=canvas.getContext('2d');if(!context)throw new Error('Image fixture canvas unavailable');context.fillStyle='#E86B2C';context.fillRect(0,0,64,64);context.fillStyle='#0B0B0C';context.fillRect(16,16,32,32);const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Image fixture unavailable')),'image/png'));return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    const canvas=document.createElement('canvas');canvas.width=3000;canvas.height=1500;const context=canvas.getContext('2d');if(!context)throw new Error('Image fixture canvas unavailable');context.fillStyle='#E86B2C';context.fillRect(0,0,3000,1500);context.fillStyle='#0B0B0C';context.fillRect(750,375,1500,750);const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Image fixture unavailable')),'image/png'));return Array.from(new Uint8Array(await blob.arrayBuffer()));
    }),uploadRequests=[];
    alice.page.on('request',request=>{if(new URL(request.url()).pathname.includes('/upload'))uploadRequests.push(request);});
    await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('menuitem',{name:'Photo, file or video',exact:true}).click();await alice.page.getByRole('menuitem',{name:'Photo · original or resized copy',exact:true}).click();
    await alice.page.locator('[data-testid="live-conversation"] input[type="file"]').setInputFiles({name,mimeType:'image/png',buffer:Buffer.from(bytes)});
    const review=alice.page.getByTestId('image-attachment-review');await expect(review).toBeVisible();await expect(review.getByText('Original ·')).toBeVisible();expect(uploadRequests).toHaveLength(0);
-   const uploaded=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'));await review.getByRole('button',{name:'Send original',exact:true}).click();const response=await uploaded;expect(response.status()).toBe(200);await expect(review).toHaveCount(0);
+   await review.getByText('Resize a copy').click();await review.getByRole('button',{name:/Balanced/}).click();await expect(review.getByRole('button',{name:'Send resized copy'})).toBeEnabled();expect(uploadRequests).toHaveLength(0);
+   const uploaded=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'));await review.getByRole('button',{name:'Send resized copy',exact:true}).click();const response=await uploaded;expect(response.status()).toBe(200);await expect(review).toHaveCount(0);
    const aliceLog=alice.page.getByRole('log',{name:'Messages',exact:true}),bobLog=bob.page.getByRole('log',{name:'Messages',exact:true});await expect(aliceLog.getByRole('button',{name:'Preview '+name,exact:true})).toBeVisible({timeout:30000});await expect(bobLog.getByRole('button',{name:'Preview '+name,exact:true})).toBeVisible({timeout:30000});
-   await bobLog.getByRole('button',{name:'Preview '+name,exact:true}).click();const preview=bobLog.getByRole('img',{name,exact:true});await expect.poll(()=>preview.evaluate(image=>image.naturalWidth)).toBe(64);
-   await expect(bob.page.getByTestId('save-decrypted-file')).toBeVisible();const savedDownload=bob.page.waitForEvent('download');await bob.page.getByTestId('save-decrypted-file').click();const saved=await savedDownload;expect(saved.suggestedFilename()).toBe(name);expect((await readFile(await saved.path())).equals(Buffer.from(bytes))).toBe(true);
+   await bobLog.getByRole('button',{name:'Preview '+name,exact:true}).click();const preview=bobLog.getByRole('img',{name,exact:true});await expect.poll(()=>preview.evaluate(image=>image.naturalWidth)).toBe(1440);
+   await expect(bob.page.getByTestId('save-decrypted-file')).toBeVisible();const savedDownload=bob.page.waitForEvent('download');await bob.page.getByTestId('save-decrypted-file').click();const saved=await savedDownload;expect(saved.suggestedFilename()).toBe(name);expect((await readFile(await saved.path())).length).toBeLessThan(bytes.length);
   });
   await test.step('Record, review and send encrypted voice only after confirmation',async()=>{
    if(process.env.LOCAT_BROWSER_ENGINE==='firefox')return;
