@@ -12,9 +12,12 @@ function greeting() { const h = new Date().getHours(); return h < 5 ? "Good nigh
 export default function Home() {
   const { user, connection, availability, adapter } = useSession();
   const nav = useNavigate();
+  const preview = adapter.mode === "preview";
   const online = connection.mode === "server" && connection.server === "connected";
-  const unread = FIXTURE_CONVERSATIONS.filter((c) => c.unread && !c.hidden);
-  const linked = FIXTURE_DEVICES.filter((d) => d.state === "paired" && d.online);
+  // Fixtures are useful in the design preview, but must never look like a
+  // signed-in user's real conversations or paired devices.
+  const unread = preview ? FIXTURE_CONVERSATIONS.filter((c) => c.unread && !c.hidden) : [];
+  const linked = preview ? FIXTURE_DEVICES.filter((d) => d.state === "paired" && d.online) : [];
   const shortcuts = ["messages", "devices", "files", "workspace", "calendar", "settings"] as const;
 
   return (
@@ -30,18 +33,19 @@ export default function Home() {
 
           <section>
             <SectionTitle action={<Button size="sm" variant="ghost" onClick={() => nav("/messages")}>All chats</Button>}>Recent conversations</SectionTitle>
+            {preview && <p className="mb-2 text-xs text-ink-3">Preview sample data</p>}
             {unread.length ? <div className="divide-y divide-line overflow-hidden rounded-2xl bg-s1 hairline">{unread.slice(0, 4).map((c) => (
               <button key={c.id} onClick={() => nav(`/messages/${c.id}`)} className="flex w-full items-center gap-3 p-3 text-left hover:bg-s2" data-testid={`home-unread-${c.id}`}>
                 <Avatar name={c.title} presence={c.peer?.presence.state} />
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{c.title}</span><span className="block truncate text-[13px] text-ink-2">{c.typing?.length ? <em className="not-italic text-ember">typing…</em> : c.lastPreview}</span></span>
                 <Badge tone="ember">{c.unread}</Badge>
-              </button>))}</div> : <p className="rounded-2xl bg-s1 p-4 text-sm text-ink-3 hairline">You're all caught up.</p>}
+              </button>))}</div> : <p className="rounded-2xl bg-s1 p-4 text-sm text-ink-3 hairline">{preview ? "You're all caught up." : "Recent conversations will appear here when this dashboard is connected to your messaging account."}</p>}
           </section>
 
           <section>
             <SectionTitle action={<Button size="sm" variant="ghost" onClick={() => nav("/devices")}>Manage Link</Button>}>Trusted devices</SectionTitle>
             <div className="grid gap-3 sm:grid-cols-2">{linked.slice(0, 2).map((d) => <div key={d.id} className="flex items-center gap-3 rounded-2xl bg-s1 p-4 hairline"><span className="grid size-10 place-items-center rounded-xl bg-ember/10 text-ember"><Smartphone className="size-5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{d.alias}</span><span className="block text-xs text-ink-3">Connected · {d.platform}</span></span><span className="size-2 rounded-full bg-ok" aria-label="Online" /></div>)}
-              {!linked.length && <button onClick={() => nav("/devices?pair=1")} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong p-4 text-left hover:bg-s1"><span className="grid size-10 place-items-center rounded-xl bg-s2 text-ember"><Smartphone className="size-5" /></span><span><span className="block text-sm font-semibold">Pair a device</span><span className="text-xs text-ink-3">Connect your trusted devices with Link</span></span></button>}
+              {!linked.length && <button onClick={() => nav("/devices?pair=1")} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong p-4 text-left hover:bg-s1"><span className="grid size-10 place-items-center rounded-xl bg-s2 text-ember"><Smartphone className="size-5" /></span><span><span className="block text-sm font-semibold">{preview ? "Pair a device" : "Manage paired devices"}</span><span className="text-xs text-ink-3">{preview ? "Connect your trusted devices with Link" : "View verified devices and transfers in Link"}</span></span></button>}
             </div>
           </section>
         </div>

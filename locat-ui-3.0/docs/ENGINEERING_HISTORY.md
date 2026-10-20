@@ -43,3 +43,7 @@ The Link Devices screen now groups registered browsers, verified pairings and en
 ## Nested private storage destinations
 
 Unlocked Vault and Secrets now separate Entries, Backups and Security into counted Obsidian Ember sections. Search, folder filtering and entry actions stay under Entries; encrypted export and missing-entry restore are under Backups; passphrase changes are under Security. The Credential/Secure note choice remains nested inside the Secrets editor. Locking resets navigation to Entries along with clearing decrypted state. Focused tests verify section visibility, the retained secret-note lifecycle and passphrase-change flows.
+
+## Live Home data boundary
+
+The Home dashboard previously rendered preview conversation and device fixtures regardless of adapter mode, which could make sample activity look like a signed-in user's real account data. Fixture rows now render only in preview mode and carry a visible “Preview sample data” label. Live mode shows a clear message that conversation summaries are not connected yet and directs users to the actual Chats and Link screens. Focused tests cover both modes. Live Home summaries remain open work.
