@@ -399,3 +399,12 @@ Source `5cd7e7c614ac0ecd7184cf5a5a299f92b2292751` passed UI3 workflow `394138621
 The hosted Chromium and Firefox runs accepted the same-UUID second-origin warning, post-reload disclosure, operator sole-writable-owner confirmation, signing-key replacement on the same server/database, preservation of the previous key pin until explicit out-of-band confirmation, and the newly pinned key after reload. This supersedes pending notes for `243bf06`, `d992bcc`, and the initial selector failure on `fdbe177`. Those failures were test interaction issues; the UI retained its stronger owner confirmation and the test was corrected.
 
 No global uniqueness or single-writer coordination is implied: clone detection only scans existing pins in this browser profile. Pins remain mutable localStorage metadata; full account/history recovery, browser/native secure storage, independent review, federation and domain ownership proof remain open.
+
+
+### P2 malformed authority-pin repair — 2026-10-20
+
+An unreadable old-origin pin previously stopped the profile scan, while the visible clear-pin action only removed the current origin record. The UI could then allow a new pin with clone status unknown. The nested authority trust disclosure now counts malformed feature-owned records, blocks pin/rotation actions, and offers an explicit cleanup action that removes only invalid v1 authority-pin entries. It preserves all valid entries, then reruns signature, pin-continuity and clone checks before enabling the appropriate explicit operator confirmation.
+
+Focused tests: **9 passed**. Full local typecheck/lint/test/build/diff-check passed (**249 frontend /107 server tests**). Source `fb1d7fe049e2159775b7e7ffea4762a6893ef013` passed UI3 workflow `39416980325` / job `118608271336` and all five core jobs in workflow `39416980238` (`118608271293`, `118608271704`, `118608271720`, `118608271754`, `118608271839`). Every OS passed 249 frontend tests and build/type/lint; Ubuntu's pinned SDK 44.0.0 / Synapse 1.163.0 acceptance passed. Browser: **7 Chromium (8.2m), 7 Firefox (8.5m), 3 repeats (17.2s)**. The strengthened regression confirms a valid clone pin survives cleanup and still triggers the stronger confirmation.
+
+This only repairs malformed browser-profile metadata; it does not provide protected storage, restore cleared pins or prove a single active writer.
