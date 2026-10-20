@@ -303,3 +303,9 @@ Still open: pin persistence is mutable browser localStorage; repair is not trust
 ### P2 malformed-pin recovery — cross-browser acceptance
 
 Built-browser test source **76e43da803ab46e67de3fa68ff6311b030f88ba9** passed UI3 workflow **39419456890** (job **118616483037**) and all five core jobs in **39419456980**: macOS **118616482977**, browser **118616483059**, connector **118616483146**, Windows **118616483177**, Ubuntu **118616483286**. Chromium **7 / 8.4m**, Firefox **7 / 8.9m**, private-store repeats **3 / 25.0s**. The test combines a corrupt old-origin entry and valid same-UUID pin, verifies cleanup is explicit, preserves the valid entry and re-applies the clone/owner-confirmation gate. This browser-only follow-up leaves the runtime accepted at `fb1d7fe`; no trust/storage scope was weakened.
+
+## 2026-10-20 — Strict authority-pin record validation
+
+Local authority-pin records now require a canonical HTTPS origin (or loopback HTTP for development), UUID-shaped server ID, canonical Ed25519 SubjectPublicKeyInfo encoding, SHA-256 fingerprint shape, canonical timestamp, and a valid account/origin storage key. Invalid records are rejected before writes and excluded from clone detection; the existing explicit repair action removes malformed feature-owned records while preserving structurally valid pins. This is format validation only: browser-profile localStorage remains mutable and the fields are not protected against deliberate local edits.
+
+Focused trust tests: **10 passed**; full local validation passed: **250 frontend / 107 server tests**, typecheck, lint, production build, and `git diff --check`. The local Playwright run could not launch because the Chromium executable is absent from this environment; hosted Chromium/Firefox acceptance is pending. No change to pin replacement policy, clone warning semantics, authority signing format, or the browser UI theme.

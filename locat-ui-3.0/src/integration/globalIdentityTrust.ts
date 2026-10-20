@@ -18,10 +18,15 @@ function encodeBase64Url(bytes:Uint8Array){
 }
 function pinKey(accountId:string,origin:string){return pinPrefix+encodeURIComponent(accountId)+':'+encodeURIComponent(origin);}
 function samePin(pin:AuthorityPin,verified:Omit<AuthorityPin,'pinnedAt'>){return pin.origin===verified.origin&&pin.serverId===verified.serverId&&pin.keyId===verified.keyId&&pin.publicKey===verified.publicKey;}
+function validPinOrigin(value:string){
+ try{const origin=new URL(value);return origin.origin===value&&!origin.username&&!origin.password&&origin.pathname==='/'&&!origin.search&&!origin.hash&&(origin.protocol==='https:'||(origin.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(origin.hostname)));}catch{return false;}
+}
 function isAuthorityPin(value:unknown):value is AuthorityPin{
  if(!value||typeof value!=='object')return false;
  const pin=value as Partial<AuthorityPin>;
- return typeof pin.origin==='string'&&typeof pin.serverId==='string'&&typeof pin.keyId==='string'&&typeof pin.publicKey==='string'&&typeof pin.pinnedAt==='string';
+ if(typeof pin.origin!=='string'||!validPinOrigin(pin.origin)||typeof pin.serverId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pin.serverId)||typeof pin.keyId!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(pin.keyId)||typeof pin.publicKey!=='string'||typeof pin.pinnedAt!=='string')return false;
+ try{if(decodeBase64Url(pin.publicKey).length!==44||new Date(pin.pinnedAt).toISOString()!==pin.pinnedAt)return false;}catch{return false;}
+ return true;
 }
 export function readAuthorityPin(accountId:string,origin:string,storage:Storage=localStorage):AuthorityPin|null{
  const raw=storage.getItem(pinKey(accountId,origin));if(raw===null)return null;
@@ -30,7 +35,7 @@ export function readAuthorityPin(accountId:string,origin:string,storage:Storage=
  return pin;
 }
 export function writeAuthorityPin(accountId:string,pin:Omit<AuthorityPin,'pinnedAt'>,storage:Storage=localStorage){
- storage.setItem(pinKey(accountId,pin.origin),JSON.stringify({...pin,pinnedAt:new Date().toISOString()}));
+ const value={...pin,pinnedAt:new Date().toISOString()};if(!/^[a-f0-9]{32}$/.test(accountId)||!isAuthorityPin(value))throw new Error('The authority pin is malformed and was not saved.');storage.setItem(pinKey(accountId,pin.origin),JSON.stringify(value));
 }
 export function removeAuthorityPin(accountId:string,origin:string,storage:Storage=localStorage){storage.removeItem(pinKey(accountId,origin));}
 /** Return only malformed entries owned by this feature; valid trust pins are never included. */
@@ -40,7 +45,7 @@ export function findInvalidAuthorityPinKeys(storage:Storage=localStorage):string
   const key=storage.key(index);if(!key?.startsWith(pinPrefix))continue;
   const encoded=key.slice(pinPrefix.length),separator=encoded.indexOf(':');
   let accountId='',origin='';
-  try{if(separator<0)throw new Error('Invalid pin key');accountId=decodeURIComponent(encoded.slice(0,separator));origin=decodeURIComponent(encoded.slice(separator+1));}catch{invalid.push(key);continue;}
+  try{if(separator<0)throw new Error('Invalid pin key');accountId=decodeURIComponent(encoded.slice(0,separator));origin=decodeURIComponent(encoded.slice(separator+1));if(!/^[a-f0-9]{32}$/.test(accountId)||!validPinOrigin(origin))throw new Error('Invalid pin scope');}catch{invalid.push(key);continue;}
   const raw=storage.getItem(key);if(raw===null){invalid.push(key);continue;}
   let pin:unknown;try{pin=JSON.parse(raw);}catch{invalid.push(key);continue;}
   if(!isAuthorityPin(pin)||pin.origin!==origin||key!==pinKey(accountId,origin))invalid.push(key);

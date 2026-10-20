@@ -15,6 +15,7 @@ function signedIdentity(previous?:{privateKey:KeyObject;publicKey:KeyObject}){
  const identity:QualifiedAccountIdentity={serverId,authority:'locat.test',address:'LC-1234@locat.test',accountUri:`locat://locat.test/account/${accountId}`,attestation:account};
  return {identity,discovery:{app:'Locat',protocolVersion:1,serverId,origin,identity:server,capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:true,authenticatedIdentity:true}},privateKey,publicKey};
 }
+function pinFor(fixture:ReturnType<typeof signedIdentity>,pinOrigin=origin,pinServerId=serverId):Omit<AuthorityPin,'pinnedAt'>{return {origin:pinOrigin,serverId:pinServerId,keyId:fixture.identity.attestation!.keyId,publicKey:fixture.identity.attestation!.publicKey};}
 
 afterEach(()=>{vi.unstubAllGlobals();localStorage.clear();});
 
@@ -39,26 +40,35 @@ it('rejects invalid account and authority signatures and treats network failure 
 });
 
 it('keeps authority pins scoped to account and exact origin and never auto-replaces a changed key',()=>{
- const first={origin,serverId,keyId:'key-one',publicKey:'public-one'};
+ const firstFixture=signedIdentity(),first=pinFor(firstFixture),changed=pinFor(signedIdentity());
  expect(compareAuthorityPin(null,first)).toBe('first-contact');writeAuthorityPin(accountId,first);
- const pin=readAuthorityPin(accountId,origin)!;expect(pin.keyId).toBe('key-one');expect(compareAuthorityPin(pin,first)).toBe('matches');
+ const pin=readAuthorityPin(accountId,origin)!;expect(pin.keyId).toBe(first.keyId);expect(compareAuthorityPin(pin,first)).toBe('matches');
  expect(readAuthorityPin('b'.repeat(32),origin)).toBeNull();expect(readAuthorityPin(accountId,'https://other.test')).toBeNull();
- expect(compareAuthorityPin(pin,{...first,keyId:'key-two',publicKey:'public-two'})).toBe('changed');
- expect(readAuthorityPin(accountId,origin)?.keyId).toBe('key-one');removeAuthorityPin(accountId,origin);expect(readAuthorityPin(accountId,origin)).toBeNull();
+ expect(compareAuthorityPin(pin,changed)).toBe('changed');
+ expect(readAuthorityPin(accountId,origin)?.keyId).toBe(first.keyId);removeAuthorityPin(accountId,origin);expect(readAuthorityPin(accountId,origin)).toBeNull();
 });
 
 it('finds the same pinned server UUID at another origin across accounts',()=>{
- writeAuthorityPin('b'.repeat(32),{origin:'https://old-locat.test',serverId,keyId:'key-one',publicKey:'public-one'});
- writeAuthorityPin('c'.repeat(32),{origin:'https://locat.test',serverId:'different-server',keyId:'key-two',publicKey:'public-two'});
+ const old=signedIdentity(),different=signedIdentity();
+ writeAuthorityPin('b'.repeat(32),pinFor(old,'https://old-locat.test'));
+ writeAuthorityPin('c'.repeat(32),pinFor(different,'https://locat.test','223e4567-e89b-42d3-a456-426614174000'));
  expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://old-locat.test']);
  expect(findPinnedAuthorityClones('different-server',origin)).toEqual([]);
 });
 
 it('repairs malformed authority records without removing valid pins',()=>{
  const malformedKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');
- localStorage.setItem(malformedKey,'not-json');writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId,keyId:'good-key',publicKey:'good-public'});
- expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey]);expect(removeInvalidAuthorityPins()).toBe(1);
- expect(localStorage.getItem(malformedKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('good-key');expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://trusted.test']);
+ const malformedFields='locat-ui3:authority-pin:v1:'+encodeURIComponent('d'.repeat(32))+':'+encodeURIComponent('https://other-locat.test');
+ const trusted=signedIdentity();localStorage.setItem(malformedKey,'not-json');localStorage.setItem(malformedFields,JSON.stringify({...pinFor(trusted,'https://other-locat.test'),keyId:'bad-fingerprint',pinnedAt:new Date(0).toISOString()}));writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
+ expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey,malformedFields]);expect(removeInvalidAuthorityPins()).toBe(2);
+ expect(localStorage.getItem(malformedKey)).toBeNull();expect(localStorage.getItem(malformedFields)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://trusted.test']);
+});
+
+it('rejects malformed pin scopes and noncanonical public-key fields before storage',()=>{
+ const fixture=signedIdentity();expect(()=>writeAuthorityPin(accountId,{...pinFor(fixture),origin:'https://locat.test/path'})).toThrow(/malformed/);
+ expect(()=>writeAuthorityPin(accountId,{...pinFor(fixture),keyId:'not-a-fingerprint'})).toThrow(/malformed/);
+ expect(()=>writeAuthorityPin(accountId,{...pinFor(fixture),publicKey:'not-base64url'})).toThrow(/malformed/);
+ expect(localStorage.length).toBe(0);
 });
 
 it('requires a separate fingerprint confirmation for first contact and changed keys',async()=>{
@@ -72,7 +82,7 @@ it('requires a separate fingerprint confirmation for first contact and changed k
 });
 
 it('warns about a cloned server UUID and requires operator confirmation before pinning another origin',async()=>{
- const existing:AuthorityPin={origin:'https://old-locat.test',serverId,keyId:'previous-key',publicKey:'previous-public',pinnedAt:new Date(0).toISOString()};writeAuthorityPin('b'.repeat(32),existing);
+ const existing={...pinFor(signedIdentity(),'https://old-locat.test'),pinnedAt:new Date(0).toISOString()};writeAuthorityPin('b'.repeat(32),existing);
  const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
  await screen.findByRole('alert');expect(screen.getByText(/This server UUID is already pinned at another origin/)).toHaveTextContent('https://old-locat.test');
@@ -83,12 +93,12 @@ it('warns about a cloned server UUID and requires operator confirmation before p
 
 it('blocks pinning until malformed records are explicitly removed and trust is rechecked',async()=>{
  const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');localStorage.setItem(invalidKey,'not-json');
- writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId,keyId:'keep-key',publicKey:'keep-public'});
+ const trusted=signedIdentity();writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
  const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
  await screen.findByText(/Clone checks are stopped/);expect(screen.queryByRole('button',{name:'Pin after comparison'})).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'Remove malformed entries and recheck'}));
- const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('keep-key');expect(pin).toBeDisabled();
+ const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(pin).toBeDisabled();
  expect(await screen.findByRole('alert')).toHaveTextContent('https://trusted.test');const confirmation=screen.getByRole('checkbox',{name:/only active writable owner/});fireEvent.click(confirmation);fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
 });
 
