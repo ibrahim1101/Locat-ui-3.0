@@ -1,0 +1,30 @@
+import {useEffect,useState} from 'react';
+import type {QualifiedAccountIdentity} from '../contracts/auth';
+import {Button} from '../ui';
+import {compareAuthorityPin,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin,type IdentityVerification} from './globalIdentityTrust';
+
+export function GlobalIdentityTrustDisclosure({accountId,identity,lcCode}:{accountId:string;identity?:QualifiedAccountIdentity|null;lcCode?:string}){
+ const [opened,setOpened]=useState(false),[verification,setVerification]=useState<IdentityVerification>({status:'checking'}),[pin,setPin]=useState<AuthorityPin|null>(null),[pinError,setPinError]=useState(false),[confirmed,setConfirmed]=useState(false),[message,setMessage]=useState('');
+ useEffect(()=>{if(!opened)return;let active=true;void verifyQualifiedIdentity(identity??undefined,accountId,lcCode).then(result=>{if(!active)return;setVerification(result);if(result.status==='valid'){try{setPin(readAuthorityPin(accountId,result.pin.origin));}catch(error){setPinError(true);setMessage(error instanceof Error?error.message:'Saved authority pin could not be read.');}}});return()=>{active=false;};},[accountId,identity,lcCode,opened]);
+ function toggleDetails(open:boolean){setOpened(open);if(open){setVerification({status:identity?.attestation?'checking':'unsigned'});setPin(null);setPinError(false);setConfirmed(false);setMessage('');}}
+ if(!identity)return null;
+ const result=verification.status==='valid'?compareAuthorityPin(pin,verification.pin):null;
+ const proof=identity.attestation;
+ function savePin(){if(verification.status!=='valid'||!confirmed||pinError)return;try{writeAuthorityPin(accountId,verification.pin);setPin(readAuthorityPin(accountId,verification.pin.origin));setPinError(false);setConfirmed(false);setMessage('Authority fingerprint pinned for this account in this browser.');}catch(error){setPinError(true);setMessage(error instanceof Error?error.message:'The authority pin could not be saved.');}}
+ function clearPin(){if(verification.status!=='valid')return;try{removeAuthorityPin(accountId,verification.pin.origin);setPin(null);setPinError(false);setConfirmed(false);setMessage('Authority fingerprint pin removed.');}catch(error){setPinError(true);setMessage(error instanceof Error?error.message:'The authority pin could not be removed.');}}
+ async function copyFingerprint(){if(!proof)return;try{await navigator.clipboard.writeText(proof.keyId);setMessage('Authority fingerprint copied.');}catch{setMessage('The fingerprint could not be copied.');}}
+ return <details className="mt-3 rounded-xl bg-s2 p-3 hairline" onToggle={event=>toggleDetails(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-medium">{verification.status==='valid'?(pinError?'Authority pin · unavailable':result==='matches'?'Authority key continuity · pinned':result==='changed'?'Authority key changed · review':'Authority signature · review'):verification.status==='unsigned'?'Authority signature · not configured':verification.status==='invalid'?'Authority signature · invalid':verification.status==='unavailable'?'Authority signature · unavailable':verification.status==='checking'?'Authority signature · checking':'Authority signature · checking'}</summary>
+  <div className="mt-3 space-y-2 text-xs text-ink-3"><p>Claims are checked against the authority discovery signature. Pinning records key continuity for this Locat account in this browser. It does not prove domain ownership; compare the fingerprint through a separate trusted channel before pinning.</p>
+   {proof&&<><p className="break-all font-mono">SHA-256 key ID · {proof.keyId}</p><Button variant="ghost" onClick={()=>void copyFingerprint()}>Copy authority fingerprint</Button></>}
+   {verification.status==='valid'&&result==='matches'&&<><p className="text-success">Both signatures are valid and match the authority key already pinned for this account.</p><Button variant="ghost" onClick={clearPin}>Remove authority pin</Button></>}
+   {verification.status==='valid'&&result==='first-contact'&&<p className="text-success">Both discovery and account signatures are valid. This confirms the same key signed these claims; it does not confirm who controls the domain.</p>}
+   {verification.status==='valid'&&result==='changed'&&<><p className="text-danger">Both signatures are valid, but they use a different key than the one pinned here. The saved pin has not changed.</p><p className="break-all font-mono">Previously pinned · {pin?.keyId}</p></>}
+   {verification.status==='valid'&&pinError&&<><p className="text-danger">Saved pin storage is unavailable or invalid. No new pin can be written until the problem is resolved.</p><Button variant="ghost" onClick={clearPin}>Clear saved authority pin</Button></>}
+   {verification.status==='valid'&&!pinError&&(result==='first-contact'||result==='changed')&&<><label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/><span>{result==='changed'?'I independently compared the new fingerprint with the authority operator.':'I independently compared this fingerprint with the authority operator.'}</span></label><Button disabled={!confirmed} onClick={savePin}>{result==='changed'?'Replace pin after comparison':'Pin after comparison'}</Button></>}
+   {verification.status==='invalid'&&<p className="text-danger">The account or discovery signature does not match the published authority identity. Do not trust this address.</p>}
+   {verification.status==='unavailable'&&<p>The authority could not be reached securely. Retry when its canonical address is available.</p>}
+   {verification.status==='unsigned'&&<p>No signed authority claim is available. This address is descriptive only.</p>}
+   {message&&<p role="status">{message}</p>}
+  </div>
+ </details>;
+}

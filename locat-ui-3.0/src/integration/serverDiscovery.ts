@@ -1,4 +1,5 @@
-export type ServerDiscovery = {app:'Locat';protocolVersion:1;serverId:string;origin:string;capabilities:{sameOriginApi:boolean;privateMessaging:boolean;federation:boolean;webSocket:boolean}};
+export type ServerIdentityAttestation={kind:'locat.server.v1';version:1;serverId:string;origin:string;keyId:string;publicKey:string;signature:string};
+export type ServerDiscovery = {app:'Locat';protocolVersion:1;serverId:string;origin:string;identity?:ServerIdentityAttestation|null;capabilities:{sameOriginApi:boolean;privateMessaging:boolean;federation:boolean;webSocket:boolean;authenticatedIdentity?:boolean}};
 /** Validate navigation targets. App keys/data are origin-scoped; browser cookies are host-scoped. */
 export function homeserverOrigin(input:string):string {
   let url:URL;try{url=new URL(input.trim());}catch{throw new Error('Enter a complete HTTPS server address.');}

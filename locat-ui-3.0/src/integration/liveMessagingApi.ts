@@ -1,4 +1,5 @@
 /** Live API access for ciphertext envelopes. No plaintext messaging API exists. */
+import type {QualifiedAccountIdentity} from '../contracts/auth';
 export type CiphertextEnvelope = {
   id: string;
   sequence: number;
@@ -9,7 +10,7 @@ export type CiphertextEnvelope = {
   algorithm: "client-e2ee-v1";
   createdAt: number;
 };
-export type DirectoryUser = { id: string; username: string; displayName: string };
+export type DirectoryUser = { id: string; username: string; displayName: string;lcCode?:string;globalIdentity?:QualifiedAccountIdentity|null };
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { ...init, credentials: "same-origin", headers: { "Content-Type": "application/json", ...init?.headers } });
   const data = await response.json();

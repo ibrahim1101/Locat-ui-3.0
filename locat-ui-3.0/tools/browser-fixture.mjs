@@ -1,18 +1,18 @@
 /** Isolated production HTTPS fixture. Never accepts an existing server/database. */
-import {randomBytes,scryptSync} from 'node:crypto';
+import {generateKeyPairSync,randomBytes,scryptSync} from 'node:crypto';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createServer} from 'node:net';
 import {get} from 'node:https';
 import {once} from 'node:events';
-import {mkdtemp,readFile,chmod,rm,mkdir,open} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,chmod,rm,mkdir,open} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {openDatabase} from '../server/database.mjs';
 import {startBrowserSynapse} from './browser-synapse-fixture.mjs';
 const exec=promisify(execFile),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-export async function startBrowserFixture({matrix=false,media=false,mediaOwnership=false,hostname='127.0.0.1'}={}){
+export async function startBrowserFixture({matrix=false,media=false,mediaOwnership=false,identitySigning=false,hostname='127.0.0.1'}={}){
  if(!['127.0.0.1','localhost'].includes(hostname))throw new Error('Only isolated loopback fixture hostnames are allowed');
  const dir=await mkdtemp(join(tmpdir(),'locat-browser-')),cwd=fileURLToPath(new URL('../',import.meta.url));let child,synapse;
  async function stopGateway(){
@@ -25,6 +25,7 @@ export async function startBrowserFixture({matrix=false,media=false,mediaOwnersh
   const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
   const origin='https://'+hostname+':'+port,key=join(dir,'fixture.key'),cert=join(dir,'fixture.crt');
   await exec('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1,DNS:localhost']);await chmod(key,0o600);
+  const identityKey=join(dir,'identity.pem');if(identitySigning){const pair=generateKeyPairSync('ed25519');await writeFile(identityKey,pair.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});await chmod(identityKey,0o600);}
   const ca=await readFile(cert),runtime=Object.fromEntries(['PATH','SystemRoot','WINDIR','TEMP','TMP','LANG'].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   if(matrix){const db=openDatabase(join(dir,'fixture.sqlite'));let serverId;try{serverId=db.serverId;}finally{db.close();}synapse=await startBrowserSynapse(dir,serverId);}
   let mediaFiles;
@@ -46,7 +47,7 @@ export async function startBrowserFixture({matrix=false,media=false,mediaOwnersh
    const db=openDatabase(join(dir,'fixture.sqlite'));try{for(const account of mediaAccounts){const salt=randomBytes(16).toString('hex');db.addUser({id:account.id,username:account.username,displayName:account.username,salt,hash:scryptSync(account.password,salt,64).toString('hex')});}}finally{db.close();}
   }
   let diagnostic='',startupError;
-  const startGateway=()=>{startupError=undefined;child=spawn(process.execPath,['server/index.mjs'],{cwd,env:{...runtime,...synapse?.environment,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_PUBLIC_ORIGIN:origin,LOCAT_TLS_KEY:key,LOCAT_TLS_CERT:cert,LOCAT_DATABASE_FILE:join(dir,'fixture.sqlite'),LOCAT_STATIC_DIR:join(cwd,'dist'),...(mediaFiles?{LOCAT_MEDIA_AUTHORIZED_ROOTS:mediaFiles.root,...(mediaAccounts?{LOCAT_MEDIA_LIBRARY_ACCESS:JSON.stringify([{root:mediaFiles.root,ownerId:mediaAccounts[0].id,friendIds:[mediaAccounts[1].id]}])}:{LOCAT_MEDIA_ACCESS_MODE:'authenticated'})}:{})},stdio:['ignore','ignore','pipe']});
+  const startGateway=()=>{startupError=undefined;child=spawn(process.execPath,['server/index.mjs'],{cwd,env:{...runtime,...synapse?.environment,LOCAT_HOST:'127.0.0.1',LOCAT_PORT:String(port),LOCAT_PUBLIC_ORIGIN:origin,LOCAT_TLS_KEY:key,LOCAT_TLS_CERT:cert,LOCAT_DATABASE_FILE:join(dir,'fixture.sqlite'),LOCAT_STATIC_DIR:join(cwd,'dist'),...(identitySigning?{LOCAT_IDENTITY_SIGNING_KEY_FILE:identityKey}:{}),...(mediaFiles?{LOCAT_MEDIA_AUTHORIZED_ROOTS:mediaFiles.root,...(mediaAccounts?{LOCAT_MEDIA_LIBRARY_ACCESS:JSON.stringify([{root:mediaFiles.root,ownerId:mediaAccounts[0].id,friendIds:[mediaAccounts[1].id]}])}:{LOCAT_MEDIA_ACCESS_MODE:'authenticated'})}:{})},stdio:['ignore','ignore','pipe']});
   child.stderr.on('data',chunk=>{diagnostic=(diagnostic+chunk).slice(-4000);});child.on('error',error=>{startupError=error;});};startGateway();
   const ready=()=>new Promise(resolve=>{
    const request=get(origin+'/api/ready',{ca,timeout:1000},response=>{response.on('error',()=>resolve(false));response.resume();resolve(response.statusCode===200);});

@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomBytes} from 'node:crypto';
 import {startBrowserFixture} from '../tools/browser-fixture.mjs';
 let fixture;
-test.beforeAll(async()=>{fixture=await startBrowserFixture();});
+test.beforeAll(async()=>{fixture=await startBrowserFixture({identitySigning:true});});
 test.afterAll(async()=>{await fixture?.stop();});
 
 test('built UI, real cookie, nonextractable Link identity across reload and encrypted store round-trip',async({browser})=>{
@@ -28,6 +28,13 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   expect(await page.evaluate(()=>document.cookie.includes('locat_session'))).toBe(false);
   expect(await page.evaluate(()=>({secure:isSecureContext,crypto:!!crypto.subtle,indexedDB:!!indexedDB,locks:!!navigator.locks}))).toEqual({secure:true,crypto:true,indexedDB:true,locks:true});
   expect(await page.evaluate(()=>navigator.locks.request('locat-browser-acceptance',()=>true))).toBe(true);
+  await page.goto(fixture.origin+'/settings');await expect(page.getByText('Your server identity')).toBeVisible();
+  const authorityDetails=page.getByText(/Authority signature/);await authorityDetails.click();
+  await expect(page.getByRole('button',{name:'Pin after comparison'})).toBeDisabled();
+  await expect(page.getByText(/Both discovery and account signatures are valid/)).toBeVisible();
+  await page.getByLabel(/I independently compared this fingerprint/).check();await page.getByRole('button',{name:'Pin after comparison'}).click();
+  await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();
+  await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Authority key continuity · pinned/)).toBeVisible();
   await page.goto(fixture.origin+'/devices');await expect(page.getByLabel("This browser's device name")).toBeVisible();
   const identity=await page.evaluate(async accountId=>{
    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-link:'+accountId,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
