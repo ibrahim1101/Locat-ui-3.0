@@ -39,3 +39,7 @@ Messages now separates accepted contacts, pending requests, account discovery an
 ## Nested Link destinations
 
 The Link Devices screen now groups registered browsers, verified pairings and encrypted transfers into separate counted sections using the existing Obsidian Ember segmented-control treatment. Successful sends open Transfers, and pairing decisions return to Pairings. Focused Link tests cover section navigation and transfer recovery; browser acceptance now navigates the same sections during the two-device pairing, transfer and revocation journey. Local TypeScript, ESLint, all frontend/server tests and production build were run for this batch; hosted acceptance will be recorded after publication.
+
+## Nested private storage destinations
+
+Unlocked Vault and Secrets now separate Entries, Backups and Security into counted Obsidian Ember sections. Search, folder filtering and entry actions stay under Entries; encrypted export and missing-entry restore are under Backups; passphrase changes are under Security. The Credential/Secure note choice remains nested inside the Secrets editor. Locking resets navigation to Entries along with clearing decrypted state. Focused tests verify section visibility, the retained secret-note lifecycle and passphrase-change flows.
