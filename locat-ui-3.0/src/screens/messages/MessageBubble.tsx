@@ -16,9 +16,10 @@ function DeliveryIcon({ d }: { d: MessageView["delivery"] }) {
 function Attachment({ a, mine, onDownload }: { a: NonNullable<MessageView["attachment"]>; mine: boolean; onDownload?:()=>void }) {
   switch (a.kind) {
     case "image": return (
-      <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-xl">
-        <div className="grid aspect-4/3 w-[min(68vw,300px)] place-items-center" style={{ background: "linear-gradient(135deg,hsl(28 30% 30%),hsl(220 20% 14%))" }}><ImageIcon className="size-8 text-white/40" /></div>
-        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-2xs font-semibold text-white backdrop-blur-sm">{a.original ? "Original" : "Compressed"} · {a.width}×{a.height}</span>
+      <div className="relative -mx-1 -mt-1 mb-1 overflow-hidden rounded-xl bg-black/20">
+        {a.previewUrl ? <img src={a.previewUrl} alt={a.name} className="max-h-[min(52vh,360px)] w-[min(68vw,300px)] object-contain" /> : <div className="grid aspect-4/3 w-[min(68vw,300px)] place-items-center" style={{ background: "linear-gradient(135deg,hsl(28 30% 30%),hsl(220 20% 14%))" }}><ImageIcon className="size-8 text-white/40" /></div>}
+        <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-1.5 py-0.5 text-2xs font-semibold text-white backdrop-blur-sm">{a.original ? "Original" : "Compressed"}{a.width && a.height ? " · " + a.width + "×" + a.height : ""}</span>
+        {!a.previewUrl && onDownload && <button type="button" onClick={onDownload} className="absolute inset-0 grid place-items-center bg-black/15 text-sm font-semibold text-white opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2" aria-label={"Preview " + a.name}><span className="rounded-full bg-black/65 px-3 py-2 backdrop-blur-sm">Load photo preview</span></button>}
       </div>);
     case "file": return (
       <div className={cn("flex min-w-[220px] max-w-[300px] items-center gap-3 rounded-xl p-2.5", mine ? "bg-black/15" : "bg-s3")}>
