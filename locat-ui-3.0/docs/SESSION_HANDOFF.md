@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `cf605a3` (`Assert live Home excludes preview fixtures`). The checkout is clean at that commit before the current global-search work is committed.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published feature checkpoint: `d81921d` (`Keep live global search account scoped`). The working tree contains a follow-up fix for the empty-contact loading state and its regression test.
 
 ## Active direction
 
@@ -20,7 +20,7 @@ Current Home conversation summaries are still not connected. Do not derive “re
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (282 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Hosted checks for `cf605a3` were still running at last inspection; verify through the commit check-runs API before reporting.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test` (285 frontend tests), `npm run test:server` (108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Hosted checks for `cf605a3` and `d81921d` were still running at last inspection; verify through the commit check-runs API before reporting.
 
 The workflow-run summary wrapper filters pull-request runs, so query commit check-runs when verifying push-triggered hosted results.
 

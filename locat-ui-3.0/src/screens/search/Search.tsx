@@ -24,6 +24,7 @@ export default function Search() {
   const [attempt, setAttempt] = useState(0);
   const contacts = user?.id && contactState?.accountId === user.id ? contactState.contacts ?? EMPTY_CONTACTS : EMPTY_CONTACTS;
   const contactError = user?.id && contactState?.accountId === user.id ? contactState.error ?? "" : "";
+  const contactsLoaded = Boolean(user?.id && contactState?.accountId === user.id && contactState.contacts);
 
   useEffect(() => {
     if (preview || !user?.id) return;
@@ -63,7 +64,7 @@ export default function Search() {
           {preview ? "Sample messages and people are for layout preview only." : "Global search covers your accepted contacts and Locat modules. Search encrypted message text inside an open conversation; it is never sent to the server."}
         </Banner>
         {contactError && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-danger/10 p-3 text-sm text-danger"><span role="alert">Contacts could not be loaded: {contactError}</span><Button size="sm" variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></div>}
-        {!preview && user && !contacts.length && !contactError && <p role="status" className="mb-4 text-sm text-ink-3">Loading your contacts…</p>}
+        {!preview && user && !contactsLoaded && !contactError && <p role="status" className="mb-4 text-sm text-ink-3">Loading your contacts…</p>}
         {!termReady ? <StateView compact kind="empty" title="Type at least 2 characters" body="Results are grouped into people and modules." />
           : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body={preview ? "Try a sample name, message or module." : scope === "messages" || scope === "attachments" ? "Open a conversation to search its locally decrypted messages." : "Try another name or module."} />
           : groups.map((group) => <Section key={group} title={group}>{results.filter((result) => result.scope === group).map((result) => <ListRow key={result.id} icon={ICON[result.scope]} title={result.title} subtitle={result.subtitle} onClick={() => nav(result.route)} chevron testId={`result-${result.id}`} />)}</Section>)}

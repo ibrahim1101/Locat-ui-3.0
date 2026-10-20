@@ -33,3 +33,11 @@ it("keeps clearly fictional search results in preview mode", async () => {
   expect(screen.getByText(/Preview search uses fictional content/)).toBeVisible();
   expect(accountRequest).not.toHaveBeenCalled();
 });
+
+it("shows an honest empty result when the live account has no contacts", async () => {
+  accountRequest.mockResolvedValue({ contacts: [] });
+  render(<MemoryRouter><Search /></MemoryRouter>);
+  fireEvent.change(screen.getByTestId("global-search-input"), { target: { value: "Mira" } });
+  expect(await screen.findByText('No results for "Mira"')).toBeVisible();
+  expect(screen.queryByText("Loading your contacts…")).toBeNull();
+});
