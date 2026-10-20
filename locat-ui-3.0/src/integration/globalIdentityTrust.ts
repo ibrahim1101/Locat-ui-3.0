@@ -1,8 +1,8 @@
 import type { QualifiedAccountIdentity } from '../contracts/auth';
-import { discoverHomeserver } from './serverDiscovery';
+import { discoverHomeserver,type IdentityKeyRotation } from './serverDiscovery';
 
 export type AuthorityPin={origin:string;serverId:string;keyId:string;publicKey:string;pinnedAt:string};
-export type IdentityVerification={status:'valid';pin:Omit<AuthorityPin,'pinnedAt'>}|{status:'unsigned'|'invalid'|'unavailable'|'checking'};
+export type IdentityVerification={status:'valid';pin:Omit<AuthorityPin,'pinnedAt'>;rotationValid:boolean}|{status:'unsigned'|'invalid'|'unavailable'|'checking'};
 const pinPrefix='locat-ui3:authority-pin:v1:';
 
 function decodeBase64Url(value:string){
@@ -33,7 +33,18 @@ export function compareAuthorityPin(pin:AuthorityPin|null,verified:Omit<Authorit
 }
 
 /** Verify both the account claim and the authority's discovery claim before displaying trust state. */
-export async function verifyQualifiedIdentity(identity:QualifiedAccountIdentity|undefined,accountId:string,expectedLcCode?:string):Promise<IdentityVerification>{
+async function verifiesRotation(rotation:IdentityKeyRotation|undefined,previous:AuthorityPin|undefined,current:Omit<AuthorityPin,'pinnedAt'>){
+ if(!rotation||!previous||previous.origin!==current.origin||previous.serverId!==current.serverId||previous.keyId===current.keyId)return false;
+ try{
+  if(rotation.kind!=='locat.rotation.v1'||rotation.version!==1||rotation.origin!==current.origin||rotation.serverId!==current.serverId||rotation.fromKeyId!==previous.keyId||rotation.fromPublicKey!==previous.publicKey||rotation.toKeyId!==current.keyId)return false;
+  const oldDer=decodeBase64Url(rotation.fromPublicKey),oldKeyId=encodeBase64Url(new Uint8Array(await crypto.subtle.digest('SHA-256',oldDer)));
+  if(oldKeyId!==previous.keyId)return false;
+  const oldKey=await crypto.subtle.importKey('spki',oldDer,{name:'Ed25519'} as AlgorithmIdentifier,false,['verify']);
+  const claims=JSON.stringify([rotation.kind,rotation.version,rotation.serverId,rotation.origin,rotation.fromKeyId,rotation.toKeyId]);
+  return await crypto.subtle.verify({name:'Ed25519'},oldKey,decodeBase64Url(rotation.signature),new TextEncoder().encode(claims));
+ }catch{return false;}
+}
+export async function verifyQualifiedIdentity(identity:QualifiedAccountIdentity|undefined,accountId:string,expectedLcCode?:string,previousPin?:AuthorityPin|null):Promise<IdentityVerification>{
  const account=identity?.attestation;if(!account)return {status:'unsigned'};
  let origin:URL;
  try{
@@ -54,6 +65,9 @@ export async function verifyQualifiedIdentity(identity:QualifiedAccountIdentity|
   const accountClaims=JSON.stringify([account.kind,account.version,account.serverId,account.origin,account.accountId,account.lcCode]);
   const serverValid=await crypto.subtle.verify({name:'Ed25519'},key,decodeBase64Url(authority.signature),new TextEncoder().encode(serverClaims));
   const accountValid=await crypto.subtle.verify({name:'Ed25519'},key,decodeBase64Url(account.signature),new TextEncoder().encode(accountClaims));
-  return serverValid&&accountValid?{status:'valid',pin:{origin:account.origin,serverId:account.serverId,keyId:account.keyId,publicKey:account.publicKey}}:{status:'invalid'};
+  if(!serverValid||!accountValid)return {status:'invalid'};
+  const pin={origin:account.origin,serverId:account.serverId,keyId:account.keyId,publicKey:account.publicKey};
+  const rotationValid=await verifiesRotation(authority.rotation,previousPin??undefined,pin);
+  return {status:'valid',pin,rotationValid};
  }catch{return {status:'invalid'};}
 }

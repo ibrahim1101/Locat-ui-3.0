@@ -1,4 +1,4 @@
-import { createHash, createPublicKey, sign } from 'node:crypto';
+import { createHash, createPublicKey, sign, verify } from 'node:crypto';
 
 function publicKeyDetails(privateKey){
  if(!privateKey)return null;
@@ -11,10 +11,35 @@ function signedClaims(kind,claims,privateKey){
  const canonical=JSON.stringify([kind,...Object.values(claims)]);
  return {kind,...claims,...details,signature:sign(null,Buffer.from(canonical),privateKey).toString('base64url')};
 }
+function decodeKey(value){
+ if(typeof value!=='string'||!/^[A-Za-z0-9_-]+$/.test(value))return null;
+ const bytes=Buffer.from(value,'base64url');return bytes.toString('base64url')===value?bytes:null;
+}
+/** Verify an explicit handoff signed by the pinned prior key and bound to the current authority key. */
+export function verifyIdentityRotation(rotation,{origin,serverId,currentKey}){
+ if(!rotation||!origin||!serverId||!currentKey)return false;
+ try{
+  const canonicalOrigin=new URL(origin).origin,oldDer=decodeKey(rotation.fromPublicKey),signature=decodeKey(rotation.signature);
+  if(rotation.kind!=='locat.rotation.v1'||rotation.version!==1||rotation.origin!==canonicalOrigin||rotation.serverId!==serverId||!oldDer||!signature)return false;
+  const oldPublicKey=createPublicKey({key:oldDer,format:'der',type:'spki'}),oldKeyId=createHash('sha256').update(oldDer).digest('base64url');
+  const current=publicKeyDetails(currentKey);if(rotation.fromKeyId!==oldKeyId||rotation.toKeyId!==current.keyId)return false;
+  const claims=JSON.stringify([rotation.kind,rotation.version,rotation.serverId,rotation.origin,rotation.fromKeyId,rotation.toKeyId]);
+  return verify(null,Buffer.from(claims),oldPublicKey,signature);
+ }catch{return false;}
+}
+export function createIdentityRotation(origin,serverId,oldPrivateKey,newPrivateKey){
+ const old=publicKeyDetails(oldPrivateKey),current=publicKeyDetails(newPrivateKey);
+ if(!old||!current||!origin||!serverId)throw new TypeError('Rotation requires two Ed25519 keys, a canonical origin and server ID');
+ const rotation={kind:'locat.rotation.v1',version:1,serverId,origin:new URL(origin).origin,fromKeyId:old.keyId,fromPublicKey:old.publicKey,toKeyId:current.keyId};
+ const claims=JSON.stringify([rotation.kind,rotation.version,rotation.serverId,rotation.origin,rotation.fromKeyId,rotation.toKeyId]);
+ return {...rotation,signature:sign(null,Buffer.from(claims),oldPrivateKey).toString('base64url')};
+}
 /** Address qualification alone is not authority authentication or federation. */
-export function serverIdentityAttestation(origin,serverId,privateKey){
+export function serverIdentityAttestation(origin,serverId,privateKey,rotation){
  if(!origin||!privateKey)return null;
- return signedClaims('locat.server.v1',{version:1,serverId,origin:new URL(origin).origin},privateKey);
+ const attestation=signedClaims('locat.server.v1',{version:1,serverId,origin:new URL(origin).origin},privateKey);
+ if(rotation){if(!verifyIdentityRotation(rotation,{origin,serverId,currentKey:privateKey}))throw new Error('Configured identity rotation does not match this server authority key');attestation.rotation=rotation;}
+ return attestation;
 }
 /** The signature binds an account's immutable local ID and LC code to one authority key. */
 export function accountIdentity(user,origin,serverId,privateKey){

@@ -6,7 +6,7 @@ import {createManagedMatrixProvisioner} from './matrixProvisioning.mjs';
 import { createMatrixGateway } from './matrixGateway.mjs';
 import { matrixProvider, createMatrixBindingHandler } from './matrixBinding.mjs';
 import { iceConfiguration } from './ice.mjs';
-import { accountIdentity, localDiscoveryQuery, serverIdentityAttestation } from './globalIdentity.mjs';
+import { accountIdentity, localDiscoveryQuery, serverIdentityAttestation, verifyIdentityRotation } from './globalIdentity.mjs';
 import { attachRealtime } from './realtime.mjs';
 /**
  * Locat 3.0 development authentication service.
@@ -32,6 +32,7 @@ const config = serverConfig();
 const connectivity = iceConfiguration();
 const matrix = matrixProvider();
 const db = openDatabase(process.env.LOCAT_DATABASE_FILE ?? "./server/data/locat.sqlite");
+if(config.identityRotation&&!verifyIdentityRotation(config.identityRotation,{origin:config.origin,serverId:db.serverId,currentKey:config.identitySigningKey}))throw new Error('LOCAT_IDENTITY_ROTATION_FILE is not a valid signed handoff for this server ID, origin and current signing key');
 const matrixServiceFile=process.env.LOCAT_MATRIX_APPSERVICE_FILE;
 if(matrixServiceFile&&!matrix)throw new Error('Managed Matrix accounts require a configured sidecar');
 const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provider:matrix,...await loadMatrixAppserviceFile(matrixServiceFile,db.serverId,matrix.serverName),serverId:db.serverId,store:db.matrixBindings,managedDevices:db.matrixManagedDevices}):null;
@@ -101,7 +102,7 @@ async function handle(req, res) {
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
-    identity:serverIdentityAttestation(config.origin,db.serverId,config.identitySigningKey),
+    identity:serverIdentityAttestation(config.origin,db.serverId,config.identitySigningKey,config.identityRotation),
     capabilities:{sameOriginApi:true,privateMessaging:!!matrix,federation:false,webSocket:true,authenticatedIdentity:!!(config.identitySigningKey&&config.origin)},
   },{'Access-Control-Allow-Origin':'*'});
   if (req.method === "GET" && url.pathname === "/api/ready") return json(res, 200, { app: "Locat", status: "ready" });

@@ -1,18 +1,19 @@
-import {createHash,generateKeyPairSync,sign} from 'node:crypto';
+import {createHash,generateKeyPairSync,sign,type KeyObject} from 'node:crypto';
 import {afterEach,expect,it,vi} from 'vitest';
 import {fireEvent,render,screen,waitFor} from '@testing-library/react';
 import type {QualifiedAccountIdentity} from '../contracts/auth';
-import {compareAuthorityPin,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin} from './globalIdentityTrust';
+import {compareAuthorityPin,readAuthorityPin,removeAuthorityPin,verifyQualifiedIdentity,writeAuthorityPin,type AuthorityPin} from './globalIdentityTrust';
 import {GlobalIdentityTrustDisclosure} from './GlobalIdentityTrustDisclosure';
 
 const origin='https://locat.test',serverId='123e4567-e89b-42d3-a456-426614174000',accountId='a'.repeat(32);
-function signedIdentity(){
+function signedIdentity(previous?:{privateKey:KeyObject;publicKey:KeyObject}){
  const {privateKey,publicKey}=generateKeyPairSync('ed25519'),der=publicKey.export({type:'spki',format:'der'}),encoded=der.toString('base64url'),keyId=createHash('sha256').update(der).digest('base64url');
  const make=(kind:string,claims:unknown[])=>sign(null,Buffer.from(JSON.stringify([kind,...claims])),privateKey).toString('base64url');
- const server={kind:'locat.server.v1' as const,version:1 as const,serverId,origin,keyId,publicKey:encoded,signature:make('locat.server.v1',[1,serverId,origin])};
+ const server:{kind:'locat.server.v1';version:1;serverId:string;origin:string;keyId:string;publicKey:string;signature:string;rotation?:{kind:'locat.rotation.v1';version:1;serverId:string;origin:string;fromKeyId:string;fromPublicKey:string;toKeyId:string;signature:string}}={kind:'locat.server.v1',version:1,serverId,origin,keyId,publicKey:encoded,signature:make('locat.server.v1',[1,serverId,origin])};
+ if(previous){const oldDer=previous.publicKey.export({type:'spki',format:'der'}),fromPublicKey=oldDer.toString('base64url'),fromKeyId=createHash('sha256').update(oldDer).digest('base64url'),rotation={kind:'locat.rotation.v1' as const,version:1 as const,serverId,origin,fromKeyId,fromPublicKey,toKeyId:keyId};server.rotation={...rotation,signature:sign(null,Buffer.from(JSON.stringify([rotation.kind,rotation.version,serverId,origin,fromKeyId,keyId])),previous.privateKey).toString('base64url')};}
  const account={kind:'locat.account.v1' as const,version:1 as const,serverId,origin,accountId,lcCode:'1234',keyId,publicKey:encoded,signature:make('locat.account.v1',[1,serverId,origin,accountId,'1234'])};
  const identity:QualifiedAccountIdentity={serverId,authority:'locat.test',address:'LC-1234@locat.test',accountUri:`locat://locat.test/account/${accountId}`,attestation:account};
- return {identity,discovery:{app:'Locat',protocolVersion:1,serverId,origin,identity:server,capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:true,authenticatedIdentity:true}}};
+ return {identity,discovery:{app:'Locat',protocolVersion:1,serverId,origin,identity:server,capabilities:{sameOriginApi:true,privateMessaging:false,federation:false,webSocket:true,authenticatedIdentity:true}},privateKey,publicKey};
 }
 
 afterEach(()=>{vi.unstubAllGlobals();localStorage.clear();});
@@ -54,4 +55,13 @@ it('requires a separate fingerprint confirmation for first contact and changed k
  view.unmount();const changed=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify(changed.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={changed.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));const replace=await screen.findByRole('button',{name:'Replace pin after comparison'});expect(readAuthorityPin(accountId,origin)?.keyId).toBe(first.identity.attestation?.keyId);expect(replace).toBeDisabled();
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(replace);await screen.findByText('Authority fingerprint pinned for this account in this browser.');await waitFor(()=>expect(readAuthorityPin(accountId,origin)?.keyId).toBe(changed.identity.attestation?.keyId));
+});
+
+it('accepts a key only after an explicit signed rotation click from the pinned old key',async()=>{
+ const first=signedIdentity(),initial=first.identity.attestation!,previous:AuthorityPin={origin,serverId,keyId:initial.keyId,publicKey:initial.publicKey,pinnedAt:new Date(0).toISOString()};writeAuthorityPin(accountId,previous);
+ const rotated=signedIdentity({privateKey:first.privateKey,publicKey:first.publicKey});vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(rotated.discovery),{status:200})));
+ const result=await verifyQualifiedIdentity(rotated.identity,accountId,'1234',previous);expect(result).toMatchObject({status:'valid',rotationValid:true});
+ render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={rotated.identity} lcCode="1234"/>);fireEvent.click(screen.getByText(/Authority signature/));
+ const accept=await screen.findByRole('button',{name:'Accept signed authority-key rotation'});expect(readAuthorityPin(accountId,origin)?.keyId).toBe(initial.keyId);fireEvent.click(accept);
+ await screen.findByText('Signed authority-key rotation accepted for this account.');expect(readAuthorityPin(accountId,origin)?.keyId).toBe(rotated.identity.attestation?.keyId);
 });

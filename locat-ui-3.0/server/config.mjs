@@ -36,6 +36,18 @@ export function serverConfig(env = process.env) {
     }
     if(identitySigningKey.asymmetricKeyType!=='ed25519')throw new Error('LOCAT_IDENTITY_SIGNING_KEY_FILE must contain an Ed25519 private key');
   }
+  let identityRotation;
+  if(env.LOCAT_IDENTITY_ROTATION_FILE){
+    if(!identitySigningKey)throw new Error('LOCAT_IDENTITY_ROTATION_FILE requires LOCAT_IDENTITY_SIGNING_KEY_FILE');
+    const rotationPath=env.LOCAT_IDENTITY_ROTATION_FILE;
+    if(!isAbsolute(rotationPath))throw new Error('LOCAT_IDENTITY_ROTATION_FILE must be an absolute path');
+    try{
+      const metadata=lstatSync(rotationPath);
+      if(metadata.isSymbolicLink()||!metadata.isFile()||metadata.size>8192)throw new Error('not a bounded regular file');
+      identityRotation=JSON.parse(readFileSync(rotationPath,'utf8'));
+      if(!identityRotation||typeof identityRotation!=='object'||Array.isArray(identityRotation))throw new Error('not a rotation object');
+    }catch{throw new Error('LOCAT_IDENTITY_ROTATION_FILE must name a readable regular JSON file no larger than 8 KiB');}
+  }
   let origin;
   if (env.LOCAT_PUBLIC_ORIGIN) {
     let url;
@@ -47,7 +59,7 @@ export function serverConfig(env = process.env) {
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(host);
   if (!loopback && (!secure || !origin)) throw new Error('Non-loopback serving requires TLS and LOCAT_PUBLIC_ORIGIN');
   if (secure && !origin) throw new Error('TLS serving requires LOCAT_PUBLIC_ORIGIN');
-  return { host, port, key, cert, tls, secure, proxy, proxyPeers, proxyClientIpHeader, origin, identitySigningKey, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
+  return { host, port, key, cert, tls, secure, proxy, proxyPeers, proxyClientIpHeader, origin, identitySigningKey, identityRotation, staticDir: env.LOCAT_STATIC_DIR ?? './dist' };
 }
 function normalizeIp(value){return typeof value==='string'?value.replace(/^::ffff:/,''):'';}
 /** Trust one canonical client IP header only through an explicitly trusted proxy peer. */

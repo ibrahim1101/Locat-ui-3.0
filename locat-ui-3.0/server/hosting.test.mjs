@@ -10,13 +10,15 @@ import { once } from 'node:events';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
 import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
+import { createIdentityRotation } from './globalIdentity.mjs';
+import { openDatabase } from './database.mjs';
 const exec = promisify(execFile);
 test('HTTPS serves the built shell safely and issues Secure authenticated cookies', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'locat-host-'));
   let child;
   try {
-    const key = join(dir, 'key.pem'), cert = join(dir, 'cert.pem'), identityKey = join(dir, 'identity.pem'), web = join(dir, 'web');
-    const identityPair=generateKeyPairSync('ed25519'),identityPem=identityPair.privateKey.export({format:'pem',type:'pkcs8'});await writeFile(identityKey,identityPem,{mode:0o600});
+    const key = join(dir, 'key.pem'), cert = join(dir, 'cert.pem'), identityKey = join(dir, 'identity.pem'), rotationFile=join(dir,'rotation.json'),databasePath=join(dir,'app.sqlite'),web = join(dir, 'web');
+    const identityPair=generateKeyPairSync('ed25519'),identityPem=identityPair.privateKey.export({format:'pem',type:'pkcs8'}),oldIdentityPair=generateKeyPairSync('ed25519');await writeFile(identityKey,identityPem,{mode:0o600});
     await mkdir(join(web, 'assets'), { recursive: true });
     await writeFile(join(web, 'index.html'), '<title>Locat test shell</title>');
     await writeFile(join(web,'assets','crypto.wasm'),Buffer.from([0,97,115,109,1,0,0,0]));
@@ -26,8 +28,9 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     await exec('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=IP:127.0.0.1,DNS:localhost']);
     const reservation = createServer(); await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
     const port = reservation.address().port; await new Promise(resolve => reservation.close(resolve));
-    const origin = 'https://127.0.0.1:' + port, ca = await readFile(cert);
-    child = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, LOCAT_HOST: '127.0.0.1', LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: join(dir, 'app.sqlite'), LOCAT_TLS_KEY: key, LOCAT_TLS_CERT: cert, LOCAT_PUBLIC_ORIGIN: origin, LOCAT_IDENTITY_SIGNING_KEY_FILE: identityKey, LOCAT_STATIC_DIR: web, LOCAT_MEDIA_AUTHORIZED_ROOTS: '' }, stdio: 'ignore' });
+    const origin = 'https://127.0.0.1:' + port, ca = await readFile(cert),database=openDatabase(databasePath);let serverId;try{serverId=database.serverId;}finally{database.close();}
+    const rotation=createIdentityRotation(origin,serverId,oldIdentityPair.privateKey,identityPair.privateKey);await writeFile(rotationFile,JSON.stringify(rotation),{mode:0o600});
+    child = spawn(process.execPath, ['server/index.mjs'], { env: { ...process.env, LOCAT_HOST: '127.0.0.1', LOCAT_PORT: String(port), LOCAT_DATABASE_FILE: databasePath, LOCAT_TLS_KEY: key, LOCAT_TLS_CERT: cert, LOCAT_PUBLIC_ORIGIN: origin, LOCAT_IDENTITY_SIGNING_KEY_FILE: identityKey, LOCAT_IDENTITY_ROTATION_FILE:rotationFile, LOCAT_STATIC_DIR: web, LOCAT_MEDIA_AUTHORIZED_ROOTS: '' }, stdio: 'ignore' });
     function request(path, method = 'GET', data, extra = {}) {
       return new Promise((resolve, reject) => {
         const req = httpsRequest(origin + path, { ca, servername: "localhost", method, headers: { Origin: origin, 'Content-Type': 'application/json', ...extra } }, res => {
@@ -39,7 +42,7 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     for (let i = 0; i < 60; i++) { try { if ((await request('/api/ready')).status === 200) { ready = true; break; } } catch {} if (child.exitCode !== null) throw new Error('TLS server exited'); await new Promise(resolve => setTimeout(resolve, 50)); }
     assert.ok(ready);
     const discovery=JSON.parse((await request('/.well-known/locat')).body),serverProof=discovery.identity;
-    assert.equal(discovery.capabilities.authenticatedIdentity,true);assert.equal(serverProof.origin,origin);assert.equal(serverProof.serverId,discovery.serverId);assert.equal(JSON.stringify(discovery).includes(identityPem),false);
+    assert.equal(discovery.capabilities.authenticatedIdentity,true);assert.equal(serverProof.origin,origin);assert.equal(serverProof.serverId,discovery.serverId);assert.deepEqual(serverProof.rotation,rotation);assert.equal(JSON.stringify(discovery).includes(identityPem),false);
     const identityPublicKey=createPublicKey({key:Buffer.from(serverProof.publicKey,'base64url'),format:'der',type:'spki'});
     const signatureValid=(claims,signature)=>verify(null,Buffer.from(JSON.stringify(claims)),identityPublicKey,Buffer.from(signature,'base64url'));
     assert.equal(signatureValid([serverProof.kind,serverProof.version,serverProof.serverId,serverProof.origin],serverProof.signature),true);

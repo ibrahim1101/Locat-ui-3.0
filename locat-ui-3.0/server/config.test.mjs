@@ -55,6 +55,10 @@ test('optional authority signing key is a protected absolute Ed25519 file and ne
   assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:'relative.pem'}),/absolute path/);
   const other=join(dir,'wrong.pem'),rsa=generateKeyPairSync('rsa',{modulusLength:2048});writeFileSync(other,rsa.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});chmodSync(other,0o600);
   assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:other}),/Ed25519/);
+  const rotationPath=join(dir,'rotation.json');writeFileSync(rotationPath,JSON.stringify({kind:'locat.rotation.v1'}),{mode:0o600});chmodSync(rotationPath,0o600);
+  assert.deepEqual(serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:path,LOCAT_IDENTITY_ROTATION_FILE:rotationPath}).identityRotation,{kind:'locat.rotation.v1'});
+  assert.throws(()=>serverConfig({LOCAT_IDENTITY_ROTATION_FILE:rotationPath}),/requires LOCAT_IDENTITY_SIGNING_KEY_FILE/);
+  assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:path,LOCAT_IDENTITY_ROTATION_FILE:'relative.json'}),/absolute path/);
   const alias=join(dir,'alias.pem');try{symlinkSync(path,alias);assert.throws(()=>serverConfig({LOCAT_IDENTITY_SIGNING_KEY_FILE:alias}),/regular Ed25519/);}catch(error){if(error.code!=='EPERM'&&error.code!=='EACCES')throw error;}
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

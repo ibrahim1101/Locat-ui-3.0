@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {accountIdentity,localDiscoveryQuery,serverIdentityAttestation} from './globalIdentity.mjs';
+import {accountIdentity,createIdentityRotation,localDiscoveryQuery,serverIdentityAttestation,verifyIdentityRotation} from './globalIdentity.mjs';
 import {createHash,createPublicKey,generateKeyPairSync,verify} from 'node:crypto';
 test('qualified addresses preserve LC/account IDs, avoid server collisions and do no remote discovery',()=>{
  const user={id:'a'.repeat(32),lcCode:'1234'};
@@ -28,4 +28,15 @@ test('signed server and account identity claims bind canonical authority, immuta
  assert.equal(account.accountId,user.id);assert.equal(account.lcCode,user.lcCode);
  const withoutKey=accountIdentity(user,origin,'server-a');assert.equal('attestation' in withoutKey,false);
  assert.equal(serverIdentityAttestation(origin,'server-a'),null);
+});
+
+test('signed key rotation binds an old signing key to the exact current authority key',()=>{
+ const oldPair=generateKeyPairSync('ed25519'),nextPair=generateKeyPairSync('ed25519'),origin='https://locat.example:8443',serverId='server-a';
+ const rotation=createIdentityRotation(origin,serverId,oldPair.privateKey,nextPair.privateKey);
+ assert.equal(verifyIdentityRotation(rotation,{origin,serverId,currentKey:nextPair.privateKey}),true);
+ assert.equal(verifyIdentityRotation(rotation,{origin:'https://attacker.example:8443',serverId,currentKey:nextPair.privateKey}),false);
+ assert.equal(verifyIdentityRotation(rotation,{origin,serverId,currentKey:oldPair.privateKey}),false);
+ assert.equal(verifyIdentityRotation({...rotation,toKeyId:'wrong'},{origin,serverId,currentKey:nextPair.privateKey}),false);
+ assert.deepEqual(serverIdentityAttestation(origin,serverId,nextPair.privateKey,rotation).rotation,rotation);
+ assert.throws(()=>serverIdentityAttestation(origin,serverId,nextPair.privateKey,{...rotation,signature:'AA'}),/rotation/);
 });
