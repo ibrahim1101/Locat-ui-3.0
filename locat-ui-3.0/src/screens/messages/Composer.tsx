@@ -62,7 +62,7 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
         { id: "schedule", label: "Schedule a text message", icon: CalendarClock, onSelect: onSchedule, disabledReason: r(cap.schedule) },
       ]} />
       <ActionMenu open={subMenu === "creative"} onClose={() => setSubMenu(null)} title="Stickers & doodles" actions={[
-        { id: "doodle", label: "Doodle", icon: Brush, onSelect: () => undefined, disabledReason: "Planned (#35)" },
+        { id: "doodle", label: "Draw a doodle · send encrypted", icon: Brush, onSelect: () => onAttach("doodle"), disabledReason: r(cap.file) },
         { id: "sticker", label: "Sticker packs", icon: Sticker, onSelect: () => undefined, disabledReason: "Planned (#28)" },
         { id: "device-media", label: "Search & select from my devices", icon: Paperclip, onSelect: () => undefined, disabledReason: "Planned — cross-device index" },
       ]} />

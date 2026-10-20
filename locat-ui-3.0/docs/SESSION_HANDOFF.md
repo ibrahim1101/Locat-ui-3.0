@@ -1,8 +1,12 @@
+## Follow-on — local doodle attachments
+
+Stickers & doodles now opens a themed drawing sheet nested under the Chat attachment groups. It supports mouse, pen, touch and keyboard drawing, four colors, three brush sizes and clear. A drawing is exported as a PNG locally, capped at the existing 2.9 MB attachment limit, and handed directly to the encrypted attachment pipeline. No standalone media library or cross-device index is used. Focused tests cover drawing, clearing, PNG creation and the send callback. Schedule sending and sticker packs remain planned.
+
 ## Follow-on — one-time encrypted Chat location share
 
 The nested Composer → Location & schedule → Share my location once action now opens a themed, explicit review flow. Location permission is requested only after the user taps Get current location; approximate, rounded coordinates are selected by default, and a precise option is available. The user sees reported device accuracy and confirms Share once. The formatted OpenStreetMap link is passed through the existing encrypted conversation send method. There is no background tracking.
 
-Coverage: five location formatter and sheet tests pass; browser acceptance now includes a real two-account geolocation grant, reviewed one-time share, ciphertext-wire privacy assertions and fixture database scan. Local `npm run check`, `npm run lint`, `npm run test:all` (**255 frontend / 108 server tests**), production build, browser syntax and seven-test discovery pass. The location browser scenario is newly added and hosted acceptance for it is pending. Next continue the retained Chat roadmap with schedule sending and creative attachments in the same nested Obsidian Ember composer. Account/history recovery remains out of active priority per user direction.
+Coverage: five location formatter and sheet tests pass; browser acceptance now includes a real two-account geolocation grant, reviewed one-time share, ciphertext-wire privacy assertions and fixture database scan. The follow-on currently passes `npm run check`, `npm run lint`, `npm run test:all` (**257 frontend / 108 server tests**), and production build; Playwright discovers seven browser scenarios. Hosted acceptance for the new location scenario remains pending. Next continue the retained Chat roadmap with schedule sending in the same nested Obsidian Ember composer. Account/history recovery remains out of active priority per user direction.
 
 ## Current checkpoint — retired media, Remote and SentinelLab removed
 
