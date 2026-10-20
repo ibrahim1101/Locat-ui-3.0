@@ -298,3 +298,8 @@ Source **fb1d7fe049e2159775b7e7ffea4762a6893ef013** passed UI3 workflow **394169
 Malformed records in the versioned local authority-pin namespace now halt trust changes. Users can remove only malformed records through the nested trust details; valid pins are preserved and verification plus clone detection runs again before the UI exposes pin or rotation acceptance. The regression seeds a valid matching server UUID at a second origin and verifies the strict operator confirmation remains required after repair. Focused trust suite: **9 passing**; local full suites: **249 frontend /107 server**, check/lint/build/diff check pass.
 
 Still open: pin persistence is mutable browser localStorage; repair is not trust recovery or global clone detection/single-writer coordination. Full account/history recovery, cross-signing, native stores, independent security review, federation and public/domain ownership proof remain open. All 49 requirements and A–AM scope remain retained; no deployment or main merge.
+
+
+### P2 malformed-pin recovery — cross-browser acceptance
+
+Built-browser test source **76e43da803ab46e67de3fa68ff6311b030f88ba9** passed UI3 workflow **39419456890** (job **118616483037**) and all five core jobs in **39419456980**: macOS **118616482977**, browser **118616483059**, connector **118616483146**, Windows **118616483177**, Ubuntu **118616483286**. Chromium **7 / 8.4m**, Firefox **7 / 8.9m**, private-store repeats **3 / 25.0s**. The test combines a corrupt old-origin entry and valid same-UUID pin, verifies cleanup is explicit, preserves the valid entry and re-applies the clone/owner-confirmation gate. This browser-only follow-up leaves the runtime accepted at `fb1d7fe`; no trust/storage scope was weakened.
