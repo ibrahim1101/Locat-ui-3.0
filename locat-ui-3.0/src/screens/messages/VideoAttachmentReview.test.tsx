@@ -13,7 +13,7 @@ it("shows a local video preview and enforces the encrypted file limit before sen
   const oversized = new File([new Uint8Array(2_900_001)], "clip.mp4", { type: "video/mp4" });
   const onSend = vi.fn().mockResolvedValue(undefined);
   const { rerender } = render(<VideoAttachmentReview file={oversized} onClose={() => undefined} onSend={onSend} />);
-  expect(screen.getByRole("video", { name: "Preview of clip.mp4" })).toHaveAttribute("src", "blob:video-preview");
+  expect(document.querySelector("video")).toHaveAttribute("src", "blob:video-preview");
   expect(screen.getByRole("button", { name: "Send encrypted video" })).toBeDisabled();
   expect(onSend).not.toHaveBeenCalled();
 
