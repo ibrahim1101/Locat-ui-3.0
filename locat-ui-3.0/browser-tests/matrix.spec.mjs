@@ -130,15 +130,17 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     expect(eventId).toMatch(/^\$/);await fixture.assertNoMessagePlaintext([replyText]);
   });
   await test.step('Edit an owned text message using encrypted in-room metadata',async()=>{
-    const replacement='LOCAT_BROWSER_EDIT_'+randomBytes(24).toString('hex'),target=alice.page.getByRole('article',{name:'You: '+markers[0]}),wireBefore=wire.length,sendsBefore=roomSends.length;
+    const original='LOCAT_BROWSER_EDIT_SOURCE_'+randomBytes(24).toString('hex'),replacement='LOCAT_BROWSER_EDIT_'+randomBytes(24).toString('hex'),sourceSends=roomSends.length;
+    const sourceSend=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/send/m.room.encrypted/'),{timeout:30000});await alice.page.getByLabel('Message',{exact:true}).fill(original);await alice.page.getByRole('button',{name:'Send',exact:true}).click();await sourceSend;await expect(alice.page.getByRole('article',{name:'You: '+original})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('article',{name:'Contact: '+original})).toBeVisible({timeout:30000});await expect.poll(()=>roomSends.length).toBe(sourceSends+1);
+    const target=alice.page.getByRole('article',{name:'You: '+original}),wireBefore=wire.length,sendsBefore=roomSends.length;
     await target.press('Shift+F10');await alice.page.getByRole('menuitem',{name:'Edit message',exact:true}).click();
-    await expect(alice.page.getByText('Editing message',{exact:true})).toBeVisible();await expect(alice.page.getByLabel('Message',{exact:true})).toHaveValue(markers[0]);
+    await expect(alice.page.getByText('Editing message',{exact:true})).toBeVisible();await expect(alice.page.getByLabel('Message',{exact:true})).toHaveValue(original);
     const encrypted=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/send/m.room.encrypted/'),{timeout:30000});
     await alice.page.getByLabel('Message',{exact:true}).fill(replacement);await alice.page.getByRole('button',{name:'Save edit',exact:true}).click();
     const request=await encrypted;expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
-    await expect(alice.page.getByRole('article',{name:'You: '+replacement})).toBeVisible({timeout:30000});await expect(alice.page.getByRole('article',{name:'You: '+markers[0]})).toHaveCount(0);
-    await expect(bob.page.getByRole('article',{name:'Contact: '+replacement})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('article',{name:'Contact: '+markers[0]})).toHaveCount(0);
-    expect(wire.slice(wireBefore).join('')).not.toContain(replacement);expect(wire.slice(wireBefore).join('')).not.toContain(markers[0]);await fixture.assertNoMessagePlaintext([replacement]);
+    await expect(alice.page.getByRole('article',{name:'You: '+replacement})).toBeVisible({timeout:30000});await expect(alice.page.getByRole('article',{name:'You: '+original})).toHaveCount(0);
+    await expect(bob.page.getByRole('article',{name:'Contact: '+replacement})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('article',{name:'Contact: '+original})).toHaveCount(0);
+    expect(wire.slice(wireBefore).join('')).not.toContain(replacement);expect(wire.slice(wireBefore).join('')).not.toContain(original);await fixture.assertNoMessagePlaintext([original,replacement]);
   });
   await test.step('Upload an encrypted attachment and verify recipient download integrity',async()=>{
    const name='private-note-'+randomBytes(6).toString('hex')+'.txt',secret='LOCAT_ATTACHMENT_PLAINTEXT_'+randomBytes(24).toString('hex'),plain=Buffer.from(secret,'utf8');
