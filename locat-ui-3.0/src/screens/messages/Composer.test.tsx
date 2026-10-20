@@ -24,5 +24,5 @@ it("keeps share choices nested by intent", () => {
   fireEvent.click(screen.getByRole("menuitem", { name: "Photo, file or video" }));
   expect(screen.getByRole("menuitem", { name: /Photo · original or resized copy/ })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: /Document or file/ })).toBeInTheDocument();
-  expect(screen.getByRole("menuitem", { name: "Video" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: /Video · up to 2.9 MB/ })).toBeInTheDocument();
 });
