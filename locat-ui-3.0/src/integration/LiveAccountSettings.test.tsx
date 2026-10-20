@@ -24,6 +24,9 @@ describe("live account settings", () => {
     await screen.findByText("Not authenticated");
     expect(screen.queryByText(/Display name saved/)).toBeNull();
   });
+  it("saves read receipt consent as an account preference and keeps typing disabled", async () => {
+    const fetch=vi.fn().mockResolvedValueOnce({ok:true,json:async()=>({sessions:[]})}).mockResolvedValueOnce({ok:true,json:async()=>({preferences:{sendReadReceipts:true}})});vi.stubGlobal('fetch',fetch);render(<LiveAccountSettings/>);fireEvent.click(screen.getByRole('button',{name:/Messaging privacy/}));const receipt=screen.getByRole('switch',{name:'Send read receipts'});expect(receipt).not.toBeChecked();fireEvent.click(receipt);await screen.findByText('Read receipt preference saved.');expect(fetch.mock.calls[1][0]).toBe('/api/preferences');expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({sendReadReceipts:true});expect(session.setPrefs).toHaveBeenCalledWith({sendReadReceipts:true});expect(screen.getByRole('switch',{name:'Typing indicators'})).toBeDisabled();
+  });
   it("clears password fields and signs out after a successful change", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ sessions: [] }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) }));
     render(<LiveAccountSettings />);

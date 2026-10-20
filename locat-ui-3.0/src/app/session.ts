@@ -8,6 +8,7 @@ export type EntryStage = "welcome" | "login" | "register" | "server" | "local-in
 export type Preferences = {
   theme: ThemeId; textScale: "default" | "large" | "xl"; motion: "system" | "reduced";
   startup: "messages" | "home"; density: "comfortable" | "compact";
+  sendReadReceipts: boolean;
   /** Preview only: swap in generated stress fixtures (5k messages, 10k songs, 20k photos, 2k videos). */
   largeLibraries: boolean;
 };

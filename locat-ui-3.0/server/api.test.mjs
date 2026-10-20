@@ -222,8 +222,9 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(updatedLogin.status, 200);
     const updatedCookie = updatedLogin.headers.get("set-cookie").split(";")[0];
     assert.equal((await request("/api/preferences", "POST", { theme: "graphite", startup: "home" }, updatedCookie)).status, 200);
+    assert.equal((await request("/api/preferences", "POST", { sendReadReceipts: true }, updatedCookie)).status, 200);
     assert.equal((await request("/api/preferences", "POST", { largeLibraries: true }, updatedCookie)).status, 400);
-    assert.equal((await (await request("/api/preferences", "GET", undefined, updatedCookie)).json()).preferences.theme, "graphite");
+    assert.deepEqual(await (await request("/api/preferences", "GET", undefined, updatedCookie)).json(), {preferences:{theme:"graphite",startup:"home",sendReadReceipts:true}});
     assert.deepEqual((await (await request("/api/preferences", "GET", undefined, bobCookie)).json()).preferences, {});
     const events = (await (await request("/api/security/events", "GET", undefined, updatedCookie)).json()).events;
     assert.ok(events.some(event => event.event === "password.changed"));

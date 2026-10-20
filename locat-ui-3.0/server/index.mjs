@@ -83,7 +83,7 @@ function setCookie(token, maxAge) {
   return "locat_session=" + token + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" + maxAge + (config.secure ? "; Secure" : "");
 }
 const sessionSecurity=createSessionSecurityHandler({db,sessionUser,sessionToken:cookie,body,json,scrypt,serialized});
-const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,conversations:db.matrixConversations,sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=db.link.proofs.verify(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
+const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindings,conversations:db.matrixConversations,preferences:userId=>db.preferences(userId),sessionUser,sessionToken:cookie,deviceActor:(req,userId,session)=>{const actor=db.link.proofs.verify(userId,session,req.headers['x-locat-device-proof']);db.link.owned(userId,actor);return actor;},body,json});
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,conversations:db.matrixConversations,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
@@ -169,7 +169,7 @@ async function handle(req, res) {
     if (!user) return json(res, 401, { error: "Not authenticated" });
     if (req.method === "GET") return json(res, 200, { preferences: db.preferences(user.id) });
     const input = await authenticatedBody(req,user);
-    const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"] };
+    const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"], sendReadReceipts: [true, false] };
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.entries(input).some(([key, value]) => !allowed[key]?.includes(value))) return json(res, 400, { error: "Invalid preferences" });
     const preferences = { ...db.preferences(user.id), ...input };
     db.savePreferences(user.id, preferences);

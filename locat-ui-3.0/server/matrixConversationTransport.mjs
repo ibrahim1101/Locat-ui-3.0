@@ -2,6 +2,12 @@ const fail=(status,message)=>{throw Object.assign(new Error(message),{status});}
 export const validConversationRoomId=value=>typeof value==='string'&&(/^![A-Za-z0-9_-]{43}$/.test(value)||/^![^\s/:]{1,254}:[^\s/]{1,255}$/.test(value));
 /** Canonical room paths only; aliases, state writes, invites and plaintext sends are excluded. */
 export function conversationRoute(path,method){
+ const receipt=/^\/_matrix\/client\/v3\/rooms\/([^/]+)\/receipt\/m\.read\/([^/]+)$/.exec(path);
+ if(receipt&&method==='POST'){
+  let roomId,eventId;try{roomId=decodeURIComponent(receipt[1]);eventId=decodeURIComponent(receipt[2]);}catch{return null;}
+  if(encodeURIComponent(roomId)!==receipt[1]||!validConversationRoomId(roomId)||encodeURIComponent(eventId)!==receipt[2]||!/^\$[A-Za-z0-9._~+=/-]{1,255}$/.test(eventId))return null;
+  return {roomId,action:'receipt',eventId};
+ }
  const match=/^\/_matrix\/client\/v3\/(?:rooms\/([^/]+)\/(join|state|members|joined_members|messages|send\/m\.room\.encrypted\/([A-Za-z0-9_][A-Za-z0-9_.-]{0,127}))|join\/([^/]+))$/.exec(path);if(!match)return null;
  let roomId;const encoded=match[1]??match[4];try{roomId=decodeURIComponent(encoded);}catch{return null;}
  if(encodeURIComponent(roomId)!==encoded||!validConversationRoomId(roomId))return null;
@@ -10,6 +16,7 @@ export function conversationRoute(path,method){
  return null;
 }
 export function validateConversationRequest(route,input,query){
+ if(route.action==='receipt'){if(query.size||Object.keys(input).some(key=>key!=='thread_id')||input.thread_id!==undefined&&(typeof input.thread_id!=='string'||input.thread_id!=='main'&&!/^\$[A-Za-z0-9._~+=/:!-]{1,255}$/.test(input.thread_id)))fail(400,'Invalid read receipt metadata');return;}
  if(route.action==='members'){
   for(const key of query.keys())if(!['at','membership','not_membership'].includes(key)||query.getAll(key).length!==1)fail(400,'Invalid room membership query');
   if(query.has('at')&&(query.get('at').length>2048||/[\x00-\x1f\x7f]/.test(query.get('at'))))fail(400,'Invalid membership cursor');
