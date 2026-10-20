@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 63629)
-Total output lines: 1134
+Warning: truncated output (original token count: 63867)
+Total output lines: 1139
 
 ## 2026-10-19 — Product scope and navigation rework
 
@@ -169,9 +169,7 @@ Commands: npm run check; npm run lint; npm run test:all; npm run build; node --t
 
 Observed failures: first targeted backup tests rejected the schema change because the verifier manifest was not yet extended; added schema-15 table/columns and reran all 19 focused migration/backup tests successfully. Real Synapse room creation failed HTTP 400 M_UNKNOWN because v12 prohibits putting its creator in the power-level users map; selected v12 explicitly, removed that entry and accepted hash-style room IDs. The corrected real run passed. Expanded gateway history initially returned 403 because the fixture used Bob's old token after reopening/rebinding to a renewed one; preserved the production exact-token rule and corrected the fixture to use the current binding. Subsequent expanded acceptance passed. The final added post-gateway database/WAL scan for both homeserver and Locat passed.
 
-Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…43629 tokens truncated…jobs completed/success: connector 117690275584,Ubuntu 117690275745,Windows 117690275769,macOS 117690275776,browser 117690275713. This entry only changes documentation; runtime above is the verified checkpoint.
-
-Observed browser logs: standard-sandbox real Vite/jsxDEV/StrictMode acceptance passed, **11 Chromium 8.3m**, **7 Firefox 39.9s**, **3 storage 12.4s**. Decoded scenes/paused seeking/actual Play progression, conversion errors/retry, quota guard, metadata, two-origin CSP server selection and existing storage/Link/Photos/Sentinel/55-message encrypted UI history passed. Ubuntu logs: **297 frontend/131 backend,0 failures,0 skipped**, plus real pinned SDK44/Synapse1.163 productionHTTPS/crypto/offline/history/revocation/plaintext-scan acceptance passed. Windows:297 frontend,130 backend passed/1 explicitUnix-shell stalled-worker fixture skipped,0 failures. Do not conflate Node cross-OS checks with physical Firefox/native installer acceptance.
+Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…43867 tokens truncated….
 
 Commands/evidence this batch: npm run check; npm run lint; npm run test:all; npm run build; focused player/media/API/Remote suites; actual scoped local Firefox built and Vite browser commands recorded above; PyYAML workflow validation; git diff --check; GitHub run/jobs and completed logs read. No assertion suppression, sandbox flags in CI, plaintext fallback or hidden test failure. Earlier failed browser runs and root causes remain recorded. Server-selection stash fully reconciled and retained only as backup.
 
@@ -345,3 +343,8 @@ Added unit cases for payload, foreign-target rejection, relation-aware retry ide
 ### Reply candidate hosted acceptance follow-up — 2026-10-20
 
 Source `ada51b61598c18b717553a3bcae0acea4d705cf3` passed the UI workflow (`39391724178`) and core typecheck/lint/test/build/real-Synapse checks on Ubuntu, macOS and Windows plus connector preparation. Hosted browser job `118524603211` reproduced a failure already present in the preceding reaction acceptance: Chromium and Firefox both reached the reaction picker, but no encrypted reaction request was observed within 30 seconds. The reply browser scenario was consequently not reached. The acceptance now reports any visible conversation error when the encrypted send is missing, so the next hosted run can identify the actual guarded runtime failure. Do not mark reactions or replies browser-accepted until the two-account scenario passes.
+
+
+### Reaction overlap fix — 2026-10-20
+
+Hosted browser diagnostics on `95af653b9a29eed9e75d5f3d9755c89d3b774813` showed the reaction callback racing an already-running conversation operation. Firefox surfaced the session's `Wait for the current messaging operation` guard; Chromium produced no visible alert. The reaction controller now waits at most 15 seconds for the in-flight operation to settle, exits if the conversation changes/closes, and then applies the normal sync/private-room/device verification checks before sending. A regression keeps an encrypted send unresolved, starts a reaction, confirms it does not overlap, then releases the send and verifies the encrypted reaction completes. No outbound guard was removed. Full local validation passed: typecheck, lint, 239 frontend /104 backend tests, production build and diff check; existing large Matrix crypto chunk warning remains. New hosted browser acceptance is pending publication.
