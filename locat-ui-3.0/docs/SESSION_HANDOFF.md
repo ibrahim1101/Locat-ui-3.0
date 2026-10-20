@@ -17,6 +17,6 @@ Keep the Obsidian Ember theme and nested navigation/disclosures. Continue retain
 
 Latest local source passed TypeScript, ESLint, all 267 frontend and 108 server tests, production build, browser-spec syntax and test discovery. The real two-account Matrix Playwright scenario was skipped locally because the pinned Synapse environment is unavailable; hosted Matrix acceptance is still required. The build reports the existing large Matrix crypto chunk advisory.
 
-The previous GitHub publication used empty blobs for some app files. This update restores those files from the last verified source snapshot and republishes them as base64 blobs. Verify non-zero fetched file sizes and hosted UI/core workflows before treating the branch as accepted.
+The previous GitHub publication used empty blobs for some app files. Those files were restored from the last verified source snapshot and republished as base64 blobs; fetched GitHub sizes and blob hashes match local files. Avoid UTF-8 connector uploads for large app source files.
 
 Historical handoff: `docs/archive/SESSION_HANDOFF_2026-10-20_pre-search.md`.
