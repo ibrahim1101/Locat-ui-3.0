@@ -31,7 +31,7 @@ it('sends only acknowledged encrypted reactions for an authorized private messag
  expect(discard).toHaveBeenCalledOnce();expect(sendEvent).toHaveBeenCalledOnce();expect(sendEvent.mock.calls[0]).toEqual(['!room:test','m.reaction',{'m.relates_to':{rel_type:'m.annotation',event_id:'$read',key:'❤️'}},expect.stringMatching(/^locat_[a-f0-9-]+$/)]);
 });
 it('blocks unsafe or duplicate reactions before outbound encryption',async()=>{
- events=[readEvent];await session.open(peer.accountId);await expect(session.react('$read','not-an-emoji')).rejects.toThrow('supported reactions');expect(sendEvent).not.toHaveBeenCalled();
+ events=[targetEvent];await session.open(peer.accountId);await expect(session.react('$read','not-an-emoji')).rejects.toThrow('supported reactions');expect(sendEvent).not.toHaveBeenCalled();
  verified=false;await expect(session.react('$read','👍')).rejects.toThrow('Verify every');expect(sendEvent).not.toHaveBeenCalled();verified=true;
  events.push({getId:()=>'$existing',getRoomId:()=> '!room:test',getSender:()=> '@alice:test',getWireType:()=> 'm.room.encrypted',getType:()=> 'm.reaction',isBeingDecrypted:()=>false,shouldAttemptDecryption:()=>false,isDecryptionFailure:()=>false,getContent:()=>({'m.relates_to':{rel_type:'m.annotation',event_id:'$read',key:'👍'}}),getTs:()=>125});
  await expect(session.react('$read','👍')).resolves.toEqual({eventId:'$existing',alreadyReacted:true});expect(sendEvent).not.toHaveBeenCalled();
