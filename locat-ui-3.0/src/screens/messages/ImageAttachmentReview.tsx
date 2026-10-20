@@ -42,8 +42,10 @@ export function ImageAttachmentReview({ file, onClose, onSend }: { file: File; o
   const isGif = file.type === "image/gif";
   const transformable = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
 
+  const close = () => { if (!sending && !busyPreset) onClose(); };
+
   return (
-    <Sheet open onClose={onClose} title="Review photo" description="Choose the original or prepare a smaller copy before encryption." size="sm" testId="image-attachment-review">
+    <Sheet open onClose={close} title="Review photo" description="Choose the original or prepare a smaller copy before encryption." size="sm" testId="image-attachment-review">
       <div className="overflow-hidden rounded-2xl bg-black/20 hairline">
         <img src={previewUrl} alt={"Preview of " + file.name} className="max-h-[42dvh] w-full object-contain" />
       </div>
