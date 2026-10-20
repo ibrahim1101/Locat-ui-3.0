@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {randomBytes} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {startBrowserFixture} from '../tools/browser-fixture.mjs';
 let fixture;
 test.beforeAll(async()=>{fixture=await startBrowserFixture({identitySigning:true});});
@@ -37,6 +37,14 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   await page.getByLabel(/confirmed this origin and fingerprint with the operator/).check();await page.getByRole('button',{name:'Pin after comparison'}).click();
   await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();
   await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Possible cloned server identity · review/)).toBeVisible();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
+  const oldAuthorityKeyId=registered.user.globalIdentity.attestation.keyId,newAuthorityKeyId=await fixture.replaceIdentityKey();expect(newAuthorityKeyId).not.toBe(oldAuthorityKeyId);
+  await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Both signatures are valid, but they use a different key/)).toBeVisible();
+  const replaceAuthorityPin=page.getByRole('button',{name:'Replace pin after comparison'});await expect(replaceAuthorityPin).toBeDisabled();
+  const storedAuthorityKeyId=()=>page.evaluate(accountId=>JSON.parse(localStorage.getItem('locat-ui3:authority-pin:v1:'+encodeURIComponent(accountId)+':'+encodeURIComponent(location.origin))).keyId,registered.user.id);
+  expect(await storedAuthorityKeyId()).toBe(oldAuthorityKeyId);
+  await page.getByLabel(/I independently compared the new fingerprint with the authority operator/).check();await replaceAuthorityPin.click();
+  await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();expect(await storedAuthorityKeyId()).toBe(newAuthorityKeyId);
+  await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Possible cloned server identity · review/)).toBeVisible();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();
   await page.goto(fixture.origin+'/devices');await expect(page.getByLabel("This browser's device name")).toBeVisible();
   const identity=await page.evaluate(async accountId=>{
    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-link:'+accountId,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
