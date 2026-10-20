@@ -52,3 +52,11 @@ it("opens the detailed editor only from its nested photo option", () => {
   expect(onEdit).toHaveBeenCalledOnce();
   expect(onSend).not.toHaveBeenCalled();
 });
+
+it("keeps animated GIFs original-only instead of converting a frame", () => {
+  vi.stubGlobal("URL", { createObjectURL: vi.fn().mockReturnValue("blob:animated-photo"), revokeObjectURL: vi.fn() });
+  const file = new File(["gif"], "animated.gif", { type: "image/gif" });
+  render(<ImageAttachmentReview file={file} onClose={() => undefined} onSend={vi.fn().mockResolvedValue(undefined)} onEdit={() => undefined} />);
+  expect(screen.getByText(/Animated GIFs stay in their original format/)).toBeInTheDocument();
+  expect(screen.queryByTestId("image-framing-options")).not.toBeInTheDocument();
+});

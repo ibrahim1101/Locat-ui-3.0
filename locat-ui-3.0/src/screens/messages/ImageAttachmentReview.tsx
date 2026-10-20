@@ -80,7 +80,7 @@ export function ImageAttachmentReview({ file, onClose, onSend, onEdit }: { file:
           </div>
         ) : <p className="mt-3 text-sm text-ink-3">This format cannot be resized here. The original remains available.</p>}
       </details>
-      {onEdit && <details className="group mt-3 rounded-xl bg-s2 p-3 hairline" data-testid="image-framing-options">
+      {onEdit && transformable && <details className="group mt-3 rounded-xl bg-s2 p-3 hairline" data-testid="image-framing-options">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold marker:hidden">
           <Pencil className="size-4 text-ember" />
           <span className="flex-1">Crop or rotate</span>
