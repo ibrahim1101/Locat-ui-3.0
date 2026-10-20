@@ -47,3 +47,7 @@ Unlocked Vault and Secrets now separate Entries, Backups and Security into count
 ## Live Home data boundary
 
 The Home dashboard previously rendered preview conversation and device fixtures regardless of adapter mode, which could make sample activity look like a signed-in user's real account data. Fixture rows now render only in preview mode and carry a visible “Preview sample data” label. Live mode shows a clear message that conversation summaries are not connected yet and directs users to the actual Chats and Link screens. Focused tests cover both modes. Live Home summaries remain open work.
+
+The live dashboard now also loads account-owned accepted-contact and incoming-request counts through the same expected-account guard used elsewhere in live settings. It has loading, retry and cancellation states, and routes into Messages for the detailed Contacts, Requests and Find people sections. No conversation previews are inferred from contact membership.
+
+This dashboard batch passes TypeScript, ESLint, 281 frontend tests, 108 server tests and the production build. The existing Matrix crypto chunk-size advisory remains.

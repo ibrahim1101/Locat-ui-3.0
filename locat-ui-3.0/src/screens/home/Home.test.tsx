@@ -14,6 +14,7 @@ const { state, navigate } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/app/session", () => ({ useSession: () => state }));
+vi.mock("@/integration/LiveHomeContactSummary", () => ({ LiveHomeContactSummary: () => <div>Live contact summary</div> }));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router")>()),
   useNavigate: () => navigate,

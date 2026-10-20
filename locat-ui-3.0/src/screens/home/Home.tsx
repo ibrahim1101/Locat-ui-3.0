@@ -5,6 +5,7 @@ import { useSession } from "@/app/session";
 import { FIXTURE_CONVERSATIONS, FIXTURE_DEVICES } from "@/fixtures/data";
 import { Screen } from "@/layouts/Screen";
 import { Avatar, Badge, Button, SectionTitle, cn } from "@/ui";
+import { LiveHomeContactSummary } from "@/integration/LiveHomeContactSummary";
 
 function greeting() { const h = new Date().getHours(); return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; }
 
@@ -60,9 +61,9 @@ export default function Home() {
               </button>;
             })}</div>
           </section>
-          <section className="rounded-3xl border border-line bg-s1/60 p-4 hairline">
-            <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-ember/10 text-ember"><MessageCircle className="size-4" /></span><div><p className="text-sm font-bold">A private place to connect</p><p className="mt-1 text-xs leading-relaxed text-ink-3">{adapter.mode === "preview" ? "This preview uses sample conversations. Connect a Locat server to work with your account." : "Your chats, trusted devices and private files are grouped here."}</p></div></div>
-          </section>
+          {user && !preview ? <LiveHomeContactSummary accountId={user.id} onOpenMessages={() => nav("/messages")} /> : <section className="rounded-3xl border border-line bg-s1/60 p-4 hairline">
+            <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-ember/10 text-ember"><MessageCircle className="size-4" /></span><div><p className="text-sm font-bold">A private place to connect</p><p className="mt-1 text-xs leading-relaxed text-ink-3">{preview ? "This preview uses sample conversations. Connect a Locat server to work with your account." : "Sign in to see your contacts and manage private conversations."}</p></div></div>
+          </section>}
         </aside>
       </div>
     </Screen>
