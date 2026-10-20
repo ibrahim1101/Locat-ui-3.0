@@ -63,7 +63,7 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
       ]} />
       <ActionMenu open={subMenu === "creative"} onClose={() => setSubMenu(null)} title="Stickers & doodles" actions={[
         { id: "doodle", label: "Draw a doodle · send encrypted", icon: Brush, onSelect: () => onAttach("doodle"), disabledReason: r(cap.file) },
-        { id: "sticker", label: "Sticker packs", icon: Sticker, onSelect: () => undefined, disabledReason: "Planned (#28)" },
+        { id: "sticker", label: "Locat sticker packs", icon: Sticker, onSelect: () => onAttach("sticker"), disabledReason: r(cap.file) },
         { id: "device-media", label: "Search & select from my devices", icon: Paperclip, onSelect: () => undefined, disabledReason: "Planned — cross-device index" },
       ]} />
     </div>
