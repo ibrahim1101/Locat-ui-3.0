@@ -112,7 +112,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     await expect(bobReaction).toHaveAttribute('aria-label','❤️ reaction, 1, yours',{timeout:30000});
     await expect(aliceReaction).toHaveAttribute('aria-label','❤️ reaction, 1',{timeout:30000});
    });
-  await test.step('Reply to a verified private message with an encrypted Matrix relation',async()=>{
+  await test.step('Reply to a verified private message with a private Megolm reply target',async()=>{
     const replyText='LOCAT_BROWSER_REPLY_'+randomBytes(24).toString('hex'),eventId=sendIds[0],target=bob.page.getByRole('article',{name:'Contact: '+markers[0]}),wireBefore=wire.length,sendsBefore=roomSends.length;
     await target.press('Shift+F10');await bob.page.getByRole('menuitem',{name:'Reply',exact:true}).click();
     await expect(bob.page.getByText('Replying to Contact',{exact:true})).toBeVisible();
@@ -120,7 +120,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     await bob.page.getByLabel('Message',{exact:true}).fill(replyText);await bob.page.getByRole('button',{name:'Send',exact:true}).click();
     const request=await encrypted;expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
     expect(wire.slice(wireBefore).join('')).not.toContain(replyText);expect(wire.slice(wireBefore).join('')).not.toContain(eventId);
-    const replyId=await bob.page.getByRole('article',{name:'You: '+replyText}).locator('..').getAttribute('id');expect(replyId).toMatch(/^msg-\$/);
+    const replyWrapper=bob.page.getByRole('article',{name:'You: '+replyText}).locator('xpath=../..');await expect(replyWrapper).toHaveAttribute('id',/^msg-\$/);const replyId=await replyWrapper.getAttribute('id');
     await expect(alice.page.getByRole('article',{name:'Contact: '+replyText})).toBeVisible({timeout:30000});
     await expect(alice.page.getByTestId('reply-ref-'+replyId.slice(4))).toContainText(markers[0],{timeout:30000});
     expect(eventId).toMatch(/^\$/);await fixture.assertNoMessagePlaintext([replyText]);
