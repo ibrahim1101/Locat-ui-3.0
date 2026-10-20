@@ -31,12 +31,12 @@ export function createMatrixGateway({provider,store,conversations,sessionUser,se
   const syncRooms=conversationSync?conversations?.rooms(user.id):[];if(conversationSync&&!syncRooms)fail(503,'Conversation sync is unavailable');
   const encryptedDelivery=encryptedToDeviceRoute(path,req.method),withheldDelivery=withheldToDeviceRoute(path,req.method);
   const mediaUpload=req.method==='POST'&&path==='/_matrix/media/v3/upload';
-  const mediaMatch=req.method==='GET'?/^\/_matrix\/media\/v3\/download\/([^/]+)\/([A-Za-z0-9_-]{1,255})$/.exec(path):null;
+  const mediaMatch=req.method==='GET'?/^\/_matrix\/client\/v1\/media\/download\/([^/]+)\/([A-Za-z0-9_-]{1,255})$/.exec(path):null;
   const mediaDownload=!!mediaMatch;
   if(mediaDownload){
    if(mediaMatch[1]!==provider.serverName)fail(403,'Remote Matrix media is disabled');
    const allowRedirect=url.searchParams.getAll('allow_redirect');
-   if([...url.searchParams.keys()].some(key=>key!=='allow_redirect')||allowRedirect.length>1||allowRedirect[0]==='true')fail(400,'Matrix media redirects are disabled');
+   if([...url.searchParams.keys()].some(key=>key!=='allow_redirect')||allowRedirect.length!==1||allowRedirect[0]!=='false')fail(400,'Matrix media redirects are disabled');
   }
   if(mediaUpload){
    if([...url.searchParams.keys()].some(key=>key!=='filename')||url.searchParams.getAll('filename').length>1||(url.searchParams.has('filename')&&(url.searchParams.get('filename')??'').length>255))fail(400,'Invalid Matrix media upload query');
@@ -64,7 +64,7 @@ export function createMatrixGateway({provider,store,conversations,sessionUser,se
    }
    if(path.endsWith('/keys/upload')&&input.device_keys){const device=input.device_keys,keys=JSON.parse(binding.publicKeys);if(device.user_id!==binding.matrixUserId||device.device_id!==binding.matrixDeviceId||(typeof device.keys?.['ed25519:'+binding.matrixDeviceId]==='string'?device.keys['ed25519:'+binding.matrixDeviceId].replace(/=+$/,''):null)!==keys.ed25519||(typeof device.keys?.['curve25519:'+binding.matrixDeviceId]==='string'?device.keys['curve25519:'+binding.matrixDeviceId].replace(/=+$/,''):null)!==keys.curve25519)fail(409,'Matrix device upload differs from the bound public keys');}
   }
-  const upstreamQuery=new URLSearchParams(url.search);if(mediaDownload)upstreamQuery.set('allow_remote','false');if(conversation)validateConversationRequest(conversation,input,upstreamQuery);
+  const upstreamQuery=new URLSearchParams(url.search);if(conversation)validateConversationRequest(conversation,input,upstreamQuery);
   // Body reads and upstream calls can overlap logout/revocation. Recheck before forwarding and returning.
   const check=()=>{if(conversationSync&&syncRooms.some(room=>!conversations.permits(user.id,room)))fail(403,'Conversation sync authorization changed');for(const target of encryptedTargets)if(store.matrixDeviceKeys?.(user.id,target.userId,target.deviceId)?.curve25519!==target.curve25519)fail(403,'Encrypted recipient authorization changed');if(conversation&&!conversations?.permits(user.id,conversation.roomId))fail(403,'Conversation authorization changed');if(verificationTarget&&!store.permitsMatrixDevice?.(user.id,verificationTarget.userId,verificationTarget.deviceId))fail(403,'Verification recipient authorization changed');for(const peer of queriedPeers)if(!store.permitsMatrixPeer?.(user.id,peer))fail(403,'Messaging contact authorization changed');if(sessionUser(req)?.id!==user.id||deviceActor(req,user.id,session)!==actor)fail(401,'Locat authorization changed');store.authorize(user.id,actor,matrixTokenHash(session),token);};check();
   const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),verification||conversation||encryptedDelivery||withheldDelivery?15000:65000);const closed=()=>controller.abort();res.once('close',closed);active.set(user.id,(active.get(user.id)??0)+1);

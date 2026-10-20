@@ -48,8 +48,8 @@ it('projects encrypted file events and verifies downloaded ciphertext before ret
  vi.stubGlobal('crypto',webcrypto);await session.open(peer.accountId);const plain=new TextEncoder().encode('original attachment'),encrypted=await encryptMatrixAttachment(plain),file={...encrypted.file,url:'mxc://media.test/opaque'};
  events=[{getWireType:()=> 'm.room.encrypted',getId:()=> '$encrypted-file',getSender:()=>peer.matrixUserId,isBeingDecrypted:()=>false,shouldAttemptDecryption:()=>false,isDecryptionFailure:()=>false,getContent:()=>({msgtype:'m.file',body:'image.png',info:{size:plain.length,mimetype:'image/png'},file}),getType:()=> 'm.room.message',getTs:()=>123}];let snapshot:ConversationSnapshot|undefined;session.subscribe(value=>{snapshot=value;});
  await vi.waitFor(()=>expect(snapshot?.messages).toMatchObject([{id:'$encrypted-file',attachment:{name:'image.png',size:plain.length,mime:'image/png'}}]));
- mediaUrl.mockReturnValue('https://matrix.test/_matrix/media/v3/download/media.test/opaque');mediaFetch.mockResolvedValueOnce(new Response(encrypted.ciphertext));
- const downloaded=await session.downloadAttachment(file);expect(new TextDecoder().decode(await downloaded.arrayBuffer())).toBe('original attachment');expect(mediaFetch).toHaveBeenCalledWith(expect.stringContaining('https://matrix.test/'),{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
+ mediaUrl.mockReturnValue('https://matrix.test/_matrix/client/v1/media/download/media.test/opaque?allow_redirect=true');mediaFetch.mockResolvedValueOnce(new Response(encrypted.ciphertext));
+ const downloaded=await session.downloadAttachment(file);expect(new TextDecoder().decode(await downloaded.arrayBuffer())).toBe('original attachment');expect(mediaUrl).toHaveBeenCalledWith(file.url,undefined,undefined,undefined,false,false,true);expect(mediaFetch).toHaveBeenCalledWith(expect.stringContaining('/_matrix/client/v1/media/download/media.test/opaque?allow_redirect=false'),{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
 });
 
 it('refuses encrypted media URLs that resolve outside the configured homeserver',async()=>{
