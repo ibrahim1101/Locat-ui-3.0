@@ -1,24 +1,22 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on branch rework/locat-core-scope in repository ibrahim1101/Locat-ui-3.0. Current source checkpoint: 27885182f2e05e6f569f5aa3a66bfa55c4480b4d.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`.
 
 ## Active direction
 
-Keep the Obsidian Ember theme and nested navigation/disclosures. Work on retained Locat core: Chat, Link, Files & Vault, account/security and workspace foundations. Cinema/media libraries, Locat Remote, and SentinelLab/vendor alert integration are retired. Do not restore them. No data recovery is requested; no service or live database has been changed by these code changes.
+Keep the Obsidian Ember theme and nested navigation/disclosures. Continue retained Locat core: Chat, Link, Files & Vault, account/security and workspace foundations. Cinema and standalone media libraries, Locat Remote and SentinelLab are retired. No data recovery is requested. No service or live database has been changed by this code work.
 
-## Current live Chat work
+## Current Chat work
 
-- Verified one-to-one Matrix conversations with encrypted text, replies/reactions, attachments, voice review, one-time location, stickers/doodles and local image crop/rotate.
-- Conversation search is a collapsed header section. It searches text and attachment names in the up-to-200 decrypted messages already loaded on this device.
-- Own-text editing uses an encrypted event. The original target ID and replacement text are inside the ciphertext; projection requires the same sender on original and edit.
-- Search is local-only; edits are append-only encrypted events. Scheduled send is still unavailable because the current server cannot reliably send as a device-held Matrix user when the app is closed.
+- Verified one-to-one Matrix conversations support encrypted text, replies, reactions and attachments, plus reviewed voice, one-time location, stickers/doodles and local image edits.
+- Conversation search is nested in the header and searches up to 200 decrypted messages already loaded on this device. Search terms are not sent or persisted.
+- Own-text editing uses a new encrypted event. Target ID and replacement text stay in ciphertext; projection accepts an edit only from the original author. Attachments and peer messages cannot be edited.
+- Scheduled sending remains unavailable until a durable sender can operate with device-held Matrix credentials while the app is closed.
 
-## Validation and current worktree
+## Validation
 
-Local check/lint, all tests (267 frontend / 108 server), build, browser-spec syntax/discovery and git diff --check passed at source commit 2788518. Exact-source hosted workflows for the new edit browser scenario are pending. The existing Matrix crypto bundle size warning remains.
+Latest local source passed TypeScript, ESLint, all 267 frontend and 108 server tests, production build, browser-spec syntax and test discovery. The real two-account Matrix Playwright scenario was skipped locally because the pinned Synapse environment is unavailable; hosted Matrix acceptance is still required. The build reports the existing large Matrix crypto chunk advisory.
 
-## Next
+The previous GitHub publication used empty blobs for some app files. This update restores those files from the last verified source snapshot and republishes them as base64 blobs. Verify non-zero fetched file sizes and hosted UI/core workflows before treating the branch as accepted.
 
-Observe all hosted jobs for the current commit. Fix failures without weakening authorization, ciphertext privacy or sender-match assertions; update the engineering history with final run IDs. Then continue retained core work in nested UI groups. Physical platforms and broader recovery/security acceptance remain open.
-
-Historical handoff: docs/archive/SESSION_HANDOFF_2026-10-20_pre-search.md.
+Historical handoff: `docs/archive/SESSION_HANDOFF_2026-10-20_pre-search.md`.

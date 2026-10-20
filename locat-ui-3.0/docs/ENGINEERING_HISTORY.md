@@ -1,26 +1,23 @@
 # Engineering history — current scope rework
 
-Date: 2026-10-20. Earlier records are preserved in the pre-search engineering history archive at docs/archive/ENGINEERING_HISTORY_2026-10-20_pre-search.md. This file records the current branch work and validation.
+Date: 2026-10-20. Earlier records are preserved in `docs/archive/ENGINEERING_HISTORY_2026-10-20_pre-search.md`.
 
 ## Retired feature scope
 
-Cinema and standalone media libraries, Locat Remote, and SentinelLab/integrations were removed from active UI, routes, and helper code. Schema 18 drops their dedicated tables; account, messaging, Link, Vault, Secrets, and account-activity data remain. Remaining Sentinel references in live source are limited to migration/backup compatibility and tests proving retired tables and endpoints are absent.
+Cinema and standalone media libraries, Locat Remote, and SentinelLab/integrations were removed from active UI, routes and helper code. Schema 18 drops their dedicated tables; core account, messaging, Link, Vault, Secrets and activity data remain. References to retired feature names in active source are limited to compatibility migration/backup code and tests that assert retired routes and tables are absent.
 
-## Nested decrypted Chat search
+## Nested decrypted Chat search and encrypted text edits
 
-Added a collapsed Search loaded messages section to the conversation header, styled with Obsidian Ember tokens. It searches text and attachment names among up to 200 successfully decrypted messages already loaded on this device. Terms remain in component memory; no server query or persistent index is used. It jumps to a result locally.
+Chat search is a collapsed header disclosure. It matches text and attachment names among up to 200 successfully decrypted messages loaded on this device, keeps terms in component memory, and jumps locally.
 
-## Encrypted text edits
+The sender can edit an owned decrypted text message from its nested message actions. The edit is a new encrypted event; the target ID and new body remain in ciphertext. Projection requires the edit sender to match the original sender. Attachments and another user's messages are rejected. Unit coverage checks ownership, forged edits and encrypted send shape; browser coverage exercises the two-account UI and checks that edit content is not sent in clear text.
 
-Added Edit message to the nested message menu for the sender’s own decrypted text messages. An edit is a new encrypted event; its target ID and replacement text stay in ciphertext. Projection applies it only when the sender matches the original sender. Attachments and other users’ messages are rejected. Uncertain delivery uses the existing encrypted retry path.
+## Validation and publication repair
 
-Local validation on source commit 2788518: check, lint, 267 frontend / 108 server tests, production build, browser syntax/discovery, and diff whitespace checks passed. The Matrix crypto chunk-size advisory remains.
+Local TypeScript, ESLint, all frontend/server tests, production build, browser-spec syntax and Playwright discovery passed after source restoration. The real Matrix browser scenario skipped locally because `LOCAT_TEST_SYNAPSE_PYTHON` is unavailable; hosted acceptance remains necessary. The production build retains its Matrix crypto chunk-size advisory.
 
-## Publication failures and fixes
-
-- Commit 89e1f36 initially published a malformed ConversationSearch.tsx blob because the path was read from the wrong working directory. UI run 39442044980 failed TypeScript with TS1490; core run 39442037749 failed its build for the same reason. Commit 715f369 repaired source, but large documentation blobs were truncated by the connector.
-- Commit 2788518 restores readable documents and adds text editing. This follow-up keeps original long records in the archive above. Exact-source hosted acceptance is pending; earlier failed runs are not counted as passes.
+Earlier publication failures: commit `89e1f36` included a malformed `ConversationSearch.tsx` from a wrong working directory; UI run `39442044980` and core run `39442037749` failed TypeScript on that source. Commit `715f369` repaired the source but its large docs were truncated by the connector. Commits `2788518` and `003585b` then used UTF-8 blob uploads that created empty app-file blobs; their GitHub Actions failures were upload corruption, not source failures. This repair restores the last verified non-empty source snapshot, reapplies encrypted edits and republishes changed files using base64. Verify fetched files before interpreting the next workflow runs.
 
 ## Remaining limits
 
-Search only covers already loaded messages. Edit behavior is client-side projection; a modified client can send malformed events. Scheduled sending stays unavailable in live Chat until it has a reliable durable sender compatible with the device-held Matrix credentials. Physical-device and broader identity-recovery acceptance remain open.
+Search covers loaded messages only. Client-side edit projection can be bypassed by a modified client, so peers should accept only authenticated same-author events. Scheduled sending stays unavailable until it has a durable sender compatible with device-held Matrix credentials. Physical-device and broader identity-recovery acceptance remain open.
