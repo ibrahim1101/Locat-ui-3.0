@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `12e4ffe` (`Link Home contact requests to Messages`). The local checkout is synced to the remote and clean.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint before current local browser-test addition: `16510ad` (`Refresh current session handoff`). The working tree contains an uncommitted browser acceptance update.
 
 ## Active direction
 
@@ -20,7 +20,7 @@ Current Home conversation summaries are still not connected. Do not derive “re
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (282 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (282 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. A new two-account Home-to-Requests browser scenario passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace.
 
 At the latest check, GitHub checks for `12e4ffe` were still running: connector preparation succeeded; Ubuntu, Windows and browser-foundation were in progress; macOS was queued. Verify before reporting a hosted result. The workflow-run summary wrapper filters pull-request runs, so query commit check-runs if needed.
 
