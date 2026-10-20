@@ -19,4 +19,8 @@ Latest local source passed TypeScript, ESLint, all 267 frontend and 108 server t
 
 The previous GitHub publication used empty blobs for some app files. Those files were restored from the last verified source snapshot and republished as base64 blobs; fetched GitHub sizes and blob hashes match local files. Avoid UTF-8 connector uploads for large app source files.
 
+## Next
+
+Continue the retained-core sequence: global connection and identity reliability for Chat/Link, then account/security and messaging lifecycle gaps, followed by Files & Vault and workspace destinations. Treat older roadmap rows for standalone media, Remote and SentinelLab as retired under the current scope override.
+
 Historical handoff: `docs/archive/SESSION_HANDOFF_2026-10-20_pre-search.md`.

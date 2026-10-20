@@ -1,5 +1,9 @@
 # Connect implementation tracker
 
+> **Current scope override (2026-10-20):** This tracker is historical context for connectivity work. The active branch is `rework/locat-core-scope`; use `REWORK_SCOPE.md` and `SESSION_HANDOFF.md` for current scope. Standalone media features, Locat Remote and SentinelLab are retired by user direction and must not be reintroduced. Continue only retained core connectivity, identity, Chat, Link, Files & Vault, account/security and workspace work. Preserve Obsidian Ember and nested UI options. No merge, deployment or release is authorized.
+
+
+
 | Priority | Source implementation | Automated validation | Platform/security acceptance |
 | --- | --- | --- | --- |
 | P0 existing stabilization | Auth, direct TLS, Host/Origin, proofs, UI3 account privacy/contact actions | Foundation API/TLS/negative/migration tests | Independent security review pending |

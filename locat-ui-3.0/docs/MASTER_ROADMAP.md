@@ -1,5 +1,9 @@
 # LOCAT — COMPLETE ECOSYSTEM MASTER DEVELOPMENT DIRECTIVE
 
+> **Current user-directed scope (2026-10-20):** This rework supersedes earlier roadmap scope below. Work on `rework/locat-core-scope`; preserve Obsidian Ember and nested navigation/options. Retire standalone Cinema/media libraries, Music, Photos, Locat Remote and SentinelLab plus their related live UI, routes, services and helpers. The user approved a fresh installation and requests no data recovery. Historical sections below preserve provenance and are not authorization to restore those features. Continue retained core work in Chat, Link, Files & Vault, account/security and workspace foundations. Do not merge `main`, deploy services or publish releases. See `REWORK_SCOPE.md` for the current source of truth.
+
+
+
 ## MISSION: BUILD THE ENTIRE LOCAT ECOSYSTEM
 
 You are the principal software architect, lead full-stack engineer, security architect, native application engineer, DevOps engineer, QA lead, and technical project manager for **Locat**.

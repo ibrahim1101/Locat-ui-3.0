@@ -1,27 +1,27 @@
 # Locat UI 3.0 active execution tracker
 
-This tracker supersedes the earlier migration-preparation plan. The approved fresh-start decision in FRESH_START_IMPLEMENTATION.md makes ibrahim1101/Locat-ui-3.0, branch integration/locat-core, the active application. Original Locat is a read-only implementation reference. No work is to be redirected into the original repository or its release branch.
+Updated 2026-10-20. This tracker follows the current user-directed scope on `rework/locat-core-scope`, superseding older roadmap priorities that include retired standalone modules. The Obsidian Ember theme and nested navigation/options remain required.
 
-## Verified live foundation
+## Retained scope
 
-| Area | Current UI3 behavior | Remaining acceptance or feature scope |
+| Area | Current behavior | Remaining work |
 | --- | --- | --- |
-| Authentication/accounts | Real SQLite registration/login/logout, password/session management, immutable LC codes and bio | Profile picture expansion, app lock, MFA/passkeys/account closure |
-| Navigation/theme | Live routes, explicit local mode, premium UI3 controls, saved/system appearance, readiness monitor | Physical accessibility and native Back/lifecycle acceptance |
-| Contacts | Account-owned requests/accept/decline/block/discovery | Cancel/remove and bio/username/request privacy implemented; wider contact fields pending; private chat remains gated |
-| Media | Browser/server libraries, authenticated ranges, FFprobe/FFmpeg, local subtitles, themed music/EQ, playlists, photo crop/text | HLS/hardware/background audio, metadata/artwork, synchronization, freehand/undo and browser/native acceptance |
-| Sentinel | Owned incidents/history, generic/nScout/PipelineGuard webhooks, revocable write-only tokens, notes/status actions | Real emitters/native monitoring, notifications, retention/redaction |
-| Vault/Secrets | Experimental client encryption, revisions/quotas, file/credential operations, local search, lock and encrypted backup/recovery | Independent review, original encrypted-data migration, rotation, native storage/autofill/sharing |
-| Devices/Link | Browser identity persistence, session-bound key proof, dual approval/pinned peers, encrypted payloads/chunks/receipts/cancellation/revocation | Real two-device/native acceptance, LAN/mDNS/P2P, cross-device media discovery/approvals and large-file memory/resume improvements |
-| Hosting | Same-origin Node UI/API, trusted Host/Origin, direct/proxy TLS, discovery, authenticated health WebSockets, SQLite online backups, Docker templates and three-OS checks | Actual Docker/ARM/Pi/native operation, signed artifacts and recovery drills |
-| Messaging | Live contacts; API/UI private-messaging gate; legacy rows preserved | Reviewed protocol/library gate, authenticated keys, chat lifecycle/outbox/history and all dependent messaging requirements |
-| Remote | Experimental paired browser screen viewing, explicit source picker/consent, encrypted signaling, cleanup and expiry | Two-device WebRTC/TURN acceptance, authenticated native capture/input agent and platform permissions |
-| Productivity/admin | Planned live states | Actual roles/admin, Hub, Calendar, Automate, Workspace, Share, Extensions and their authorization/encryption contracts |
+| Accounts and security | Real account/session controls, activity, device binding and revocation | Continue app-lock and identity hardening from the preserved requirement register; retain explicit authorization and recovery limits |
+| Chat | Verified one-to-one Matrix rooms, encrypted text/replies/reactions/attachments, local decrypted search, sender-validated encrypted text edits | Durable scheduled send remains unavailable until device-held credentials can send safely while the app is closed; continue lifecycle, reliability and physical-device acceptance |
+| Link | Verified device pairing and encrypted file/text transfers | Continue real two-device, larger-transfer, native and network acceptance |
+| Files & Vault | Encrypted Vault/Secrets stores and scoped file flows | Continue workspace integration, permissions and acceptance without restoring standalone media libraries |
+| Workspace | Nested destinations, Search, Home, command palette and grouped Settings using Obsidian Ember | Continue useful retained destinations with server-backed data and truthful unavailable states |
+| Global readiness | Same-origin service, discovery, session-bound identity proofs and authenticated health | Continue connection and identity prerequisites that support retained Chat/Link features; physical-host and independent-review gates remain open |
 
-## Full roadmap remains active
+## Retired scope
 
-ORIGINAL_LOCAT_REQUIREMENTS.md preserves all 49 numbered requirements and the ecosystem register. Its historical statuses do not certify UI3. ENGINEERING_HISTORY.md records each actual UI3 batch, checks and limitations; PORTED_INTEGRATIONS.md records source provenance.
+Cinema, standalone media libraries, Music, Photos library/editor, host media scanning/streaming/sharing, Locat Remote, Link remote-signaling, SentinelLab incident/webhook integrations, vendor mappings and related routes/helpers are retired. Ordinary encrypted Chat attachments remain in scope. Fresh installation is acceptable; no data recovery is requested.
 
-Continue autonomously through independent implementable work. A passed batch is a publication checkpoint, not overall completion. Keep backend authorization authoritative, never display fixture content as live, and use the current theme for every option/dialog/section. Develop and publish ordinary work only to integration/locat-core; do not merge main, deploy services or publish releases implicitly.
+## Execution order
 
-The new Locat Connect directive makes global connectivity the highest priority without removing ecosystem scope. See CONNECT_IMPLEMENTATION_TRACKER.md. Dependency order: stabilize shared discovery/connection/session infrastructure; evaluate reviewed messaging protocol/library and implement dependent messaging; finish account/media/infrastructure features; implement productivity/admin using real authorization and appropriate encryption/isolation; integrate native hosts and run platform acceptance. Independent tasks may proceed while an unavailable toolchain or hardware blocks acceptance elsewhere. Only concrete blocked requirements should be marked blocked; never mark the whole roadmap complete because tests pass.
+1. Continue retained connection and identity reliability that gates Chat and Link.
+2. Close high-value account/security and encrypted messaging lifecycle requirements.
+3. Expand Files & Vault and workspace destinations using the shared nested UI hierarchy.
+4. Run hosted and platform-specific acceptance; record concrete limits in `ENGINEERING_HISTORY.md`.
+
+A passing test batch is a checkpoint, not overall completion. Keep backend authorization authoritative. Do not treat historical feature statuses below `MASTER_ROADMAP.md` as current scope; its user-directed override at the top controls this rework.
