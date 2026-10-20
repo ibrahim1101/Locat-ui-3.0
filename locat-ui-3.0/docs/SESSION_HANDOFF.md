@@ -380,3 +380,10 @@ Source **fb1d7fe049e2159775b7e7ffea4762a6893ef013** on `rework/locat-core-scope`
 Malformed local authority-pin entries now stop clone checking and block all pin/rotation acceptance. The nested trust disclosure can remove only malformed records owned by the pin feature, keeps every valid record, and reruns signature/pin/clone verification. If a valid same-UUID origin pin remains, the clone warning and sole-writable-owner confirmation continue to apply. Focused identity tests passed (**9 tests**); full local checks passed: **249 frontend / 107 server tests**, typecheck, lint, production build and `git diff --check`. The feature and strengthened regression are accepted on the exact hosted source above.
 
 Limits remain: the repair does not make localStorage tamper-resistant or recover deleted/cleared trust; clone detection is limited to pins in this browser profile and does not coordinate server ownership. Full account/history recovery, protected browser/native pin storage, cross-signing, independent review, federation and public/domain ownership proof remain open. No main merge, deployment, release, DNS/Cloudflare or production-data change occurred.
+
+
+## 2026-10-20 — malformed pin repair cross-browser acceptance
+
+Browser regression source **76e43da803ab46e67de3fa68ff6311b030f88ba9** passed UI3 workflow **39419456890** (job **118616483037**) and all five core jobs in workflow **39419456980**: macOS **118616482977**, browser-foundation **118616483059**, connector **118616483146**, Windows **118616483177**, Ubuntu **118616483286**. The browser job passed **7 Chromium scenarios (8.4m), 7 Firefox scenarios (8.9m), and 3 private-store repeats (25.0s)**.
+
+The real browser test seeds an unreadable old-origin authority record alongside a valid same-UUID pin. It confirms trust actions are blocked, explicitly removes the malformed record, then verifies that the preserved valid pin brings the clone warning and sole-active-writable-owner confirmation back before pinning. UI3 and core all-green evidence is from this exact browser-test commit; runtime source remains the previously accepted `fb1d7fe`.
