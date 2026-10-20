@@ -29,12 +29,14 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   expect(await page.evaluate(()=>({secure:isSecureContext,crypto:!!crypto.subtle,indexedDB:!!indexedDB,locks:!!navigator.locks}))).toEqual({secure:true,crypto:true,indexedDB:true,locks:true});
   expect(await page.evaluate(()=>navigator.locks.request('locat-browser-acceptance',()=>true))).toBe(true);
   await page.goto(fixture.origin+'/settings');await expect(page.getByText('Your server identity')).toBeVisible();
+  await page.evaluate(({serverId,keyId,publicKey})=>localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('other-account')+':'+encodeURIComponent('https://old-origin.invalid'),JSON.stringify({origin:'https://old-origin.invalid',serverId,keyId,publicKey,pinnedAt:new Date(0).toISOString()})),{serverId:registered.user.globalIdentity.serverId,keyId:registered.user.globalIdentity.attestation.keyId,publicKey:registered.user.globalIdentity.attestation.publicKey});
   const authorityDetails=page.getByText(/Authority signature/);await authorityDetails.click();
   await expect(page.getByRole('button',{name:'Pin after comparison'})).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
   await expect(page.getByText(/Both discovery and account signatures are valid/)).toBeVisible();
-  await page.getByLabel(/I independently compared this fingerprint/).check();await page.getByRole('button',{name:'Pin after comparison'}).click();
+  await page.getByLabel(/confirmed this origin and fingerprint with the operator/).check();await page.getByRole('button',{name:'Pin after comparison'}).click();
   await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();
-  await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Authority key continuity · pinned/)).toBeVisible();
+  await page.reload();await page.getByText(/Possible cloned server identity · review/).click();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
   await page.goto(fixture.origin+'/devices');await expect(page.getByLabel("This browser's device name")).toBeVisible();
   const identity=await page.evaluate(async accountId=>{
    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-link:'+accountId,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
