@@ -160,6 +160,14 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
    await bobLog.getByRole('button',{name:'Preview '+name,exact:true}).click();const preview=bobLog.getByRole('img',{name,exact:true});await expect.poll(()=>preview.evaluate(image=>image.naturalWidth)).toBe(1440);
    await expect(bob.page.getByTestId('save-decrypted-file')).toBeVisible();const savedDownload=bob.page.waitForEvent('download');await bob.page.getByTestId('save-decrypted-file').click();const saved=await savedDownload;expect(saved.suggestedFilename()).toBe(name);expect((await readFile(await saved.path())).length).toBeLessThan(bytes.length);
   });
+  await test.step('Draw a doodle and deliver it as an encrypted attachment',async()=>{
+   const sendsBefore=roomSends.length,wireBefore=wire.length,encrypted=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/send/m.room.encrypted/'),{timeout:30000}),uploaded=alice.page.waitForResponse(response=>new URL(response.url()).pathname.includes('/upload'),{timeout:30000});
+   await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('menuitem',{name:'Stickers & doodles',exact:true}).click();await alice.page.getByRole('menuitem',{name:'Draw a doodle · send encrypted',exact:true}).click();
+   const sheet=alice.page.getByTestId('doodle-composer');await expect(sheet).toBeVisible();const canvas=sheet.getByTestId('doodle-canvas'),box=await canvas.boundingBox();expect(box).toBeTruthy();
+   await alice.page.mouse.move(box.x+box.width*.25,box.y+box.height*.3);await alice.page.mouse.down();await alice.page.mouse.move(box.x+box.width*.45,box.y+box.height*.45,{steps:6});await alice.page.mouse.move(box.x+box.width*.7,box.y+box.height*.6,{steps:6});await alice.page.mouse.up();
+   await sheet.getByRole('button',{name:'Send doodle',exact:true}).click();const [request,response]=await Promise.all([encrypted,uploaded]);expect(request.method()).toBe('PUT');expect(response.status()).toBe(200);await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);expect(wire.slice(wireBefore).join('')).not.toContain('locat-doodle-');
+   const filename=/Preview (locat-doodle-\d+\.png)/;await expect(alice.page.getByRole('log',{name:'Messages',exact:true}).getByRole('button',{name:filename})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('log',{name:'Messages',exact:true}).getByRole('button',{name:filename})).toBeVisible({timeout:30000});
+  });
   await test.step('Record, review and send encrypted voice only after confirmation',async()=>{
    if(process.env.LOCAT_BROWSER_ENGINE==='firefox')return;
    await alice.context.grantPermissions(['microphone'],{origin:fixture.origin});const uploads=[];const watch=request=>{if(new URL(request.url()).pathname.includes('/_matrix/media/v3/upload'))uploads.push(request);};alice.page.on('request',watch);
