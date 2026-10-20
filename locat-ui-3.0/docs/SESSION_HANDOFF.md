@@ -1,3 +1,9 @@
+## Follow-on — one-time encrypted Chat location share
+
+The nested Composer → Location & schedule → Share my location once action now opens a themed, explicit review flow. Location permission is requested only after the user taps Get current location; approximate, rounded coordinates are selected by default, and a precise option is available. The user sees reported device accuracy and confirms Share once. The formatted OpenStreetMap link is passed through the existing encrypted conversation send method. There is no background tracking.
+
+Coverage: five location formatter and sheet tests pass; browser acceptance now includes a real two-account geolocation grant, reviewed one-time share, ciphertext-wire privacy assertions and fixture database scan. Local `npm run check`, `npm run lint`, `npm run test:all` (**255 frontend / 108 server tests**), production build, browser syntax and seven-test discovery pass. The location browser scenario is newly added and hosted acceptance for it is pending. Next continue the retained Chat roadmap with schedule sending and creative attachments in the same nested Obsidian Ember composer. Account/history recovery remains out of active priority per user direction.
+
 ## Current checkpoint — retired media, Remote and SentinelLab removed
 
 Schema 18 removes the retired Cinema/media-sharing overrides, Link Remote sessions/signals, and Sentinel incident/token/event tables. Fresh schemas no longer create them. Link no longer queries Remote tables; dormant Sentinel incident search/export helpers are deleted. SentinelLab and related integrations are retired. Settings → Security account audit history remains. The updated Live Devices copy now describes only the retained Link relay. Existing backup verification still accepts older schemas without requiring those retired tables.
