@@ -169,7 +169,7 @@ async function handle(req, res) {
     if (!user) return json(res, 401, { error: "Not authenticated" });
     if (req.method === "GET") return json(res, 200, { preferences: db.preferences(user.id) });
     const input = await authenticatedBody(req,user);
-    const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"], sendReadReceipts: [true, false] };
+    const allowed = { theme: ["obsidian", "graphite", "daylight", "system"], textScale: ["default", "large", "xl"], motion: ["system", "reduced"], startup: ["messages", "home"], density: ["comfortable", "compact"], sendReadReceipts: [true, false], typingIndicators: [true, false] };
     if (!input || typeof input !== "object" || Array.isArray(input) || Object.entries(input).some(([key, value]) => !allowed[key]?.includes(value))) return json(res, 400, { error: "Invalid preferences" });
     const preferences = { ...db.preferences(user.id), ...input };
     db.savePreferences(user.id, preferences);

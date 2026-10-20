@@ -18,7 +18,7 @@ export function SessionProvider({ adapter, initialUser, initialConnection, platf
   const effectiveUser = adapter.mode === "live" ? (liveSession!.authStatus === "ready" ? liveSession!.user : null) : user;
   const effectiveConnection = adapter.mode === "live" ? liveSession!.connection : connection;
   const effectiveStage: EntryStage = adapter.mode === "live" ? (liveSession!.authStatus === "local" ? "app" : liveSession!.authStatus === "ready" && effectiveUser ? "app" : liveSession!.authStatus === "needsKeyRestore" ? "locked" : stage === "app" ? "login" : stage) : stage;
-  const [prefs, setPrefsState] = useState<Preferences>({ theme: "obsidian", textScale: "default", motion: "system", startup: adapter.mode === "live" ? "home" : "messages", density: "comfortable", largeLibraries: false, sendReadReceipts: false });
+  const [prefs, setPrefsState] = useState<Preferences>({ theme: "obsidian", textScale: "default", motion: "system", startup: adapter.mode === "live" ? "home" : "messages", density: "comfortable", largeLibraries: false, sendReadReceipts: false, typingIndicators: false });
   const setPrefs = useCallback((p: Partial<Preferences>) => setPrefsState((old) => ({ ...old, ...p })), []);
 
   const effectiveUserId = effectiveUser?.id;

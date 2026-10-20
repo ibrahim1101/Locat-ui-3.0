@@ -2,6 +2,12 @@ const fail=(status,message)=>{throw Object.assign(new Error(message),{status});}
 export const validConversationRoomId=value=>typeof value==='string'&&(/^![A-Za-z0-9_-]{43}$/.test(value)||/^![^\s/:]{1,254}:[^\s/]{1,255}$/.test(value));
 /** Canonical room paths only; aliases, state writes, invites and plaintext sends are excluded. */
 export function conversationRoute(path,method){
+ const typing=/^\/_matrix\/client\/v3\/rooms\/([^/]+)\/typing\/([^/]+)$/.exec(path);
+ if(typing&&method==='PUT'){
+  let roomId,userId;try{roomId=decodeURIComponent(typing[1]);userId=decodeURIComponent(typing[2]);}catch{return null;}
+  if(encodeURIComponent(roomId)!==typing[1]||!validConversationRoomId(roomId)||encodeURIComponent(userId)!==typing[2]||!/^@[^\s/:]{1,255}:[^\s/]{1,255}$/.test(userId))return null;
+  return {roomId,action:'typing',userId};
+ }
  const receipt=/^\/_matrix\/client\/v3\/rooms\/([^/]+)\/receipt\/m\.read\/([^/]+)$/.exec(path);
  if(receipt&&method==='POST'){
   let roomId,eventId;try{roomId=decodeURIComponent(receipt[1]);eventId=decodeURIComponent(receipt[2]);}catch{return null;}
@@ -16,6 +22,7 @@ export function conversationRoute(path,method){
  return null;
 }
 export function validateConversationRequest(route,input,query){
+ if(route.action==='typing'){if(query.size||Object.keys(input).some(key=>!['typing','timeout'].includes(key))||typeof input.typing!=='boolean'||input.typing&&( !Number.isSafeInteger(input.timeout)||input.timeout<1000||input.timeout>30000)||!input.typing&&input.timeout!==undefined)fail(400,'Invalid typing indicator metadata');return;}
  if(route.action==='receipt'){if(query.size||Object.keys(input).some(key=>key!=='thread_id')||input.thread_id!==undefined&&(typeof input.thread_id!=='string'||input.thread_id!=='main'&&!/^\$[A-Za-z0-9._~+=/:!-]{1,255}$/.test(input.thread_id)))fail(400,'Invalid read receipt metadata');return;}
  if(route.action==='members'){
   for(const key of query.keys())if(!['at','membership','not_membership'].includes(key)||query.getAll(key).length!==1)fail(400,'Invalid room membership query');
