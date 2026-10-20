@@ -1,3 +1,11 @@
+## Encrypted one-to-one reactions — code and acceptance coverage pushed; execution pending
+
+The live Matrix conversation now offers **React to message** from the existing message context menu and a nested Obsidian Ember emoji sheet (👍, ❤️, 😂, 🔥, 😮, 🙏). On touch, a long press opens the emoji sheet directly. Reactions are sent as encrypted Matrix `m.reaction` annotations only after the same verified-device, private-room membership, sync, and outbound-session checks as other encrypted sends. Duplicate own reactions are blocked and rendered annotations are deduplicated by sender. Reaction chips expose accessible counts and an own-reaction label.
+
+Unit coverage was added for encrypted annotation projection, sender deduplication, wire-type and event-type rejection, unsupported emoji, device verification, outbound encryption, duplicate reactions and accessible chip rendering. A real two-account Chromium acceptance step exercises Shift+F10 → React to message → ❤️ Love, verifies encrypted send transport, and checks both sender and recipient chips.
+
+Source and acceptance changes are pushed to `rework/locat-core-scope`; latest commit at handoff: **f59a41d5224ca47493e53569e2aa42ad58a1c185**. This environment lost its local exec connection before check/lint/tests/build could run. GitHub currently reports no status checks for the new commits, so hosted acceptance for reactions is still pending and must not be inferred from the earlier receipt/typing run. Resume by reconnecting the workspace, syncing the branch, running `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`, checking browser spec syntax/listing, then running the pinned Synapse browser acceptance. Fix any failures and update this handoff with actual results.
+
 # Locat UI3 engineering handoff — 2026-10-20
 
 ## Opt-in encrypted read receipts and typing signals — hosted acceptance passed
