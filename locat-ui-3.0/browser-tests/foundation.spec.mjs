@@ -29,8 +29,10 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   expect(await page.evaluate(()=>({secure:isSecureContext,crypto:!!crypto.subtle,indexedDB:!!indexedDB,locks:!!navigator.locks}))).toEqual({secure:true,crypto:true,indexedDB:true,locks:true});
   expect(await page.evaluate(()=>navigator.locks.request('locat-browser-acceptance',()=>true))).toBe(true);
   await page.goto(fixture.origin+'/settings');await expect(page.getByText('Your server identity')).toBeVisible();
-  await page.evaluate(({serverId,keyId,publicKey})=>localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('other-account')+':'+encodeURIComponent('https://old-origin.invalid'),JSON.stringify({origin:'https://old-origin.invalid',serverId,keyId,publicKey,pinnedAt:new Date(0).toISOString()})),{serverId:registered.user.globalIdentity.serverId,keyId:registered.user.globalIdentity.attestation.keyId,publicKey:registered.user.globalIdentity.attestation.publicKey});
+  await page.evaluate(({serverId,keyId,publicKey})=>{localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('other-account')+':'+encodeURIComponent('https://old-origin.invalid'),JSON.stringify({origin:'https://old-origin.invalid',serverId,keyId,publicKey,pinnedAt:new Date(0).toISOString()}));localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('corrupt-account')+':'+encodeURIComponent('https://broken-origin.invalid'),'not-json');},{serverId:registered.user.globalIdentity.serverId,keyId:registered.user.globalIdentity.attestation.keyId,publicKey:registered.user.globalIdentity.attestation.publicKey});
   const authorityDetails=page.getByText(/Authority signature/);await authorityDetails.click();
+  await expect(page.getByText(/Clone checks are stopped/)).toBeVisible();await expect(page.getByRole('button',{name:'Pin after comparison'})).toHaveCount(0);await page.getByRole('button',{name:'Remove malformed entries and recheck'}).click();
+  await expect(page.getByText(/Possible cloned server identity · review/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Pin after comparison'})).toBeDisabled();
   await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
   await expect(page.getByText(/Both discovery and account signatures are valid/)).toBeVisible();
