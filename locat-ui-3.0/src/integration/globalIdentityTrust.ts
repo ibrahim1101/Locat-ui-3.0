@@ -18,16 +18,38 @@ function encodeBase64Url(bytes:Uint8Array){
 }
 function pinKey(accountId:string,origin:string){return pinPrefix+encodeURIComponent(accountId)+':'+encodeURIComponent(origin);}
 function samePin(pin:AuthorityPin,verified:Omit<AuthorityPin,'pinnedAt'>){return pin.origin===verified.origin&&pin.serverId===verified.serverId&&pin.keyId===verified.keyId&&pin.publicKey===verified.publicKey;}
+function isAuthorityPin(value:unknown):value is AuthorityPin{
+ if(!value||typeof value!=='object')return false;
+ const pin=value as Partial<AuthorityPin>;
+ return typeof pin.origin==='string'&&typeof pin.serverId==='string'&&typeof pin.keyId==='string'&&typeof pin.publicKey==='string'&&typeof pin.pinnedAt==='string';
+}
 export function readAuthorityPin(accountId:string,origin:string,storage:Storage=localStorage):AuthorityPin|null{
  const raw=storage.getItem(pinKey(accountId,origin));if(raw===null)return null;
  let pin:AuthorityPin;try{pin=JSON.parse(raw) as AuthorityPin;}catch{throw new Error('The saved authority pin is unreadable. Remove it before trusting this authority again.');}
- if(!pin||pin.origin!==origin||typeof pin.serverId!=='string'||typeof pin.keyId!=='string'||typeof pin.publicKey!=='string'||typeof pin.pinnedAt!=='string')throw new Error('The saved authority pin is invalid. Remove it before trusting this authority again.');
+ if(!isAuthorityPin(pin)||pin.origin!==origin)throw new Error('The saved authority pin is invalid. Remove it before trusting this authority again.');
  return pin;
 }
 export function writeAuthorityPin(accountId:string,pin:Omit<AuthorityPin,'pinnedAt'>,storage:Storage=localStorage){
  storage.setItem(pinKey(accountId,pin.origin),JSON.stringify({...pin,pinnedAt:new Date().toISOString()}));
 }
 export function removeAuthorityPin(accountId:string,origin:string,storage:Storage=localStorage){storage.removeItem(pinKey(accountId,origin));}
+/** Return only malformed entries owned by this feature; valid trust pins are never included. */
+export function findInvalidAuthorityPinKeys(storage:Storage=localStorage):string[]{
+ const invalid:string[]=[];
+ for(let index=0;index<storage.length;index++){
+  const key=storage.key(index);if(!key?.startsWith(pinPrefix))continue;
+  const encoded=key.slice(pinPrefix.length),separator=encoded.indexOf(':');
+  let accountId='',origin='';
+  try{if(separator<0)throw new Error('Invalid pin key');accountId=decodeURIComponent(encoded.slice(0,separator));origin=decodeURIComponent(encoded.slice(separator+1));}catch{invalid.push(key);continue;}
+  const raw=storage.getItem(key);if(raw===null){invalid.push(key);continue;}
+  let pin:unknown;try{pin=JSON.parse(raw);}catch{invalid.push(key);continue;}
+  if(!isAuthorityPin(pin)||pin.origin!==origin||key!==pinKey(accountId,origin))invalid.push(key);
+ }
+ return invalid;
+}
+export function removeInvalidAuthorityPins(storage:Storage=localStorage):number{
+ const keys=findInvalidAuthorityPinKeys(storage);for(const key of keys)storage.removeItem(key);return keys.length;
+}
 /** Detect a server UUID already trusted at another origin in this browser profile. */
 export function findPinnedAuthorityClones(serverId:string,origin:string,storage:Storage=localStorage):string[]{
  const origins=new Set<string>();
@@ -36,7 +58,7 @@ export function findPinnedAuthorityClones(serverId:string,origin:string,storage:
   const raw=storage.getItem(key);if(raw===null)continue;
   let pin:AuthorityPin;
   try{pin=JSON.parse(raw) as AuthorityPin;}catch{throw new Error('A saved authority pin is unreadable. Clear the invalid pin before checking for cloned server identities.');}
-  if(!pin||typeof pin.serverId!=='string'||typeof pin.origin!=='string'||typeof pin.keyId!=='string'||typeof pin.publicKey!=='string'||typeof pin.pinnedAt!=='string')throw new Error('A saved authority pin is invalid. Clear the invalid pin before checking for cloned server identities.');
+  if(!isAuthorityPin(pin))throw new Error('A saved authority pin is invalid. Clear the invalid pin before checking for cloned server identities.');
   if(pin.serverId===serverId&&pin.origin!==origin)origins.add(pin.origin);
  }
  return [...origins].sort();
