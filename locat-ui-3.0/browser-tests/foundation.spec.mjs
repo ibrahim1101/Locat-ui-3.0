@@ -42,7 +42,7 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   const replaceAuthorityPin=page.getByRole('button',{name:'Replace pin after comparison'});await expect(replaceAuthorityPin).toBeDisabled();
   const storedAuthorityKeyId=()=>page.evaluate(accountId=>JSON.parse(localStorage.getItem('locat-ui3:authority-pin:v1:'+encodeURIComponent(accountId)+':'+encodeURIComponent(location.origin))).keyId,registered.user.id);
   expect(await storedAuthorityKeyId()).toBe(oldAuthorityKeyId);
-  await page.getByLabel(/I independently compared the new fingerprint with the authority operator/).check();await replaceAuthorityPin.click();
+  await page.getByLabel(/I confirmed this origin and fingerprint with the operator as the only active writable owner/).check();await replaceAuthorityPin.click();
   await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();expect(await storedAuthorityKeyId()).toBe(newAuthorityKeyId);
   await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Possible cloned server identity · review/)).toBeVisible();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();
   await page.goto(fixture.origin+'/devices');await expect(page.getByLabel("This browser's device name")).toBeVisible();
