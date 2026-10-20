@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 63867)
-Total output lines: 1139
+Warning: truncated output (original token count: 64045)
+Total output lines: 1144
 
 ## 2026-10-19 — Product scope and navigation rework
 
@@ -169,11 +169,7 @@ Commands: npm run check; npm run lint; npm run test:all; npm run build; node --t
 
 Observed failures: first targeted backup tests rejected the schema change because the verifier manifest was not yet extended; added schema-15 table/columns and reran all 19 focused migration/backup tests successfully. Real Synapse room creation failed HTTP 400 M_UNKNOWN because v12 prohibits putting its creator in the power-level users map; selected v12 explicitly, removed that entry and accepted hash-style room IDs. The corrected real run passed. Expanded gateway history initially returned 403 because the fixture used Bob's old token after reopening/rebinding to a renewed one; preserved the production exact-token rule and corrected the fixture to use the current binding. Subsequent expanded acceptance passed. The final added post-gateway database/WAL scan for both homeserver and Locat passed.
 
-Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…43867 tokens truncated….
-
-Commands/evidence this batch: npm run check; npm run lint; npm run test:all; npm run build; focused player/media/API/Remote suites; actual scoped local Firefox built and Vite browser commands recorded above; PyYAML workflow validation; git diff --check; GitHub run/jobs and completed logs read. No assertion suppression, sandbox flags in CI, plaintext fallback or hidden test failure. Earlier failed browser runs and root causes remain recorded. Server-selection stash fully reconciled and retained only as backup.
-
-Implemented: CINEMA007 accurate bounded conversion seeks, guarded metadata/progress/lifecycle and explicit remux seek restriction; CINEMA008 worker timeout/disconnect slot recovery; CINEMA011 StrictMode source protection; SERVER001 strict-CSP reviewed navigation; REMOTE001 bounded streaming status consumer; MEDIA-REFRESH002 account/shared scan budgets. Cinema001–005 automated regressions remain accepted. Files/subsystems and detailed commands/failed-then-fixed evidence are in preceding entries and ENGINEERING_BUG_REGISTER.
+Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…44045 tokens truncated…trictMode source protection; SERVER001 strict-CSP reviewed navigation; REMOTE001 bounded streaming status consumer; MEDIA-REFRESH002 account/shared scan budgets. Cinema001–005 automated regressions remain accepted. Files/subsystems and detailed commands/failed-then-fixed evidence are in preceding entries and ENGINEERING_BUG_REGISTER.
 
 Exact next engineering task: add deterministic rapid consecutive converted-seek-during-setup acceptance (including preservation of playing intent), then explicit operator-assigned per-library ownership and accepted-friend grants enforced on listing/probe/direct/remux/transcode and revocation, with negative API/browser tests before friend-sharing claims. Guided server-source setup remains Cinema006. Current media roots remain authenticated-global; Cinema010 is OPEN. Long13 GB/original movie, Pi throughput, native/physical Windows/Android/macOS, actual international/federation/TURN/media and independent review remain unverified. BUILD001 remains OPEN: full npm audit5high dev nodes/no patched braces release; production audit0. Theme/logo/account data/all 49 requirements / A–AM scope preserved. No public deployment/DNS/main merge/release/purchase or unrelated lab service changed.
 
@@ -348,3 +344,8 @@ Source `ada51b61598c18b717553a3bcae0acea4d705cf3` passed the UI workflow (`39391
 ### Reaction overlap fix — 2026-10-20
 
 Hosted browser diagnostics on `95af653b9a29eed9e75d5f3d9755c89d3b774813` showed the reaction callback racing an already-running conversation operation. Firefox surfaced the session's `Wait for the current messaging operation` guard; Chromium produced no visible alert. The reaction controller now waits at most 15 seconds for the in-flight operation to settle, exits if the conversation changes/closes, and then applies the normal sync/private-room/device verification checks before sending. A regression keeps an encrypted send unresolved, starts a reaction, confirms it does not overlap, then releases the send and verifies the encrypted reaction completes. No outbound guard was removed. Full local validation passed: typecheck, lint, 239 frontend /104 backend tests, production build and diff check; existing large Matrix crypto chunk warning remains. New hosted browser acceptance is pending publication.
+
+
+### Conversation open overlap follow-up — 2026-10-20
+
+The next browser candidate still surfaced a transient busy message in Firefox while the reaction test lacked an outbound event. To remove duplicate-mount/navigation overlap as another source, `open()` now waits up to 15 seconds behind an active operation, validates the session epoch while waiting, then follows the existing full bootstrap/sync path. This preserves the existing private-room and device guards. A regression holds the first open at the peer lookup, starts a second open, and verifies both complete in order without a busy error. Focused session tests (28) and typecheck pass; full repository/Synapse/hosted browser validation is pending.
