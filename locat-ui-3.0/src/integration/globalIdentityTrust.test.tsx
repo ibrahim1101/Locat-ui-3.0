@@ -56,9 +56,9 @@ it('finds the same pinned server UUID at another origin across accounts',()=>{
 
 it('repairs malformed authority records without removing valid pins',()=>{
  const malformedKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');
- localStorage.setItem(malformedKey,'not-json');writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId:'different-server',keyId:'good-key',publicKey:'good-public'});
+ localStorage.setItem(malformedKey,'not-json');writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId,keyId:'good-key',publicKey:'good-public'});
  expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey]);expect(removeInvalidAuthorityPins()).toBe(1);
- expect(localStorage.getItem(malformedKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('good-key');expect(findPinnedAuthorityClones(serverId,origin)).toEqual([]);
+ expect(localStorage.getItem(malformedKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('good-key');expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://trusted.test']);
 });
 
 it('requires a separate fingerprint confirmation for first contact and changed keys',async()=>{
@@ -83,13 +83,13 @@ it('warns about a cloned server UUID and requires operator confirmation before p
 
 it('blocks pinning until malformed records are explicitly removed and trust is rechecked',async()=>{
  const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');localStorage.setItem(invalidKey,'not-json');
- writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId:'different-server',keyId:'keep-key',publicKey:'keep-public'});
+ writeAuthorityPin('c'.repeat(32),{origin:'https://trusted.test',serverId,keyId:'keep-key',publicKey:'keep-public'});
  const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
  await screen.findByText(/Clone checks are stopped/);expect(screen.queryByRole('button',{name:'Pin after comparison'})).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'Remove malformed entries and recheck'}));
  const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe('keep-key');expect(pin).toBeDisabled();
- fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
+ expect(await screen.findByRole('alert')).toHaveTextContent('https://trusted.test');const confirmation=screen.getByRole('checkbox',{name:/only active writable owner/});fireEvent.click(confirmation);fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
 });
 
 it('accepts a key only after an explicit signed rotation click from the pinned old key',async()=>{
