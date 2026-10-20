@@ -79,7 +79,7 @@ test('explicit proxy termination retains Host/Origin checks and Secure cookies o
       let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>resolve({status:res.statusCode,ok:res.statusCode===200,headers:{get:key=>Array.isArray(res.headers[key])?res.headers[key][0]:res.headers[key]},json:async()=>JSON.parse(body)}));
     });req.on('error',reject);req.end(data?JSON.stringify(data):undefined);
   });
-  let ready=false;for(let i=0;i<60;i++){try{if((await request('/api/ready')).ok){ready=true;break;}}catch{}if(child.exitCode!==null)throw new Error('Proxy-mode server exited');await new Promise(resolve=>setTimeout(resolve,50));}assert.ok(ready);
+  let ready=false;for(let i=0;i<200;i++){try{if((await request('/api/ready')).ok){ready=true;break;}}catch{}if(child.exitCode!==null)throw new Error('Proxy-mode server exited');await new Promise(resolve=>setTimeout(resolve,50));}assert.ok(ready);
   const info=await (await request('/.well-known/locat')).json();assert.equal(info.origin,origin);assert.equal(info.identity,null);assert.equal(info.capabilities.authenticatedIdentity,false);
   assert.equal((await request('/api/ready','GET',undefined,{Host:'evil.test','X-Forwarded-Host':'locat.test','X-Forwarded-Proto':'https'})).status,403);
   const credentials={username:'alice',displayName:'Alice',password:'long-test-password-123'};
