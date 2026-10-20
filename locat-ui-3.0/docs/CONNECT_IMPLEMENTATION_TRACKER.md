@@ -280,3 +280,12 @@ Source9b170d9f9aa0e123cc448efcd8fad55e5b0936ca aborts parallel discovery on fail
 ## 2026-10-20 encrypted attachment acceptance
 
 Authenticated Matrix media downloads now use the client v1 endpoint with same-server, redirect-disabled gateway policy. The attachment outbox tracks attempts without persisting attachment event ciphertext. Core CI `39345677638` and UI3 CI `39345677593` passed on source `5b2d36a`; Chromium/Firefox upload, recipient decryption and exact-byte save, multi-room recovery, offline/restart, revocation and history scenarios passed. Remaining P3 gaps include image previews/transforms, full identity recovery, physical/native and global/public acceptance.
+
+
+## 2026-10-20 — P2 global identity continuity accepted
+
+Source **5cd7e7c614ac0ecd7184cf5a5a299f92b2292751**: UI3 workflow **39413862156** passed; core workflow **39413862056** passed all five jobs (connector **118597992279**, macOS **118597992102**, Windows **118597992040**, Ubuntu **118597992171**, browser **118597991783**). Each OS passed check/lint/build and **247 frontend tests**. Ubuntu passed real HTTPS Matrix SDK **44.0.0** / Synapse **1.163.0** acceptance. Chromium **7 scenarios / 8.3m**, Firefox **7 / 8.7m**, private-store repeats **3 / 15.1s**.
+
+The real-browser acceptance includes same-UUID alternate-origin clone warning and explicit only-active-writable-owner confirmation, plus same-database signing-key loss/replacement. The original pin remains unchanged until separate fingerprint comparison and explicit replacement; the new pin is verified on reload. Prior `d992bcc` collapsed-details and `fdbe177` checkbox selector failures were corrected in tests and superseded by this green source.
+
+Open limitations: browser-profile-local pin storage, no global or cross-device clone detection or single-writer coordination; no full account/history recovery, native secure stores, independent security review, federation or domain ownership proof. All 49 requirements and A–AM scope remain retained. No main merge, deployment, release, DNS/Cloudflare change or production data migration.
