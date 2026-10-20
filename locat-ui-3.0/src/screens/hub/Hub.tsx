@@ -1,4 +1,4 @@
-import { Archive, Database, HardDrive, Info, MemoryStick, Network, Server, Timer, Users } from "lucide-react";
+import { Archive, Database, Info, MemoryStick, Network, Server, Timer, Users } from "lucide-react";
 import type { MetricView, ServiceView } from "@/contracts/ecosystem";
 import { Screen } from "@/layouts/Screen";
 import { Badge, Banner, Section, ListRow, SectionTitle } from "@/ui";
@@ -11,10 +11,10 @@ const METRICS: MetricView[] = [
   { label: "Users", value: null, source: "admin-stats" }, { label: "Active sessions", value: null, source: "admin-stats" },
   { label: "Message queue", value: null, source: "admin-stats" }, { label: "Database size", value: null, source: "admin-stats" },
   { label: "Memory (container)", value: null, source: "os-container", caveat: "Reflects the container, not the host" }, { label: "Uptime", value: null, source: "os-container" },
-  { label: "CPU", value: null, source: "unavailable", caveat: "No host agent — not collected" }, { label: "Media activity", value: null, source: "unavailable", caveat: "Not collected" },
+  { label: "CPU", value: null, source: "unavailable", caveat: "No host agent — not collected" },
 ];
-const SERVICES: ServiceView[] = [{ name: "API (Hono/tRPC)", state: "unknown" }, { name: "MariaDB", state: "unknown" }, { name: "Realtime (SSE)", state: "unknown" }, { name: "Media (FFmpeg)", state: "unknown" }, { name: "Web push", state: "unknown" }];
-const ICONS = [Users, Network, Timer, Database, MemoryStick, Timer, Server, HardDrive];
+const SERVICES: ServiceView[] = [{ name: "Locat API (Node.js)", state: "unknown" }, { name: "SQLite database", state: "unknown" }, { name: "Matrix gateway", state: "unknown" }, { name: "Link transfer relay", state: "unknown" }];
+const ICONS = [Users, Network, Timer, Database, MemoryStick, Timer, Server];
 
 export default function Hub() {
   return (
