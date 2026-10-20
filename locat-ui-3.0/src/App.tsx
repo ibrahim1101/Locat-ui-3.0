@@ -14,6 +14,7 @@ import { LiveDevices } from "./integration/LiveDevices";
 import { LivePrivateStore } from "./integration/LivePrivateStore";
 import { LiveModuleNotice } from "./integration/LiveModuleNotice";
 import { FilesLayout } from "./screens/private/FilesLayout";
+import { LiveAppLockGate } from "./integration/LiveAppLockGate";
 
 const Home = lazy(() => import("./screens/home/Home"));
 const Modules = lazy(() => import("./screens/home/Modules"));
@@ -44,7 +45,7 @@ export function App() {
   const live = adapter.mode === "live";
   const root = prefs.startup === "home" ? "/home" : "/messages";
   return (
-    <BackProvider rootPath={root}>
+    <LiveAppLockGate><BackProvider rootPath={root}>
       <ContextMenuProvider><DropProvider><ErrorBoundary>
         <Routes>
           <Route element={<AppShell />}>
@@ -75,6 +76,6 @@ export function App() {
           </Route>
         </Routes>
       </ErrorBoundary></DropProvider></ContextMenuProvider>
-    </BackProvider>
+    </BackProvider></LiveAppLockGate>
   );
 }

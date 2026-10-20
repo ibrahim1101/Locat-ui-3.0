@@ -12,15 +12,16 @@ Keep the Obsidian Ember theme and nested navigation/disclosures. Continue retain
 - Conversation search is nested in the header and searches up to 200 decrypted messages already loaded on this device. Search terms are not sent or persisted.
 - Own-text editing uses a new encrypted event. Target ID and replacement text stay in ciphertext; projection accepts an edit only from the original author. Attachments and peer messages cannot be edited.
 - Scheduled sending remains unavailable until a durable sender can operate with device-held Matrix credentials while the app is closed.
+- Account → Security includes a device-local PBKDF2 app lock with configurable inactivity and background policies. It gates the UI only, does not encrypt browser storage, and leaves biometrics disabled pending verified platform authentication.
 
 ## Validation
 
-Latest local source passed TypeScript, ESLint, all 267 frontend and 108 server tests, production build, browser-spec syntax and test discovery. The real two-account Matrix Playwright scenario was skipped locally because the pinned Synapse environment is unavailable; hosted Matrix acceptance is still required. The build reports the existing large Matrix crypto chunk advisory.
+The restored Chat source passed TypeScript, ESLint, all 267 frontend and 108 server tests, production build, browser-spec syntax and Playwright discovery. The real two-account Matrix Playwright scenario skipped locally because the pinned Synapse environment is unavailable; hosted Chromium/Firefox Matrix acceptance passed on run `39446768005`. Hosted Chromium/Firefox identity, Link and messaging acceptance also passed on run `39450561720`. The new app-lock slice passes TypeScript, ESLint, all 271 frontend and 108 server tests, and production build locally; its hosted workflow is pending. Builds retain the large Matrix crypto chunk advisory.
 
 The previous GitHub publication used empty blobs for some app files. Those files were restored from the last verified source snapshot and republished as base64 blobs; fetched GitHub sizes and blob hashes match local files. Avoid UTF-8 connector uploads for large app source files.
 
 ## Next
 
-Continue the retained-core sequence: global connection and identity reliability for Chat/Link, then account/security and messaging lifecycle gaps, followed by Files & Vault and workspace destinations. Treat older roadmap rows for standalone media, Remote and SentinelLab as retired under the current scope override.
+Continue the retained-core sequence: account/security and messaging lifecycle gaps, followed by Files & Vault and workspace destinations. Global connection and identity reliability now has hosted Chromium/Firefox coverage for the exercised flow; cross-device, physical-host, single-writer and recovery acceptance remain open. Treat older roadmap rows for standalone media, Remote and SentinelLab as retired under the current scope override.
 
 Historical handoff: `docs/archive/SESSION_HANDOFF_2026-10-20_pre-search.md`.
