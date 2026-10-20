@@ -29,3 +29,7 @@ Search covers loaded messages only. Client-side edit projection can be bypassed 
 ## Standalone encrypted secure notes
 
 Secrets now stores secure notes as a separate encrypted entry type with strict field validation and the same account/module/record-bound authenticated encryption as credentials. The editor presents Credential and Secure note as a nested segmented choice; note mode provides a multiline field, while credential mode keeps password generation and optional note details. Notes can be searched locally after unlock, viewed, copied, edited and removed. UI and crypto tests verify encrypted upload, note round-trip and bounds. This remains an experimental browser implementation; native storage and independent security review are pending.
+
+## Nested contact sections
+
+Messages now separates accepted contacts, pending requests, account discovery and blocked accounts into a compact Obsidian Ember segmented control. Sending, accepting or cancelling a friend request moves into Requests; block/unblock moves into Blocked or Contacts after the server confirms the mutation. Empty states explain each destination, and the existing account-scoped request cancellation behavior remains in place. Focused UI coverage verifies section isolation and the discovery/mutation lifecycle.
