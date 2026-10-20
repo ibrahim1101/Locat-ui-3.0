@@ -36,7 +36,7 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   await expect(page.getByText(/Both discovery and account signatures are valid/)).toBeVisible();
   await page.getByLabel(/confirmed this origin and fingerprint with the operator/).check();await page.getByRole('button',{name:'Pin after comparison'}).click();
   await expect(page.getByText('Authority fingerprint pinned for this account in this browser.')).toBeVisible();
-  await page.reload();await page.getByText(/Possible cloned server identity · review/).click();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
+  await page.reload();await page.getByText(/Authority signature/).click();await expect(page.getByText(/Possible cloned server identity · review/)).toBeVisible();await expect(page.getByText(/Both signatures are valid and match the authority key already pinned for this account/)).toBeVisible();await expect(page.getByRole('alert')).toContainText('https://old-origin.invalid');
   await page.goto(fixture.origin+'/devices');await expect(page.getByLabel("This browser's device name")).toBeVisible();
   const identity=await page.evaluate(async accountId=>{
    const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('locat-ui3-link:'+accountId,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
