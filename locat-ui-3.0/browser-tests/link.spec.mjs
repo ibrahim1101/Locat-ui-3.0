@@ -20,28 +20,29 @@ test('two independent browser identities compare, approve, transfer text and mul
   return page;
  }
  const refresh=async page=>{await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();};
+ const section=(page,name)=>page.getByRole('button',{name:new RegExp('^'+name)}).click();
  const card=(page,name)=>page.locator('article').filter({has:page.getByRole('heading',{name,exact:true})});
  try{
   const a=await open('Browser A',true),b=await open('Browser B');await refresh(a);
   await card(a,'Browser B').getByRole('button',{name:'Pair device',exact:true}).click();
   const first=a.getByRole('dialog',{name:'Compare both device screens',exact:true});await expect(first).toBeVisible();
   const code=await first.locator('p.font-mono').innerText();expect(code).toMatch(/^[A-Z0-9]+-[A-Z0-9]+$/);
-  await refresh(b);await b.getByRole('button',{name:'Review pairing',exact:true}).click();
+  await refresh(b);await section(b,'Pairings');await b.getByRole('button',{name:'Review pairing',exact:true}).click();
   const second=b.getByRole('dialog',{name:'Compare both device screens',exact:true});await expect(second.locator('p.font-mono')).toHaveText(code);
   await first.getByRole('button',{name:'Codes match — approve on this device',exact:true}).click();await expect(first).toHaveCount(0);
   await expect(a.getByRole('button',{name:'Send to device',exact:true})).toHaveCount(0);
-  await second.getByRole('button',{name:'Codes match — approve on this device',exact:true}).click();await expect(second).toHaveCount(0);await refresh(a);
+  await second.getByRole('button',{name:'Codes match — approve on this device',exact:true}).click();await expect(second).toHaveCount(0);await refresh(a);await section(a,'Pairings');
   const plaintext='Synthetic browser Link message '+randomBytes(24).toString('hex');
   await a.getByRole('button',{name:'Send to device',exact:true}).click();await a.getByLabel('Text to encrypt',{exact:true}).fill(plaintext);await a.getByRole('button',{name:'Encrypt and queue',exact:true}).click();await expect(a.getByRole('dialog',{name:'Send to Browser B',exact:true})).toHaveCount(0);
-  await refresh(b);const textDelivery=card(b,'Encrypted text');await expect(textDelivery.getByRole('button',{name:'Mark received',exact:true})).toBeDisabled();await textDelivery.getByRole('button',{name:'Decrypt message',exact:true}).click();
+  await refresh(b);await section(b,'Transfers');const textDelivery=card(b,'Encrypted text');await expect(textDelivery.getByRole('button',{name:'Mark received',exact:true})).toBeDisabled();await textDelivery.getByRole('button',{name:'Decrypt message',exact:true}).click();
   const received=b.getByRole('dialog',{name:'Received Link message',exact:true});await expect(received.getByText(plaintext,{exact:true})).toBeVisible();await received.getByRole('button',{name:'Close',exact:true}).click();await textDelivery.getByRole('button',{name:'Mark received',exact:true}).click();await expect(textDelivery).toContainText('complete');
   // More than two 256 KiB chunks, including a partial final chunk.
   const bytes=randomBytes(2*256*1024+137),filename='synthetic-link.bin';
-  await a.getByRole('button',{name:'Send to device',exact:true}).click();await a.getByRole('button',{name:'file',exact:true}).click();await a.getByLabel('Send encrypted Link file',{exact:true}).setInputFiles({name:filename,mimeType:'application/octet-stream',buffer:bytes});await expect(a.getByRole('dialog',{name:'Send to Browser B',exact:true})).toHaveCount(0);
-  await refresh(b);const fileDelivery=card(b,filename);await expect(fileDelivery).toContainText('3/3 encrypted chunks');await expect(fileDelivery.getByRole('button',{name:'Mark received',exact:true})).toBeDisabled();
+  await section(a,'Pairings');await a.getByRole('button',{name:'Send to device',exact:true}).click();await a.getByRole('button',{name:'file',exact:true}).click();await a.getByLabel('Send encrypted Link file',{exact:true}).setInputFiles({name:filename,mimeType:'application/octet-stream',buffer:bytes});await expect(a.getByRole('dialog',{name:'Send to Browser B',exact:true})).toHaveCount(0);
+  await refresh(b);await section(b,'Transfers');const fileDelivery=card(b,filename);await expect(fileDelivery).toContainText('3/3 encrypted chunks');await expect(fileDelivery.getByRole('button',{name:'Mark received',exact:true})).toBeDisabled();
   const downloadPromise=b.waitForEvent('download');await fileDelivery.getByRole('button',{name:'Download and verify file',exact:true}).click();const download=await downloadPromise;expect(download.suggestedFilename()).toBe(filename);const stream=await download.createReadStream();expect(stream).not.toBeNull();const parts=[];for await(const part of stream)parts.push(part);expect(Buffer.concat(parts).equals(bytes)).toBe(true);
   await fileDelivery.getByRole('button',{name:'Mark received',exact:true}).click();await expect(fileDelivery).toContainText('complete');expect(writes.length).toBe(4);expect(JSON.stringify(writes)).not.toContain(plaintext);
-  await card(a,'Browser B').getByRole('button',{name:'Revoke device',exact:true}).click();await a.getByRole('button',{name:'Confirm device revocation',exact:true}).click();await expect(card(a,'Browser B')).toContainText('Revoked');
+  await section(a,'Devices');await card(a,'Browser B').getByRole('button',{name:'Revoke device',exact:true}).click();await a.getByRole('button',{name:'Confirm device revocation',exact:true}).click();await expect(card(a,'Browser B')).toContainText('Revoked');
   await refresh(b);await expect(b.getByRole('alert')).toBeVisible();
   // An established account cookie cannot resurrect the revoked persisted key.
   await b.reload();await expect(b.getByRole('alert')).toBeVisible();await expect(b.getByRole('button',{name:'Send to device',exact:true})).toHaveCount(0);

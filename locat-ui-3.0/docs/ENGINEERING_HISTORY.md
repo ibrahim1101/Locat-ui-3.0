@@ -35,3 +35,7 @@ Secrets now stores secure notes as a separate encrypted entry type with strict f
 ## Nested contact sections
 
 Messages now separates accepted contacts, pending requests, account discovery and blocked accounts into a compact Obsidian Ember segmented control. Sending or cancelling a friend request moves into Requests; accepting one moves into Contacts. Block/unblock moves into Blocked or Contacts after the server confirms the mutation. Empty states explain each destination, and the existing account-scoped request cancellation behavior remains in place. Focused UI coverage verifies section isolation and the discovery/mutation lifecycle.
+
+## Nested Link destinations
+
+The Link Devices screen now groups registered browsers, verified pairings and encrypted transfers into separate counted sections using the existing Obsidian Ember segmented-control treatment. Successful sends open Transfers, and pairing decisions return to Pairings. Focused Link tests cover section navigation and transfer recovery; browser acceptance now navigates the same sections during the two-device pairing, transfer and revocation journey. Local TypeScript, ESLint, all frontend/server tests and production build were run for this batch; hosted acceptance will be recorded after publication.
