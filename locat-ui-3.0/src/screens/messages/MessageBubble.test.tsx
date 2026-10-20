@@ -13,3 +13,8 @@ it('loads encrypted voice media only when requested, then uses native paused pla
  view.rerender(<MessageBubble m={{...voice,attachment:{kind:'voice',name:'Voice message.webm',size:12_000,mime:'audio/webm',durationSec:12,previewUrl:'blob:decrypted'}}} grouped={false} showAuthor={false} onMenu={()=>{}} onJump={()=>{}} onRetry={()=>{}} onDownload={onDownload}/>);
  const audio=screen.getByLabelText('Voice message Voice message.webm');expect(audio.tagName).toBe('AUDIO');expect(audio).toHaveAttribute('preload','metadata');expect(audio).not.toHaveAttribute('autoplay');expect(audio).toHaveAttribute('controls');
 });
+
+it('renders accessible reaction counts and marks this device\'s reaction',()=>{
+ const message={...voice,text:'hello',reactions:[{emoji:'❤️',count:2,mine:true},{emoji:'👍',count:1,mine:false}]};renderVoice(vi.fn(),message);
+ expect(screen.getByTestId('reaction-voice-1-❤️')).toHaveAttribute('aria-label','❤️ reaction, 2, yours');expect(screen.getByTestId('reaction-voice-1-👍')).toHaveAttribute('aria-label','👍 reaction, 1');
+});
