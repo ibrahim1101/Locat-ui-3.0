@@ -7,7 +7,7 @@ Updated 2026-10-20. This tracker follows the current user-directed scope on `rew
 | Area | Current behavior | Remaining work |
 | --- | --- | --- |
 | Accounts and security | Real account/session controls, activity, device binding and revocation; device-local PBKDF2 app-lock passcode with background and inactivity policies | Independent review, cross-platform persistence checks and broader identity recovery; retain explicit authorization and recovery limits |
-| Chat | Verified one-to-one Matrix rooms, encrypted text/replies/reactions/attachments, local decrypted search, sender-validated encrypted text edits | Durable scheduled send remains unavailable until device-held credentials can send safely while the app is closed; continue lifecycle, reliability and physical-device acceptance |
+| Chat | Verified one-to-one Matrix rooms, encrypted text/replies/reactions/attachments, local decrypted search, sender-validated encrypted text edits and own-message redactions with a nested confirmation | Durable scheduled send remains unavailable until device-held credentials can send safely while the app is closed; continue lifecycle, reliability and physical-device acceptance |
 | Link | Verified device pairing and encrypted file/text transfers | Continue real two-device, larger-transfer, native and network acceptance |
 | Files & Vault | Encrypted Vault/Secrets stores and scoped file flows | Continue workspace integration, permissions and acceptance without restoring standalone media libraries |
 | Workspace | Nested destinations, Search, Home, command palette and grouped Settings using Obsidian Ember | Continue useful retained destinations with server-backed data and truthful unavailable states |

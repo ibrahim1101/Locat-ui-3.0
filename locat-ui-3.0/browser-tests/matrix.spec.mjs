@@ -142,6 +142,21 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     await expect(bob.page.getByRole('article',{name:'Contact: '+replacement})).toBeVisible({timeout:30000});await expect(bob.page.getByRole('article',{name:'Contact: '+original})).toHaveCount(0);
     expect(wire.slice(wireBefore).join('')).not.toContain(replacement);expect(wire.slice(wireBefore).join('')).not.toContain(original);await fixture.assertNoMessagePlaintext([original,replacement]);
   });
+  await test.step('Delete an owned encrypted message for everyone through a nested confirmation',async()=>{
+    const secret='LOCAT_BROWSER_DELETE_'+randomBytes(24).toString('hex'),sendsBefore=roomSends.length;
+    const sourceSend=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/send/m.room.encrypted/'),{timeout:30000});
+    await alice.page.getByLabel('Message',{exact:true}).fill(secret);await alice.page.getByRole('button',{name:'Send',exact:true}).click();await sourceSend;
+    const aliceTarget=alice.page.getByRole('article',{name:'You: '+secret}),bobTarget=bob.page.getByRole('article',{name:'Contact: '+secret});
+    await expect(aliceTarget).toBeVisible({timeout:30000});await expect(bobTarget).toBeVisible({timeout:30000});await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
+    const wireBefore=wire.length,redaction=alice.page.waitForRequest(request=>new URL(request.url()).pathname.includes('/redact/'),{timeout:30000});
+    await aliceTarget.press('Shift+F10');await alice.page.getByRole('menuitem',{name:'Delete for everyone',exact:true}).click();
+    const confirmation=alice.page.getByRole('dialog',{name:'Delete message for everyone?',exact:true});await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText('copies already saved by participants cannot be recalled');await confirmation.getByRole('button',{name:'Delete for everyone',exact:true}).click();
+    const request=await redaction;expect(request.method()).toBe('PUT');expect(request.postDataJSON()).toEqual({});
+    await expect(alice.page.getByText('This message was deleted',{exact:true})).toBeVisible({timeout:30000});await expect(bob.page.getByText('This message was deleted',{exact:true})).toBeVisible({timeout:30000});
+    await expect(alice.page.getByRole('article',{name:'You: '+secret})).toHaveCount(0);await expect(bob.page.getByRole('article',{name:'Contact: '+secret})).toHaveCount(0);
+    expect(wire.slice(wireBefore).join('')).not.toContain(secret);await fixture.assertNoMessagePlaintext([secret]);
+  });
   await test.step('Upload an encrypted attachment and verify recipient download integrity',async()=>{
    const name='private-note-'+randomBytes(6).toString('hex')+'.txt',secret='LOCAT_ATTACHMENT_PLAINTEXT_'+randomBytes(24).toString('hex'),plain=Buffer.from(secret,'utf8');
    await alice.page.getByTestId('composer-attach').click();await alice.page.getByRole('menuitem',{name:'Photo, file or video',exact:true}).click();await alice.page.getByRole('menuitem',{name:'Document or file · up to 2.9 MB',exact:true}).click();

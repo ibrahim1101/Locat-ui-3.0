@@ -2,6 +2,12 @@ const fail=(status,message)=>{throw Object.assign(new Error(message),{status});}
 export const validConversationRoomId=value=>typeof value==='string'&&(/^![A-Za-z0-9_-]{43}$/.test(value)||/^![^\s/:]{1,254}:[^\s/]{1,255}$/.test(value));
 /** Canonical room paths only; aliases, state writes, invites and plaintext sends are excluded. */
 export function conversationRoute(path,method){
+ const redact=/^\/_matrix\/client\/v3\/rooms\/([^/]+)\/redact\/([^/]+)\/([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})$/.exec(path);
+ if(redact&&method==='PUT'){
+  let roomId,eventId;try{roomId=decodeURIComponent(redact[1]);eventId=decodeURIComponent(redact[2]);}catch{return null;}
+  if(encodeURIComponent(roomId)!==redact[1]||!validConversationRoomId(roomId)||encodeURIComponent(eventId)!==redact[2]||!/^\$[A-Za-z0-9._~+=/-]{1,255}$/.test(eventId))return null;
+  return {roomId,action:'redact',eventId};
+ }
  const typing=/^\/_matrix\/client\/v3\/rooms\/([^/]+)\/typing\/([^/]+)$/.exec(path);
  if(typing&&method==='PUT'){
   let roomId,userId;try{roomId=decodeURIComponent(typing[1]);userId=decodeURIComponent(typing[2]);}catch{return null;}
@@ -22,6 +28,7 @@ export function conversationRoute(path,method){
  return null;
 }
 export function validateConversationRequest(route,input,query){
+ if(route.action==='redact'){if(query.size||Object.keys(input).length)fail(400,'Message deletion does not accept extra fields');return;}
  if(route.action==='typing'){if(query.size||Object.keys(input).some(key=>!['typing','timeout'].includes(key))||typeof input.typing!=='boolean'||input.typing&&( !Number.isSafeInteger(input.timeout)||input.timeout<1000||input.timeout>30000)||!input.typing&&input.timeout!==undefined)fail(400,'Invalid typing indicator metadata');return;}
  if(route.action==='receipt'){if(query.size||Object.keys(input).some(key=>key!=='thread_id')||input.thread_id!==undefined&&(typeof input.thread_id!=='string'||input.thread_id!=='main'&&!/^\$[A-Za-z0-9._~+=/:!-]{1,255}$/.test(input.thread_id)))fail(400,'Invalid read receipt metadata');return;}
  if(route.action==='members'){
