@@ -32,4 +32,4 @@ Secrets now stores secure notes as a separate encrypted entry type with strict f
 
 ## Nested contact sections
 
-Messages now separates accepted contacts, pending requests, account discovery and blocked accounts into a compact Obsidian Ember segmented control. Sending, accepting or cancelling a friend request moves into Requests; block/unblock moves into Blocked or Contacts after the server confirms the mutation. Empty states explain each destination, and the existing account-scoped request cancellation behavior remains in place. Focused UI coverage verifies section isolation and the discovery/mutation lifecycle.
+Messages now separates accepted contacts, pending requests, account discovery and blocked accounts into a compact Obsidian Ember segmented control. Sending or cancelling a friend request moves into Requests; accepting one moves into Contacts. Block/unblock moves into Blocked or Contacts after the server confirms the mutation. Empty states explain each destination, and the existing account-scoped request cancellation behavior remains in place. Focused UI coverage verifies section isolation and the discovery/mutation lifecycle.
