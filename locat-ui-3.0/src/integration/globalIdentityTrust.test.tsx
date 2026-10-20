@@ -59,9 +59,10 @@ it('finds the same pinned server UUID at another origin across accounts',()=>{
 it('repairs malformed authority records without removing valid pins',()=>{
  const malformedKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');
  const malformedFields='locat-ui3:authority-pin:v1:'+encodeURIComponent('d'.repeat(32))+':'+encodeURIComponent('https://other-locat.test');
- const trusted=signedIdentity();localStorage.setItem(malformedKey,'not-json');localStorage.setItem(malformedFields,JSON.stringify({...pinFor(trusted,'https://other-locat.test'),keyId:'bad-fingerprint',pinnedAt:new Date(0).toISOString()}));writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
- expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey,malformedFields]);expect(removeInvalidAuthorityPins()).toBe(2);
- expect(localStorage.getItem(malformedKey)).toBeNull();expect(localStorage.getItem(malformedFields)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://trusted.test']);
+ const malformedScope='locat-ui3:authority-pin:v1:other-account:'+encodeURIComponent('https://scope-locat.test'),trusted=signedIdentity();
+ localStorage.setItem(malformedKey,'not-json');localStorage.setItem(malformedFields,JSON.stringify({...pinFor(trusted,'https://other-locat.test'),keyId:'bad-fingerprint',pinnedAt:new Date(0).toISOString()}));localStorage.setItem(malformedScope,JSON.stringify({...pinFor(trusted,'https://scope-locat.test'),pinnedAt:new Date(0).toISOString()}));writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
+ expect(()=>findPinnedAuthorityClones(serverId,origin)).toThrow(/saved authority pin/);expect(findInvalidAuthorityPinKeys()).toEqual([malformedKey,malformedFields,malformedScope]);expect(removeInvalidAuthorityPins()).toBe(3);
+ expect(localStorage.getItem(malformedKey)).toBeNull();expect(localStorage.getItem(malformedFields)).toBeNull();expect(localStorage.getItem(malformedScope)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(findPinnedAuthorityClones(serverId,origin)).toEqual(['https://trusted.test']);
 });
 
 it('rejects malformed pin scopes and noncanonical public-key fields before storage',()=>{
@@ -92,13 +93,13 @@ it('warns about a cloned server UUID and requires operator confirmation before p
 });
 
 it('blocks pinning until malformed records are explicitly removed and trust is rechecked',async()=>{
- const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test');localStorage.setItem(invalidKey,'not-json');
- const trusted=signedIdentity();writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
+ const invalidKey='locat-ui3:authority-pin:v1:'+encodeURIComponent('b'.repeat(32))+':'+encodeURIComponent('https://old-locat.test'),invalidScope='locat-ui3:authority-pin:v1:invalid-account:'+encodeURIComponent('https://scope-locat.test');localStorage.setItem(invalidKey,'not-json');
+ const trusted=signedIdentity();localStorage.setItem(invalidScope,JSON.stringify({...pinFor(trusted,'https://scope-locat.test'),pinnedAt:new Date(0).toISOString()}));writeAuthorityPin('c'.repeat(32),pinFor(trusted,'https://trusted.test'));
  const fixture=signedIdentity();vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>new Response(JSON.stringify(fixture.discovery),{status:200})));
  render(<GlobalIdentityTrustDisclosure accountId={accountId} identity={fixture.identity}/>);fireEvent.click(screen.getByText(/Authority signature/));
  await screen.findByText(/Clone checks are stopped/);expect(screen.queryByRole('button',{name:'Pin after comparison'})).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'Remove malformed entries and recheck'}));
- const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(pin).toBeDisabled();
+ const pin=await screen.findByRole('button',{name:'Pin after comparison'});expect(localStorage.getItem(invalidKey)).toBeNull();expect(localStorage.getItem(invalidScope)).toBeNull();expect(readAuthorityPin('c'.repeat(32),'https://trusted.test')?.keyId).toBe(trusted.identity.attestation?.keyId);expect(pin).toBeDisabled();
  expect(await screen.findByRole('alert')).toHaveTextContent('https://trusted.test');const confirmation=screen.getByRole('checkbox',{name:/only active writable owner/});fireEvent.click(confirmation);fireEvent.click(pin);await screen.findByText('Authority fingerprint pinned for this account in this browser.');
 });
 

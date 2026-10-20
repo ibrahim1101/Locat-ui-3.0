@@ -391,3 +391,7 @@ The real browser test seeds an unreadable old-origin authority record alongside 
 ### Current continuation — strict authority-pin record validation
 
 Local pin records are checked for canonical secure origin, UUID-shaped server ID, canonical Ed25519 SPKI bytes, SHA-256 fingerprint shape and canonical timestamp before participating in pin continuity/clone detection. Account/origin storage keys are validated; the existing explicit repair action remains limited to malformed entries. Focused tests pass 10 cases, full local suite passes 250 frontend / 107 server tests, and check/lint/build pass. The hosted core/UI3 runs for the first candidate are in progress; review also corrected the browser fixture to use valid account IDs for its preserved clone pin. Pin storage remains editable browser `localStorage`; this format check is not tamper protection, account recovery or cross-device coordination.
+
+### P2 pin-scope clone-scan follow-up
+
+Clone scans now validate the versioned pin storage key's 32-hex account ID and canonical origin before considering a pin. An invalid scope halts the scan and routes through the explicit nested malformed-entry repair. Regression confirms invalid-scope records are removed and a valid clone pin is preserved. Focused trust tests pass 10; full local validation passed (250 frontend / 107 server tests, typecheck, lint and build); hosted acceptance for this follow-up is pending.

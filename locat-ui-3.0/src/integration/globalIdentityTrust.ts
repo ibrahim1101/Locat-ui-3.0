@@ -21,6 +21,11 @@ function samePin(pin:AuthorityPin,verified:Omit<AuthorityPin,'pinnedAt'>){return
 function validPinOrigin(value:string){
  try{const origin=new URL(value);return origin.origin===value&&!origin.username&&!origin.password&&origin.pathname==='/'&&!origin.search&&!origin.hash&&(origin.protocol==='https:'||(origin.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(origin.hostname)));}catch{return false;}
 }
+function authorityPinScope(key:string){
+ if(!key.startsWith(pinPrefix))return null;
+ const encoded=key.slice(pinPrefix.length),separator=encoded.indexOf(':');if(separator<0)return null;
+ try{const accountId=decodeURIComponent(encoded.slice(0,separator)),origin=decodeURIComponent(encoded.slice(separator+1));if(!/^[a-f0-9]{32}$/.test(accountId)||!validPinOrigin(origin)||key!==pinKey(accountId,origin))return null;return {accountId,origin};}catch{return null;}
+}
 function isAuthorityPin(value:unknown):value is AuthorityPin{
  if(!value||typeof value!=='object')return false;
  const pin=value as Partial<AuthorityPin>;
@@ -43,12 +48,10 @@ export function findInvalidAuthorityPinKeys(storage:Storage=localStorage):string
  const invalid:string[]=[];
  for(let index=0;index<storage.length;index++){
   const key=storage.key(index);if(!key?.startsWith(pinPrefix))continue;
-  const encoded=key.slice(pinPrefix.length),separator=encoded.indexOf(':');
-  let accountId='',origin='';
-  try{if(separator<0)throw new Error('Invalid pin key');accountId=decodeURIComponent(encoded.slice(0,separator));origin=decodeURIComponent(encoded.slice(separator+1));if(!/^[a-f0-9]{32}$/.test(accountId)||!validPinOrigin(origin))throw new Error('Invalid pin scope');}catch{invalid.push(key);continue;}
+  const scope=authorityPinScope(key);if(!scope){invalid.push(key);continue;}
   const raw=storage.getItem(key);if(raw===null){invalid.push(key);continue;}
   let pin:unknown;try{pin=JSON.parse(raw);}catch{invalid.push(key);continue;}
-  if(!isAuthorityPin(pin)||pin.origin!==origin||key!==pinKey(accountId,origin))invalid.push(key);
+  if(!isAuthorityPin(pin)||pin.origin!==scope.origin)invalid.push(key);
  }
  return invalid;
 }
@@ -60,10 +63,11 @@ export function findPinnedAuthorityClones(serverId:string,origin:string,storage:
  const origins=new Set<string>();
  for(let index=0;index<storage.length;index++){
   const key=storage.key(index);if(!key?.startsWith(pinPrefix))continue;
+  const scope=authorityPinScope(key);if(!scope)throw new Error('A saved authority pin has an invalid account or origin scope. Repair malformed authority pins before checking for cloned server identities.');
   const raw=storage.getItem(key);if(raw===null)continue;
   let pin:AuthorityPin;
   try{pin=JSON.parse(raw) as AuthorityPin;}catch{throw new Error('A saved authority pin is unreadable. Clear the invalid pin before checking for cloned server identities.');}
-  if(!isAuthorityPin(pin))throw new Error('A saved authority pin is invalid. Clear the invalid pin before checking for cloned server identities.');
+  if(!isAuthorityPin(pin)||pin.origin!==scope.origin)throw new Error('A saved authority pin is invalid. Clear the invalid pin before checking for cloned server identities.');
   if(pin.serverId===serverId&&pin.origin!==origin)origins.add(pin.origin);
  }
  return [...origins].sort();
