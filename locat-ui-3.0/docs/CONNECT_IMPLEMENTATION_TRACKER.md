@@ -289,3 +289,12 @@ Source **5cd7e7c614ac0ecd7184cf5a5a299f92b2292751**: UI3 workflow **39413862156*
 The real-browser acceptance includes same-UUID alternate-origin clone warning and explicit only-active-writable-owner confirmation, plus same-database signing-key loss/replacement. The original pin remains unchanged until separate fingerprint comparison and explicit replacement; the new pin is verified on reload. Prior `d992bcc` collapsed-details and `fdbe177` checkbox selector failures were corrected in tests and superseded by this green source.
 
 Open limitations: browser-profile-local pin storage, no global or cross-device clone detection or single-writer coordination; no full account/history recovery, native secure stores, independent security review, federation or domain ownership proof. All 49 requirements and A–AM scope remain retained. No main merge, deployment, release, DNS/Cloudflare change or production data migration.
+
+
+## 2026-10-20 — P2 malformed authority-pin repair accepted
+
+Source **fb1d7fe049e2159775b7e7ffea4762a6893ef013** passed UI3 workflow **39416980325** (job **118608271336**) and core workflow **39416980238**: connector **118608271293**, macOS **118608271704**, Ubuntu **118608271720**, browser **118608271754**, Windows **118608271839**, all successful. Each OS passed **249 frontend tests**, typecheck, lint and build; Ubuntu passed actual SDK **44.0.0** / Synapse **1.163.0**. Browser passed **7 Chromium / 8.2m, 7 Firefox / 8.5m, 3 private-store repeats / 17.2s**.
+
+Malformed records in the versioned local authority-pin namespace now halt trust changes. Users can remove only malformed records through the nested trust details; valid pins are preserved and verification plus clone detection runs again before the UI exposes pin or rotation acceptance. The regression seeds a valid matching server UUID at a second origin and verifies the strict operator confirmation remains required after repair. Focused trust suite: **9 passing**; local full suites: **249 frontend /107 server**, check/lint/build/diff check pass.
+
+Still open: pin persistence is mutable browser localStorage; repair is not trust recovery or global clone detection/single-writer coordination. Full account/history recovery, cross-signing, native stores, independent security review, federation and public/domain ownership proof remain open. All 49 requirements and A–AM scope remain retained; no deployment or main merge.
