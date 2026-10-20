@@ -15,6 +15,7 @@ export type ComposerProps = {
  */
 export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, onSend, onCancelContext, onAttach, onSchedule, onVoice }: ComposerProps) {
   const [menu, setMenu] = useState(false);
+  const [subMenu, setSubMenu] = useState<"media" | "place" | "creative" | null>(null);
   const [rec, setRec] = useState<number | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (rec === null) return; const t = setInterval(() => setRec((s) => (s === null ? s : s >= 60 ? s : s + 1)), 1000); return () => clearInterval(t); }, [rec]);
@@ -43,7 +44,7 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
         </div>
       ) : (
         <div className="flex items-end gap-1">
-          <IconButton icon={Plus} label="Attach" onClick={() => setMenu(true)} disabledReason={r(cap.file)} data-testid="composer-attach" />
+          <IconButton icon={Plus} label="Attach" onClick={() => { setSubMenu(null); setMenu(true); }} disabledReason={r(cap.file)} data-testid="composer-attach" />
           <div className={cn("flex min-h-[44px] flex-1 items-end rounded-[22px] bg-s2 px-3.5 hairline focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))]", textOff && "opacity-50")}>
             <textarea ref={ta} rows={1} value={draft.text} disabled={!!textOff} aria-label="Message" placeholder={editing ? "Edit message" : "Encrypted message"} data-testid="composer-input"
               onChange={(e) => onDraft({ ...draft, text: e.target.value })}
@@ -55,11 +56,20 @@ export function Composer({ draft, capabilities: cap, replyTo, editing, onDraft, 
             : <IconButton icon={Mic} label="Record voice message (max 60s)" onClick={() => setRec(0)} disabledReason={r(cap.voice)} data-testid="composer-voice" />}
         </div>)}
       <ActionMenu open={menu} onClose={() => setMenu(false)} title="Share in conversation" actions={[
-        { id: "image", label: "Photo (original quality)", icon: ImageIcon, onSelect: () => onAttach("image"), disabledReason: r(cap.image) },
+        { id: "media", label: "Photo, file or video", icon: Paperclip, onSelect: () => { setSubMenu("media"); setMenu(false); } },
+        { id: "place", label: "Location & schedule", icon: MapPin, onSelect: () => { setSubMenu("place"); setMenu(false); } },
+        { id: "creative", label: "Stickers & doodles", icon: Brush, onSelect: () => { setSubMenu("creative"); setMenu(false); } },
+      ]} />
+      <ActionMenu open={subMenu === "media"} onClose={() => setSubMenu(null)} title="Photo, file or video" actions={[
+        { id: "image", label: "Photo · original or resized copy", icon: ImageIcon, onSelect: () => onAttach("image"), disabledReason: r(cap.image) },
         { id: "file", label: "Document or file · up to 2.9 MB", icon: FileUp, onSelect: () => onAttach("file"), disabledReason: r(cap.file) },
+        { id: "video", label: "Video", icon: Video, onSelect: () => onAttach("video"), disabledReason: r(cap.video) },
+      ]} />
+      <ActionMenu open={subMenu === "place"} onClose={() => setSubMenu(null)} title="Location & schedule" actions={[
         { id: "location", label: "Share my location once", icon: MapPin, onSelect: () => onAttach("location"), disabledReason: r(cap.location) },
         { id: "schedule", label: "Schedule a text message", icon: CalendarClock, onSelect: onSchedule, disabledReason: r(cap.schedule) },
-        { id: "video", label: "Video", icon: Video, onSelect: () => onAttach("video"), disabledReason: r(cap.video) },
+      ]} />
+      <ActionMenu open={subMenu === "creative"} onClose={() => setSubMenu(null)} title="Stickers & doodles" actions={[
         { id: "doodle", label: "Doodle", icon: Brush, onSelect: () => undefined, disabledReason: "Planned (#35)" },
         { id: "sticker", label: "Sticker packs", icon: Sticker, onSelect: () => undefined, disabledReason: "Planned (#28)" },
         { id: "device-media", label: "Search & select from my devices", icon: Paperclip, onSelect: () => undefined, disabledReason: "Planned — cross-device index" },
