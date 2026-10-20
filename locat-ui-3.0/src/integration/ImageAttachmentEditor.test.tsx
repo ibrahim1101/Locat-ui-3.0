@@ -29,3 +29,17 @@ it('preserves original bytes and disables originals over the encrypted attachmen
  await screen.findByLabelText('Photo crop preview');expect(screen.getByRole('button',{name:'Send original'})).toBeDisabled();expect(screen.getByRole('button',{name:'Send edited copy'})).toBeEnabled();
  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(onSend).not.toHaveBeenCalled();
 });
+
+it('rejects an oversized source before decoding it',async()=>{
+ const decode=vi.fn();vi.stubGlobal('createImageBitmap',decode);
+ const file=new File(['small'], 'oversized.jpg',{type:'image/jpeg'});Object.defineProperty(file,'size',{value:40_000_001});
+ render(<ImageAttachmentEditor file={file} onClose={()=>{}} onSend={()=>{}}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('Choose a photo smaller than 40 MB to edit safely.');expect(decode).not.toHaveBeenCalled();
+});
+
+it('closes and rejects decoded images above the pixel budget',async()=>{
+ const bitmap={width:6001,height:6000,close:vi.fn()};vi.stubGlobal('createImageBitmap',vi.fn(async()=>bitmap));
+ const file=new File(['source'],'large-dimensions.jpg',{type:'image/jpeg'});
+ render(<ImageAttachmentEditor file={file} onClose={()=>{}} onSend={()=>{}}/>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('This photo is too large to edit safely on this device.');expect(bitmap.close).toHaveBeenCalledOnce();
+});
