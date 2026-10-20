@@ -1,10 +1,10 @@
 /** One uncertain transaction per exclusively owned account/device store. Never stores SDK events or drafts. */
-export type PendingMatrixSend={peerId:string;roomId:string;transaction:string;devices:string;createdAt:number;attempts:number;body?:string;kind?:'attachment'};
+export type PendingMatrixSend={peerId:string;roomId:string;transaction:string;devices:string;createdAt:number;attempts:number;body?:string;kind?:'attachment'|'reaction'};
 export type MatrixOutbox=ReturnType<typeof createMatrixOutbox>;
 export function createMatrixOutbox(scope:string,deviceId:string,senderKey:string){
  const name='locat-ui3-matrix-outbox:'+scope;
  function validate(row:PendingMatrixSend){
-  if(!row||Object.keys(row).some(key=>!['peerId','roomId','transaction','devices','createdAt','attempts','body','kind'].includes(key))||(row.kind!==undefined&&row.kind!=='attachment')||(row.kind==='attachment'&&row.body!==undefined)||!/^[a-f0-9]{32}$/.test(row.peerId)||!/^![^\s/]{1,510}$/.test(row.roomId)||!/^locat_[a-f0-9-]{36}$/.test(row.transaction)||typeof row.devices!=='string'||row.devices.length>16384||!Number.isSafeInteger(row.createdAt)||row.createdAt<=0||!Number.isInteger(row.attempts)||row.attempts<0||row.attempts>3)throw new Error('Invalid encrypted retry record.');
+  if(!row||Object.keys(row).some(key=>!['peerId','roomId','transaction','devices','createdAt','attempts','body','kind'].includes(key))||(row.kind!==undefined&&!['attachment','reaction'].includes(row.kind))||(row.kind==='attachment'&&row.body!==undefined)||!/^[a-f0-9]{32}$/.test(row.peerId)||!/^![^\s/]{1,510}$/.test(row.roomId)||!/^locat_[a-f0-9-]{36}$/.test(row.transaction)||typeof row.devices!=='string'||row.devices.length>16384||!Number.isSafeInteger(row.createdAt)||row.createdAt<=0||!Number.isInteger(row.attempts)||row.attempts<0||row.attempts>3)throw new Error('Invalid encrypted retry record.');
   const devices:unknown=JSON.parse(row.devices);if(!Array.isArray(devices)||!devices.length||devices.length>100||devices.some(id=>typeof id!=='string'||!id||id.length>255))throw new Error('Invalid encrypted retry device scope.');
   if(row.body!==undefined)validateBody(row.body);
   return row;
