@@ -1,36 +1,72 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { LayoutGrid, Lock, MessageCircle, Settings, User } from "lucide-react";
+import { LayoutGrid, Lock, MessageCircle, User } from "lucide-react";
 import type { SearchResultView, SearchScope } from "@/contracts/ecosystem";
 import { MODULES } from "@/app/registry";
+import { useSession } from "@/app/session";
 import { FIXTURE_CONTACTS, FIXTURE_MESSAGES } from "@/fixtures/data";
+import { accountRequest } from "@/integration/accountRequest";
 import { Screen } from "@/layouts/Screen";
-import { Banner, ChipRow, SearchField, Section, ListRow, StateView } from "@/ui";
+import { Banner, Button, ChipRow, SearchField, Section, ListRow, StateView } from "@/ui";
 
-const ICON: Record<SearchScope, typeof User> = { messages: MessageCircle, attachments: MessageCircle, contacts: User, modules: LayoutGrid, settings: Settings };
+const ICON: Record<SearchScope, typeof User> = { messages: MessageCircle, attachments: MessageCircle, contacts: User, modules: LayoutGrid, settings: LayoutGrid };
+type Contact = { user: { id: string; displayName: string; username: string; lcCode: string }; status: "pending" | "accepted" };
+const EMPTY_CONTACTS: Contact[] = [];
 
-/** Scoped universal search (M4). Message search runs on this device's decrypted copy only. */
+/** Search only real live account contacts; message search remains local to an open conversation. */
 export default function Search() {
   const nav = useNavigate();
-  const [q, setQ] = useState(""); const [scope, setScope] = useState<"all" | SearchScope>("all");
+  const { adapter, user } = useSession();
+  const preview = adapter.mode === "preview";
+  const [q, setQ] = useState("");
+  const [scope, setScope] = useState<"all" | SearchScope>("all");
+  const [contactState, setContactState] = useState<{ accountId: string; contacts?: Contact[]; error?: string }>();
+  const [attempt, setAttempt] = useState(0);
+  const contacts = user?.id && contactState?.accountId === user.id ? contactState.contacts ?? EMPTY_CONTACTS : EMPTY_CONTACTS;
+  const contactError = user?.id && contactState?.accountId === user.id ? contactState.error ?? "" : "";
+
+  useEffect(() => {
+    if (preview || !user?.id) return;
+    const control = new AbortController();
+    void Promise.resolve().then(async () => {
+      try {
+        const data = await accountRequest("/api/contacts", user.id, undefined, control.signal);
+        if (!control.signal.aborted) setContactState({ accountId: user.id, contacts: data.contacts as Contact[] });
+      } catch (reason) {
+        if (!control.signal.aborted) setContactState({ accountId: user.id, error: reason instanceof Error ? reason.message : "Contacts could not be searched." });
+      }
+    });
+    return () => control.abort();
+  }, [preview, user?.id, attempt]);
+
   const results = useMemo<SearchResultView[]>(() => {
-    const s = q.trim().toLowerCase(); if (s.length < 2) return [];
+    const term = q.trim().toLowerCase();
+    if (term.length < 2) return [];
+    const messages = preview ? [
+      ...FIXTURE_MESSAGES.filter((m) => !m.hidden && m.text?.toLowerCase().includes(term)).map((m) => ({ id: m.id, scope: "messages" as const, title: m.text!, subtitle: `${m.authorName} · preview`, route: `/messages/${m.conversationId}` })),
+      ...FIXTURE_MESSAGES.filter((m) => m.attachment && "name" in m.attachment && m.attachment.name.toLowerCase().includes(term)).map((m) => ({ id: "a" + m.id, scope: "attachments" as const, title: (m.attachment as { name: string }).name, subtitle: "Preview attachment name", route: `/messages/${m.conversationId}` })),
+      ...FIXTURE_CONTACTS.filter((c) => `${c.displayName} ${c.username} ${c.lcCode}`.toLowerCase().includes(term)).map((c) => ({ id: c.id, scope: "contacts" as const, title: c.displayName, subtitle: `@${c.username} · ${c.lcCode}`, route: "/messages" })),
+    ] : contacts.filter((contact) => contact.status === "accepted" && `${contact.user.displayName} ${contact.user.username} ${contact.user.lcCode}`.toLowerCase().includes(term)).map((contact) => ({ id: contact.user.id, scope: "contacts" as const, title: contact.user.displayName, subtitle: `@${contact.user.username} · ${contact.user.lcCode}`, route: "/messages" }));
     return [
-      ...FIXTURE_MESSAGES.filter((m) => !m.hidden && m.text?.toLowerCase().includes(s)).map((m) => ({ id: m.id, scope: "messages" as const, title: m.text!, subtitle: `${m.authorName} · this device`, route: `/messages/${m.conversationId}` })),
-      ...FIXTURE_MESSAGES.filter((m) => m.attachment && "name" in m.attachment && m.attachment.name.toLowerCase().includes(s)).map((m) => ({ id: "a" + m.id, scope: "attachments" as const, title: (m.attachment as { name: string }).name, subtitle: "Attachment name", route: `/messages/${m.conversationId}` })),
-      ...FIXTURE_CONTACTS.filter((c) => `${c.displayName} ${c.username} ${c.lcCode}`.toLowerCase().includes(s)).map((c) => ({ id: c.id, scope: "contacts" as const, title: c.displayName, subtitle: `@${c.username} · ${c.lcCode}`, route: "/messages" })),
-      ...MODULES.filter((m) => `${m.name} ${m.tagline}`.toLowerCase().includes(s)).map((m) => ({ id: m.id, scope: "modules" as const, title: m.name, subtitle: m.tagline, route: m.route })),
-    ].filter((r) => scope === "all" || r.scope === scope);
-  }, [q, scope]);
-  const groups = [...new Set(results.map((r) => r.scope))];
+      ...messages,
+      ...MODULES.filter((module) => `${module.name} ${module.tagline}`.toLowerCase().includes(term)).map((module) => ({ id: module.id, scope: "modules" as const, title: module.name, subtitle: module.tagline, route: module.route })),
+    ].filter((result) => scope === "all" || result.scope === scope);
+  }, [q, scope, preview, contacts]);
+  const groups = [...new Set(results.map((result) => result.scope))];
+  const termReady = q.trim().length >= 2;
+
   return (
-    <Screen title="Search" testId="search-screen" toolbar={<><SearchField autoFocus value={q} onChange={setQ} placeholder="Search messages, people, files, modules" testId="global-search-input" />
-      <ChipRow label="Scope" value={scope} onChange={setScope} options={[{ value: "all", label: "All" }, { value: "messages", label: "Messages" }, { value: "attachments", label: "Files" }, { value: "contacts", label: "People" }, { value: "modules", label: "Modules" }]} /></>}>
+    <Screen title="Search" testId="search-screen" toolbar={<><SearchField autoFocus value={q} onChange={setQ} placeholder="Search people and modules" testId="global-search-input" />
+      <ChipRow label="Scope" value={scope} onChange={setScope} options={[{ value: "all", label: "All" }, { value: "contacts", label: "People" }, { value: "modules", label: "Modules" }, { value: "messages", label: "Messages" }, { value: "attachments", label: "Files" }]} /></>}>
       <div className="mx-auto max-w-3xl">
-        <Banner className="mb-5" tone="info" icon={Lock} title="Encrypted content is searched on this device only">Your server can't read messages, so it can't search them. Hidden messages, Vault and Secrets are never included.</Banner>
-        {q.trim().length < 2 ? <StateView compact kind="empty" title="Type at least 2 characters" body="Results are grouped by where they came from." />
-          : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body="Older history not stored on this device can't be searched." />
-          : groups.map((g) => <Section key={g} title={g}>{results.filter((r) => r.scope === g).map((r) => <ListRow key={r.id} icon={ICON[r.scope]} title={r.title} subtitle={r.subtitle} onClick={() => nav(r.route)} chevron testId={`result-${r.id}`} />)}</Section>)}
+        <Banner className="mb-5" tone="info" icon={Lock} title={preview ? "Preview search uses fictional content" : "Private messages stay on this device"}>
+          {preview ? "Sample messages and people are for layout preview only." : "Global search covers your accepted contacts and Locat modules. Search encrypted message text inside an open conversation; it is never sent to the server."}
+        </Banner>
+        {contactError && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-danger/10 p-3 text-sm text-danger"><span role="alert">Contacts could not be loaded: {contactError}</span><Button size="sm" variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></div>}
+        {!preview && user && !contacts.length && !contactError && <p role="status" className="mb-4 text-sm text-ink-3">Loading your contacts…</p>}
+        {!termReady ? <StateView compact kind="empty" title="Type at least 2 characters" body="Results are grouped into people and modules." />
+          : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body={preview ? "Try a sample name, message or module." : scope === "messages" || scope === "attachments" ? "Open a conversation to search its locally decrypted messages." : "Try another name or module."} />
+          : groups.map((group) => <Section key={group} title={group}>{results.filter((result) => result.scope === group).map((result) => <ListRow key={result.id} icon={ICON[result.scope]} title={result.title} subtitle={result.subtitle} onClick={() => nav(result.route)} chevron testId={`result-${result.id}`} />)}</Section>)}
       </div>
     </Screen>
   );

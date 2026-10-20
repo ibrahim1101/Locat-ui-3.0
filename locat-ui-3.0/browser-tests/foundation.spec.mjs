@@ -55,6 +55,10 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   await homeSummary.getByRole('button',{name:'Review requests'}).click();
   await expect(page.getByRole('button',{name:/Requests/})).toHaveAttribute('aria-pressed','true');
   await expect(page.getByText(/Synthetic requester · @request_/)).toBeVisible();
+  await page.goto(fixture.origin+'/search');
+  await page.getByTestId('global-search-input').fill('Mira');
+  await expect(page.getByText('No results for "Mira"')).toBeVisible();
+  await expect(page.getByText('Mira Okafor')).toHaveCount(0);
   await page.goto(fixture.origin+'/settings');await expect(page.getByText('Your server identity')).toBeVisible();
   await page.evaluate(({serverId,keyId,publicKey})=>{localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('d'.repeat(32))+':'+encodeURIComponent('https://old-origin.invalid'),JSON.stringify({origin:'https://old-origin.invalid',serverId,keyId,publicKey,pinnedAt:new Date(0).toISOString()}));localStorage.setItem('locat-ui3:authority-pin:v1:'+encodeURIComponent('e'.repeat(32))+':'+encodeURIComponent('https://broken-origin.invalid'),'not-json');},{serverId:registered.user.globalIdentity.serverId,keyId:registered.user.globalIdentity.attestation.keyId,publicKey:registered.user.globalIdentity.attestation.publicKey});
   const authorityDetails=page.getByText(/Authority signature/);await authorityDetails.click();

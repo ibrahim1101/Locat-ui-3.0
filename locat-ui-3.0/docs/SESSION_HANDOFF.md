@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint before current local browser-test addition: `16510ad` (`Refresh current session handoff`). The working tree contains an uncommitted browser acceptance update.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `cf605a3` (`Assert live Home excludes preview fixtures`). The checkout is clean at that commit before the current global-search work is committed.
 
 ## Active direction
 
@@ -20,13 +20,13 @@ Current Home conversation summaries are still not connected. Do not derive “re
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (282 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. A new two-account Home-to-Requests browser scenario passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (282 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Hosted checks for `cf605a3` were still running at last inspection; verify through the commit check-runs API before reporting.
 
-At the latest check, GitHub checks for `12e4ffe` were still running: connector preparation succeeded; Ubuntu, Windows and browser-foundation were in progress; macOS was queued. Verify before reporting a hosted result. The workflow-run summary wrapper filters pull-request runs, so query commit check-runs if needed.
+The workflow-run summary wrapper filters pull-request runs, so query commit check-runs when verifying push-triggered hosted results.
 
 ## Remaining work
 
-- Continue useful server-backed workspace destinations and truthful unavailable states.
+- Global Search now uses account-owned accepted contacts and modules in live mode; encrypted messages remain searchable inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
 - Connect Home to actual conversation summaries only if the Matrix session can provide a safe, account-scoped local projection.
 - Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
 - Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
