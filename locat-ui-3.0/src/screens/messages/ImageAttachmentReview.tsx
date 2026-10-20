@@ -41,7 +41,6 @@ export function ImageAttachmentReview({ file, onClose, onSend }: { file: File; o
   };
   const isGif = file.type === "image/gif";
   const transformable = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
-  const tooLarge = displayFile.size > MAX_ATTACHMENT_BYTES;
 
   return (
     <Sheet open onClose={onClose} title="Review photo" description="Choose the original or prepare a smaller copy before encryption." size="sm" testId="image-attachment-review">
