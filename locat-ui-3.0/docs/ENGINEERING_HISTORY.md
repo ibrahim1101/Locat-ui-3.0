@@ -25,3 +25,7 @@ Earlier publication failures: commit `89e1f36` included a malformed `Conversatio
 ## Remaining limits
 
 Search covers loaded messages only. Client-side edit projection can be bypassed by a modified client, so peers should accept only authenticated same-author events. Scheduled sending stays unavailable until it has a durable sender compatible with device-held Matrix credentials. Physical-device and broader identity-recovery acceptance remain open.
+
+## Standalone encrypted secure notes
+
+Secrets now stores secure notes as a separate encrypted entry type with strict field validation and the same account/module/record-bound authenticated encryption as credentials. The editor presents Credential and Secure note as a nested segmented choice; note mode provides a multiline field, while credential mode keeps password generation and optional note details. Notes can be searched locally after unlock, viewed, copied, edited and removed. UI and crypto tests verify encrypted upload, note round-trip and bounds. This remains an experimental browser implementation; native storage and independent security review are pending.

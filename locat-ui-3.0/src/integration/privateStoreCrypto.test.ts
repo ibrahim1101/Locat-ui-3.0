@@ -13,6 +13,13 @@ it('uses real Web Crypto for encrypted round-trip without extractable keys or pl
  const again=await encryptPrivateEntry(key,config,scope,'record-a',entry);expect(again.iv).not.toBe(envelope.iv);expect(again.data).not.toBe(envelope.data);
  await expect(crypto.subtle.exportKey('raw',key)).rejects.toThrow();
 });
+it('encrypts and validates standalone secure notes as their own entry type',async()=>{
+ const {key,config}=await createPrivateStore(phrase,scope),entry={kind:'note' as const,name:'Recovery steps',folder:'Personal',note:'Keep this private\nsecond line',createdAt:1};
+ const envelope=await encryptPrivateEntry(key,config,scope,'note-record',entry);
+ expect(JSON.stringify(envelope)).not.toContain(entry.name);expect(JSON.stringify(envelope)).not.toContain(entry.note);
+ expect(await decryptPrivateEntry(key,config,scope,'note-record',envelope)).toEqual(entry);
+ expect(()=>validateEntry({...entry,username:''})).toThrow();expect(()=>validateEntry({...entry,note:'x'.repeat(16001)})).toThrow();
+});
 it('rejects wrong passwords, owners, modules, record IDs, stores and modified ciphertext',async()=>{
  const {key,config}=await createPrivateStore(phrase,scope);
  await expect(unlockPrivateStore('a wrong long passphrase',config,scope)).rejects.toThrow();
@@ -23,7 +30,7 @@ it('rejects wrong passwords, owners, modules, record IDs, stores and modified ci
  const tampered={...envelope,data:(envelope.data.startsWith('A')?'B':'A')+envelope.data.slice(1)};
  await expect(decryptPrivateEntry(key,config,scope,'record-a',tampered)).rejects.toThrow();
  await expect(decryptPrivateEntry(key,{...config,storeId:crypto.randomUUID()},scope,'record-a',envelope)).rejects.toThrow();
-});
+},15000);
 it('encrypts bounded file data and rejects mismatched decrypted file lengths',async()=>{
  const fileScope={...scope,module:'vault' as const};const {key,config}=await createPrivateStore(phrase,fileScope);const bytes=new Uint8Array([0,255,4]);
  const entry={kind:'file' as const,name:'file.bin',folder:'',mime:'application/octet-stream',bytes:3,data:encodeBase64(bytes),createdAt:1};

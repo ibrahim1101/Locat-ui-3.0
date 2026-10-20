@@ -16,9 +16,10 @@ export function samePrivateConfig(a,b){
  return a.v===b.v&&a.storeId===b.storeId&&a.salt===b.salt&&a.iterations===b.iterations&&a.wrappedKey.v===b.wrappedKey.v&&a.wrappedKey.iv===b.wrappedKey.iv&&a.wrappedKey.data===b.wrappedKey.data;
 }
 export function validateEntry(value){
- const file=value?.kind==='file';object(value,file?['kind','name','folder','mime','bytes','data','createdAt']:['kind','name','folder','username','password','url','note','createdAt']);
- if(!['file','credential'].includes(value.kind) || !Number.isSafeInteger(value.createdAt) || value.createdAt<=0)fail();
- for(const [field,max] of Object.entries(file?{name:255,folder:200,mime:128}:{name:200,folder:200,username:500,password:4096,url:2048,note:16000}))if(typeof value[field]!=='string' || value[field].length>max)fail();
+ const file=value?.kind==='file',note=value?.kind==='note';
+ object(value,file?['kind','name','folder','mime','bytes','data','createdAt']:note?['kind','name','folder','note','createdAt']:['kind','name','folder','username','password','url','note','createdAt']);
+ if(!['file','credential','note'].includes(value.kind) || !Number.isSafeInteger(value.createdAt) || value.createdAt<=0)fail();
+ for(const [field,max] of Object.entries(file?{name:255,folder:200,mime:128}:note?{name:200,folder:200,note:16000}:{name:200,folder:200,username:500,password:4096,url:2048,note:16000}))if(typeof value[field]!=='string' || value[field].length>max)fail();
  if(!value.name.trim())fail();
  if(file){if(!Number.isSafeInteger(value.bytes) || value.bytes<0 || value.bytes>PRIVATE_FILE_LIMIT)fail();base64(value.data,0,4*Math.ceil(PRIVATE_FILE_LIMIT/3));}
  return value;

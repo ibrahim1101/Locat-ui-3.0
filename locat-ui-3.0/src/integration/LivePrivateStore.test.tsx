@@ -20,6 +20,19 @@ it('encrypts secret fields before upload and clears plaintext when the page is h
  vi.spyOn(document,'hidden','get').mockReturnValue(true);fireEvent(document,new Event('visibilitychange'));
  await waitFor(()=>expect(screen.queryByText('Private account title')).toBeNull());expect(screen.queryByRole('button',{name:'Add credential or note'})).toBeNull();
 });
+it('creates, searches, edits and views a standalone encrypted secure note',async()=>{
+ vi.stubGlobal('crypto',webcrypto);vi.stubGlobal('isSecureContext',true);
+ const writes:unknown[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{const input=options?.body?JSON.parse(String(options.body)):undefined;if(path.endsWith('/put'))writes.push(input);return {ok:true,json:async()=>options?.method==='POST'?(path.endsWith('/put')?{revision:1}:{ok:true}):{config:null,objects:[],quota:67108864,maxObjects:128}};}));
+ render(<MemoryRouter><LivePrivateStore kind="secrets"/></MemoryRouter>);
+ fireEvent.change(await screen.findByLabelText('Private-store passphrase'),{target:{value:'a separate long passphrase'}});fireEvent.change(screen.getByLabelText('Confirm private-store passphrase'),{target:{value:'a separate long passphrase'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted store'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Add credential or note'}));fireEvent.click(screen.getByRole('button',{name:'Secure note'}));
+ fireEvent.change(screen.getByLabelText('Entry name'),{target:{value:'Private travel plan'}});fireEvent.change(screen.getByLabelText('Folder'),{target:{value:'Personal'}});fireEvent.change(screen.getByLabelText('Secure note'),{target:{value:'First private line\nSecond private line'}});fireEvent.click(screen.getByRole('button',{name:'Encrypt and save'}));
+ await screen.findByText('Private travel plan');expect(screen.getByText('Secure note · Personal · revision 1')).toBeVisible();
+ const sent=JSON.stringify(writes);expect(sent).not.toContain('Private travel plan');expect(sent).not.toContain('First private line');
+ fireEvent.click(screen.getByRole('button',{name:'View secret'}));expect(screen.getByLabelText('Secure note contents')).toHaveTextContent('First private line Second private line');
+ fireEvent.click(screen.getByRole('button',{name:'Close'}));fireEvent.click(screen.getByRole('button',{name:'Edit note'}));expect(screen.getByLabelText('Secure note')).toHaveValue('First private line\nSecond private line');
+});
 it('does not fetch private data in local mode',()=>{
  const original=session.user;session.user=null as unknown as typeof original;const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
  try{render(<MemoryRouter><LivePrivateStore kind="vault"/></MemoryRouter>);expect(screen.getByText('A signed-in account is required')).toBeVisible();expect(fetch).not.toHaveBeenCalled();}finally{session.user=original;}
