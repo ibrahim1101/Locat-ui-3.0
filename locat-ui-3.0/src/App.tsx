@@ -59,7 +59,7 @@ export function App() {
               <Route path="vault" element={live ? <LivePrivateStore key="vault" kind="vault" /> : <PrivateStore kind="vault" />} />
               <Route path="secrets" element={live ? <LivePrivateStore key="secrets" kind="secrets" /> : <PrivateStore kind="secrets" />} />
             </Route>
-            <Route path="search" element={live ? <LiveOverview kind="search" /> : <Search />} />
+            <Route path="search" element={<Search />} />
             <Route path="hub" element={live ? <LiveModuleNotice title="Hub" /> : <Hub />} />
             <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />
             <Route path="diagnostics" element={live ? <LiveDiagnostics /> : <Diagnostics />} />

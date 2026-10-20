@@ -45,7 +45,7 @@ test('built UI, real cookie, nonextractable Link identity across reload and encr
   expect(incoming).toEqual({stage:'owner sign-in',status:200});
   await page.goto(fixture.origin+'/home');
   await expect(page.getByText('Preview sample data')).toHaveCount(0);
-  await expect(page.getByText(/Recent conversations will appear here/)).toBeVisible();
+  await expect(page.getByRole('region',{name:'Recent conversations'}).getByText(/not connected to this dashboard yet/)).toBeVisible();
   await expect(page.getByText('Mira Okafor')).toHaveCount(0);
   await expect(page.getByText('Studio Desktop')).toHaveCount(0);
   const homeSummary=page.getByRole('region',{name:'Contact summary'});

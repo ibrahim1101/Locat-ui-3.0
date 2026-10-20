@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published feature checkpoint: `d81921d` (`Keep live global search account scoped`). The working tree contains a follow-up fix for the empty-contact loading state and its regression test.
+Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published Search checkpoint: `678f181` (`Clear live Search loading after empty contacts`). The current batch connects the account-backed Home summary to the actual live route and aligns browser acceptance with that route.
 
 ## Active direction
 
@@ -20,13 +20,13 @@ Current Home conversation summaries are still not connected. Do not derive “re
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test` (285 frontend tests), `npm run test:server` (108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Hosted checks for `cf605a3` and `d81921d` were still running at last inspection; verify through the commit check-runs API before reporting.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Commit `cf605a3` exposed that browser acceptance was asserting preview Home copy on the separate live Home route; the current batch fixes the expectation and mounts the server-backed summary on live Home. Verify hosted checks on the next published checkpoint.
 
 The workflow-run summary wrapper filters pull-request runs, so query commit check-runs when verifying push-triggered hosted results.
 
 ## Remaining work
 
-- Global Search now uses account-owned accepted contacts and modules in live mode; encrypted messages remain searchable inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
+- Live Home now includes account-owned contact/request counts and a direct nested Requests shortcut. Live Search uses account-owned accepted contacts and modules; encrypted message search stays inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
 - Connect Home to actual conversation summaries only if the Matrix session can provide a safe, account-scoped local projection.
 - Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
 - Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
