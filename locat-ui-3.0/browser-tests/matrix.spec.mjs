@@ -105,7 +105,7 @@ test('two real browser accounts verify, retain crypto and exchange encrypted mes
     await target.press('Shift+F10');await bob.page.getByRole('menuitem',{name:'React to message',exact:true}).click();
     await expect(bob.page.getByRole('dialog',{name:'React to message',exact:true})).toBeVisible();
     await bob.page.getByRole('menuitem',{name:'❤️ Love',exact:true}).click();
-    const request=await encrypted;expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
+    const request=await encrypted.catch(async reason=>{const alerts=await bob.page.getByRole('alert').allTextContents();throw new Error('Encrypted reaction was not sent. Conversation error: '+(alerts.join(' | ')||'none')+'. '+reason.message);});expect(request.method()).toBe('PUT');await expect.poll(()=>roomSends.length).toBe(sendsBefore+1);
     const reactionWire=wire.slice(wireBefore).join('');expect(reactionWire).not.toContain('m.reaction');expect(reactionWire).not.toContain(markers[0]);
     const bobReaction=bob.page.getByTestId('reaction-'+eventId+'-❤️'),aliceReaction=alice.page.getByTestId('reaction-'+eventId+'-❤️');
     await expect(bobReaction).toHaveAttribute('aria-label','❤️ reaction, 1, yours',{timeout:30000});

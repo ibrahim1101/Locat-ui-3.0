@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 63426)
-Total output lines: 1129
+Warning: truncated output (original token count: 63629)
+Total output lines: 1134
 
 ## 2026-10-19 — Product scope and navigation rework
 
@@ -169,12 +169,7 @@ Commands: npm run check; npm run lint; npm run test:all; npm run build; node --t
 
 Observed failures: first targeted backup tests rejected the schema change because the verifier manifest was not yet extended; added schema-15 table/columns and reran all 19 focused migration/backup tests successfully. Real Synapse room creation failed HTTP 400 M_UNKNOWN because v12 prohibits putting its creator in the power-level users map; selected v12 explicitly, removed that entry and accepted hash-style room IDs. The corrected real run passed. Expanded gateway history initially returned 403 because the fixture used Bob's old token after reopening/rebinding to a renewed one; preserved the production exact-token rule and corrected the fixture to use the current binding. Subsequent expanded acceptance passed. The final added post-gateway database/WAL scan for both homeserver and Locat passed.
 
-Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…43426 tokens truncated…sharing claims (Cinema010). Guided operator-only source setup remains Cinema006. BUILD-001 unpatched dev dependency needs a separate compatibility-tested tooling change; production audit0 does not clear full audit5high. Physical Windows/Android/Pi, original13GB movie, long-file workload, actual international/federation/TURN/native releases remain open. All49/A–AM/full roadmap retained. No public exposure/DNS/deployment/purchases/main merge/release/unrelated infrastructure operations.
-
-
-## Final accepted checkpoint — 2026-10-18
-
-Start remote `0284b5e40c048798b7f9760c260ccf75aee9916e`; ending production source `0be90a070ddfcee60b0ef72689646341a1c0f9d7`, accepted commit `8c79940f5d0c715d3bbe70e49b70a02e47f7e0e4` (tree `0d241d34b66e4d6188bf2e3cc32788a0422bcf09`). Workflow **39132471838**, all five jobs completed/success: connector 117690275584,Ubuntu 117690275745,Windows 117690275769,macOS 117690275776,browser 117690275713. This entry only changes documentation; runtime above is the verified checkpoint.
+Pending reservations intentionally block automatic replay after uncertain setup. UI Send remains gated; next implement complete authorized encrypted key transport and scoped room sync, then account-owned UI crypto lifecycle and actual browser conversatio…43629 tokens truncated…jobs completed/success: connector 117690275584,Ubuntu 117690275745,Windows 117690275769,macOS 117690275776,browser 117690275713. This entry only changes documentation; runtime above is the verified checkpoint.
 
 Observed browser logs: standard-sandbox real Vite/jsxDEV/StrictMode acceptance passed, **11 Chromium 8.3m**, **7 Firefox 39.9s**, **3 storage 12.4s**. Decoded scenes/paused seeking/actual Play progression, conversion errors/retry, quota guard, metadata, two-origin CSP server selection and existing storage/Link/Photos/Sentinel/55-message encrypted UI history passed. Ubuntu logs: **297 frontend/131 backend,0 failures,0 skipped**, plus real pinned SDK44/Synapse1.163 productionHTTPS/crypto/offline/history/revocation/plaintext-scan acceptance passed. Windows:297 frontend,130 backend passed/1 explicitUnix-shell stalled-worker fixture skipped,0 failures. Do not conflate Node cross-OS checks with physical Firefox/native installer acceptance.
 
@@ -345,3 +340,8 @@ After the workspace reconnected, corrected the Matrix SDK event typing and react
 Connected the live private-conversation composer to Matrix replies without introducing a second composer or flattening message actions into another page. Reply is available from keyboard/context and touch action sheets and uses the existing Obsidian Ember reply preview. Outbound replies use `sendMessage` with an `m.in_reply_to` event relation; because the Matrix client encrypts the room event, reply IDs and content remain inside the Megolm payload. The session validates that the target is a decrypted authorized message in the current private room, resolves received previews from authorized decrypted events, and shows a bounded missing-original state. The uncertain-send memory retry is now tied to reply target as well as text and devices; ciphertext persistence/recovery continues through the existing Matrix encrypted-send transport hook.
 
 Added unit cases for payload, foreign-target rejection, relation-aware retry identity, projection, and missing target. Added two-account browser coverage for reply send, recipient preview and plaintext absence. Validation passed: `npm run check`, `npm run lint`, `npm run test:all` (**238 frontend /104 backend**), `npm run build`, Playwright listing and browser spec syntax check, `git diff --check`, and real Matrix SDK 44 / Synapse 1.163.0 acceptance. The Playwright scenario has not run locally; hosted CI remains necessary for actual UI acceptance. Existing large Matrix bundle advisory remains.
+
+
+### Reply candidate hosted acceptance follow-up — 2026-10-20
+
+Source `ada51b61598c18b717553a3bcae0acea4d705cf3` passed the UI workflow (`39391724178`) and core typecheck/lint/test/build/real-Synapse checks on Ubuntu, macOS and Windows plus connector preparation. Hosted browser job `118524603211` reproduced a failure already present in the preceding reaction acceptance: Chromium and Firefox both reached the reaction picker, but no encrypted reaction request was observed within 30 seconds. The reply browser scenario was consequently not reached. The acceptance now reports any visible conversation error when the encrypted send is missing, so the next hosted run can identify the actual guarded runtime failure. Do not mark reactions or replies browser-accepted until the two-account scenario passes.
