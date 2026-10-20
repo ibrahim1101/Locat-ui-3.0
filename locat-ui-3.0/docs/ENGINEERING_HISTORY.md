@@ -51,3 +51,7 @@ The Home dashboard previously rendered preview conversation and device fixtures 
 The live dashboard now also loads account-owned accepted-contact and incoming-request counts through the same expected-account guard used elsewhere in live settings. It has loading, retry and cancellation states, and routes into Messages for the detailed Contacts, Requests and Find people sections. No conversation previews are inferred from contact membership.
 
 This dashboard batch passes TypeScript, ESLint, 281 frontend tests, 108 server tests and the production build. The existing Matrix crypto chunk-size advisory remains.
+
+## Active handoff and messaging status
+
+The old UI integration handoff described this project as a fixture-only presentation layer and listed Cinema, media, Remote and Sentinel integrations as future targets. It is now archived as `docs/archive/LOCAT_INTEGRATION_HANDOFF_pre_core_scope.md`; the active handoff documents the current same-origin server, authenticated APIs, Matrix/Link/private-store boundaries, retired scope and remaining platform/security acceptance. The live module availability message for Messages now reflects the existing verified one-to-one encrypted implementation and keeps cross-device/physical-device acceptance marked open.

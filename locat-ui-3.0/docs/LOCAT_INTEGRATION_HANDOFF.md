@@ -1,41 +1,53 @@
-# Locat UI 3.0: integration handoff
+# Locat UI 3.0 implementation handoff
 
-## What this repository is
-A standalone React 19 + TypeScript + Vite 7 + Tailwind 3 presentation layer, compatible with Locat's frontend toolchain. It has **no** backend, auth, crypto, storage, media engine or network calls. It runs with `npm install && npm run dev` using isolated fixtures (`src/fixtures/*`).
+Updated 2026-10-20. This is the active implementation handoff for `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The older design-to-integration handoff is preserved at `docs/archive/LOCAT_INTEGRATION_HANDOFF_pre_core_scope.md` for provenance only.
 
-## Dependencies added
-`react-router@7` (already in Locat), `lucide-react` (already in Locat), `clsx` (already in Locat), `@fontsource-variable/manrope`, `@fontsource/jetbrains-mono`. No Radix, Expo, React Native, Next.js or animation libraries.
+## Current product scope
 
-## How to integrate (recommended sequence, following Locat's `LOCAT_UI_INTEGRATION_PLAN.md`)
-1. Copy `src/ui`, `src/theme`, `src/contracts`, `src/layouts`, `src/app`, `src/screens` into an isolated area of the Locat repo (e.g. `src/ui3/`). Merge the `@theme` utility mappings from `src/index.css` and `themes.css` behind a namespace. **Don't** copy `src/fixtures` into production entrypoints.
-2. Implement `LiveLocatAdapter implements LocatUiAdapter`:
-   - `auth.*` → `useAuth()` login/register/logout (identity-key unlock stays inside Locat), `NativeServerSetup` probe, `registrationPasswordError` for guidance, `quickSignIn` saved accounts.
-   - `messaging.*` → the existing Chat.tsx handlers: encrypt → outbox → relay. `saveDraft` → `encryptedDraft`. `messageAction` → reactions / pins / replies / forwarding / edit / delete control payloads. `friendAction` / `conversationAction` → tRPC routers.
-   - `media.*` → `deviceMedia`, MediaLocal queries, `renderPhotoEdit`, `musicPresets`.
-   - `link.*`, `remote.*`, `sentinel.*`, `privateStore.*`, `admin.*` → the existing page logic and routers listed in `LOCAT_COMPONENT_INTEGRATION_MAP.md`.
-   - `moduleAvailability` → port `moduleDisabledReason` and add `platform` checks.
-   - Return `{status:"ok"}` **only** after the real operation completes (for messages: after durable encrypt and outbox enqueue, never before).
-3. Provide projection hooks so screens get live data instead of fixtures. Each fixture import in a screen is one replacement point:
-   `FIXTURE_CONVERSATIONS/MESSAGES/CONTACTS/SCHEDULED` (Messages), `FIXTURE_VIDEOS` (Cinema/Home), `FIXTURE_TRACKS` (Music, `app/PlayerProvider.tsx`), `FIXTURE_PHOTOS`, `FIXTURE_DEVICES/TRANSFERS`, `FIXTURE_REMOTE_HOSTS`, `FIXTURE_ALERTS/TOKENS/SOURCES`, `FIXTURE_VAULT/SECRETS`, `FIXTURE_ADMIN_USERS`. The recommended approach is a `useLocatData()` context provided next to the adapter.
-4. Remove preview-only paths in live mode: `PreviewLab` (already self-hides when `adapter.mode==="live"`), the "Explore with fictional demo data" buttons (gate them on `adapter.mode`), the `onLocalMessages` fixture mutation, `screens/messages/capabilities.ts` (use `messageComposerState`), `VideoPlayer` (use `PlayerChrome` over the Locat `<video>`), the "Preview: show permission state" buttons, and the Equalizer `Curve`.
-5. Mount the app inside Locat's existing providers: `AuthProvider`, `ConnectionProvider`, `TrpcProvider`/QueryClient, `AppLockGate`, `DownloadStatusHost`. Wire the Capacitor `backButton` to `window.locatBack()`.
-6. Validate with `npm run check/lint/test/build`, the Android APK workflow, and the physical acceptance checklists.
+Locat is a runnable React, TypeScript and Vite application backed by the same-origin Locat server in `server/`. The server provides account authentication, sessions, contacts, device-bound Link, optional Matrix messaging, encrypted private storage, account activity and signed identity discovery. Local and preview adapters remain presentation/testing modes; they must never make sample data appear as a live account record.
 
-## Callback catalogue
-Every callback is declared in `src/contracts/*.ts` with JSDoc that names the owning Locat module. In brief: `AuthAdapter` (8), `AppLockAdapter` (3), `MessagingAdapter` (10), `MediaAdapter` (5), `PlayerCallbacks` (10), `LinkAdapter` (6), `RemoteAdapter` (3), `SentinelAdapter` (3), `PrivateStoreAdapter` (8), `AdminAdapter` (3).
+Keep the Obsidian Ember visual system, shared controls, responsive layouts and nested destination hierarchy. Current product priorities are Chat, Link, Files & Vault, account/security and useful workspace foundations.
 
-## Unsupported / intentionally not implemented
-Calls, passkeys, MFA, account closure, disappearing / timed / view-limited messages, doodles, sticker packs, encrypted video sharing, share target, widgets, LAN/mDNS/P2P, presence logs, Calendar, Automate, Workspace, Share and the Extensions runtime. Each one appears only as a reserved, disabled UI with a reason.
+Retired scope: standalone Cinema and media libraries, Music, Photos library/editor, host media scanning/streaming/sharing, Locat Remote, Link remote-signaling, SentinelLab and its incident/webhook/vendor integrations. Do not restore their routes, services, data models or helper modules. Ordinary encrypted Chat attachments remain supported. Fresh installation is acceptable; data recovery is not requested.
 
-## Stop conditions (from Locat's integration plan)
-- Any fixture or mock session reaches production.
-- An adapter returns `ok` before the real operation is durable.
-- The UI bypasses identity-key unlock or sends plaintext.
-- A real action silently does nothing.
-- The Android package ID, auth origins or push settings change.
+## Live behavior and trust boundaries
 
-## preview.2 integration notes
-- New contract: `MessagingAdapter.attachFiles(conversationId, files)` → Locat's encrypted attachment pipeline (drag-and-drop and pickers).
-- `fixtures/large.ts` and `prefs.largeLibraries` are preview-only stress data. Live data feeds the same `VirtualList`/`VirtualGrid` props.
-- Connect `VirtualList.onEndReached`-style paging to the localdb history cursors when integrating (not yet a prop; add it if Locat pages history).
-- `/gallery` isn't routed in live mode.
+- Server-owned operations must use same-origin authenticated APIs and enforce ownership on the server. `accountRequest` carries an expected account ID to prevent stale-tab actions crossing account switches.
+- Local mode has no authenticated account authority. It cannot access account discovery, sessions, contacts, Link or private server stores.
+- Chat uses verified one-to-one Matrix rooms through the scoped gateway. Message content and attachments are encrypted on the device. Never infer delivery from a queued transfer or claim recovery of missing encryption keys.
+- Link uses per-browser signing keys, dual-confirmed pairings and encrypted text/file payloads. Queued means stored, not delivered.
+- Vault and Secrets encrypt entries in the browser before server storage. Their passphrase is independent of the login password.
+- The app lock is a device-local privacy gate, not browser-storage encryption. Biometrics remain disabled pending verified platform authentication.
+- Signed identity disclosures verify authority/account claims and support explicit, per-account browser pinning. A signature does not prove domain ownership.
+- Preview fixtures are allowed only in preview mode and must be labeled. If live data is not connected, show a truthful empty/unavailable state.
+
+## Navigation and UI
+
+Keep related options inside nested sections or disclosures rather than flattening them onto one page. Messages groups Contacts, Requests, Find people and Blocked. Link groups Devices, Pairings and Transfers. Vault and Secrets group Entries, Backups and Security; credential and secure-note types stay nested inside the Secrets editor. Live account settings group Profile, Messaging privacy, Sessions, Security, and Messaging devices. Preserve the current theme tokens and shared `Screen`, `Sheet`, `Button`, `TextField`, `Switch`, `StateView` and other `src/ui` controls.
+
+Buttons inside forms must explicitly use `type="submit"`. Browser `prompt` and `confirm` are not application UI. Keep accessibility labels, status/error announcements, loading and retry states, and responsive behavior.
+
+## Validation and open acceptance
+
+For meaningful code batches, run from `locat-ui-3.0/`:
+
+```sh
+npm run check
+npm run lint
+npm run test:all
+npm run build
+```
+
+The latest locally validated dashboard batches pass these checks. The build reports the existing large Matrix crypto chunk advisory. Hosted status for the latest connector-published commits is not available through the current GitHub status/run endpoints; do not describe local checks as hosted checks.
+
+Continue remaining work in `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md`. Open acceptance includes real two-device and physical-device behavior, larger transfers, cross-platform storage behavior, identity recovery limits, single-writer hosting assumptions and independent security review. Scheduled sending stays unavailable until a durable sender can safely operate with device-held Matrix credentials while the app is closed.
+
+Do not merge to `main`, deploy public services or publish releases. Ordinary implementation, testing, development commits and publication to `rework/locat-core-scope` are authorized.
+
+## Source-of-truth documents
+
+- `docs/REWORK_SCOPE.md` — product scope and data behavior.
+- `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` — active work sequence and remaining acceptance.
+- `docs/ENGINEERING_HISTORY.md` — implementation decisions and observed failures/fixes.
+- `docs/ORIGINAL_LOCAT_REQUIREMENTS.md` and `docs/LOCAT_FEATURE_UI_COVERAGE.md` — retained requirement register and historical coverage; read them through the current scope override.
+- `server/README.md`, `docs/SELF_HOSTING.md`, `docs/PRIVATE_STORAGE.md` and `docs/LINK_INTEGRATION.md` — operational and feature-specific details.

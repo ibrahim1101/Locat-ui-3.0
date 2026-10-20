@@ -1,7 +1,7 @@
 /**
  * PREVIEW ADAPTER — implements LocatUiAdapter without any network, crypto or storage.
- * Every server/crypto operation returns `integration-pending`. It must never be
- * mounted in a production Locat build (see docs/LOCAT_INTEGRATION_HANDOFF.md §Stop conditions).
+ * Every server/crypto operation returns `integration-pending`. The live root
+ * uses authenticated server and device integrations for those operations.
  */
 import { pending, type LocatUiAdapter, type PasswordGuidance, type ServerProbeView } from "@/contracts";
 import type { ModuleId } from "@/app/registry";

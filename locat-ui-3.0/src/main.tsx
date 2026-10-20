@@ -12,7 +12,7 @@ import { FIXTURE_USER } from "./fixtures/data";
 import { LiveLocatRoot } from "./integration/LiveLocatRoot";
 import type { PlatformInfo } from "./contracts";
 
-/** Standalone preview entry. Production Locat mounts <App/> with a LiveLocatAdapter instead. */
+/** Standalone preview entry. The live app starts at integration/LiveLocatRoot. */
 const platform: PlatformInfo = {
   kind: "browser", os: "unknown",
   capabilities: { nativeSaveDialog: false, notifications: "Notification" in window, biometric: false, shareTarget: false, widgets: false },

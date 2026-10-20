@@ -9,9 +9,9 @@ import type { ModuleId } from "../app/registry";
 export type AvailabilityContext = { connection: ConnectionState; isAdmin: boolean; authenticated: boolean; platform: PlatformInfo };
 
 /**
- * The single seam between Locat UI 3.0 and the existing Locat application.
- * `src/fixtures/previewAdapter.ts` implements it for standalone preview;
- * production supplies a `LiveLocatAdapter` wrapping useAuth/Chat/tRPC/libs
+ * Shared contract used by the standalone preview and the live app composition.
+ * `src/fixtures/previewAdapter.ts` supplies preview-only behavior; the live
+ * root composes authenticated server, Matrix, Link and private-store APIs
  * (see docs/LOCAT_INTEGRATION_HANDOFF.md).
  */
 export interface LocatUiAdapter {
