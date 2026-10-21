@@ -21,12 +21,13 @@ Read `docs/REWORK_SCOPE.md` and `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` fi
 - `23057ab` restored the complete Matrix browser spec and switched back to the nested Contacts section after accepting a new contact.
 - `b19d23b` and `46974d0` covered the cross-tab app-lock signal and returned to Security after re-unlocking a tab.
 - `666b461` raised the browser job cap to 35 minutes for Chromium, Firefox and the repeated private-store acceptance.
+- `f352c9c` added an interrupted 8 MiB encrypted Link upload test that resumes from 10/33 chunks and verifies the downloaded bytes; hosted Chromium, Firefox and platform checks passed.
 
 Current Home conversation summaries are still not connected. Do not derive “recent conversations” from contact membership or show preview records as live.
 
 ## Validation and hosted status
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. Hosted acceptance on `666b461` passed 7/7 Chromium tests, 7/7 Firefox tests and all three repeated private-store foreground runs; Linux, Windows, macOS and connector checks also passed (workflow run 39477108881, artifact 12291521749). The previous full run on `46974d0` passed the same browser acceptance. Browser specs pass syntax checks, but local execution is blocked because the Chromium headless executable is not installed in this workspace. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices and that live Search returns no fictional person for a fixture-only query. The workflow-run summary wrapper filters pull-request runs, so use commit check-runs and job logs to verify push-triggered hosted results.
+The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. Hosted acceptance on `f352c9c` passed 7/7 Chromium tests, 7/7 Firefox tests and all three repeated private-store foreground runs; Linux, Windows, macOS and connector checks also passed (browser workflow run `39580001897`; general workflow run `39580001895`). This includes the interrupted 8 MiB Link upload, resume from 10/33 chunks, and exact downloaded-byte verification. Browser specs pass syntax checks, but local execution is blocked because the Chromium headless executable is not installed in this workspace. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices and that live Search returns no fictional person for a fixture-only query. The workflow-run summary wrapper filters pull-request runs, so use commit check-runs and job logs to verify push-triggered hosted results.
 
 ## Remaining work
 
