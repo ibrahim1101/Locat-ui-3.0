@@ -37,6 +37,10 @@ it('resumes an interrupted file using the exact journaled ciphertext after reche
  cryptoMocks.encrypt.mockResolvedValue(envelope);cryptoMocks.decrypt.mockImplementation(async()=>new Uint8Array(bytes));
  render(<MemoryRouter><LiveDevices/></MemoryRouter>);await screen.findByText('Own browser · This browser');await section('Pairings');fireEvent.click(await screen.findByRole('button',{name:'Send to device'}));fireEvent.click(screen.getByRole('button',{name:'file'}));const original=new File([bytes],'send.txt',{type:'text/plain'});fireEvent.change(screen.getByLabelText('Send encrypted Link file'),{target:{files:[original]}});
  await section('Transfers');await screen.findByRole('button',{name:'Resume encrypted upload'});expect(journal.chunks).toEqual([{seq:0,envelope}]);
+ const wrongBytes=bytes.slice();wrongBytes[0]^=1;const wrongFile=new File([wrongBytes],'send.txt',{type:'text/plain'});
+ fireEvent.click(screen.getByRole('button',{name:'Resume encrypted upload'}));fireEvent.change(screen.getByLabelText('Choose the original file to resume encrypted upload'),{target:{files:[wrongFile]}});
+ await waitFor(()=>expect(screen.getAllByRole('alert').some(alert=>alert.textContent?.includes('Selected file does not match the saved encrypted transfer.'))).toBe(true));
+ expect(calls.filter(row=>row.action==='chunk')).toHaveLength(1);expect(journal.chunks).toEqual([{seq:0,envelope}]);
  fireEvent.click(screen.getByRole('button',{name:'Resume encrypted upload'}));fireEvent.change(screen.getByLabelText('Choose the original file to resume encrypted upload'),{target:{files:[original]}});
  await waitFor(()=>expect(calls.filter(row=>row.action==='chunk')).toHaveLength(2));expect(calls.filter(row=>row.action==='chunk').map(row=>row.input)).toEqual([{id:'file-job',seq:0,envelope},{id:'file-job',seq:0,envelope}]);expect(journal.meta).toBeNull();
 });
