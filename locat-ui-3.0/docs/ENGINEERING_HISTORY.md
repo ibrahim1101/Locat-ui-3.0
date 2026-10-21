@@ -69,3 +69,7 @@ The live `/search` route previously used a destination-only view. It now uses th
 ## Windows proxy-test startup tolerance
 
 The hosted Windows verifier occasionally exceeded the proxy-mode server test's original three-second readiness window before starting the listener. The test now polls for up to ten seconds while retaining the immediate child-exit check. Both focused hosting tests pass locally; the next Windows workflow will verify the larger startup margin.
+
+## One-time location and creative attachment browser acceptance
+
+The two-account Matrix browser flow verifies that location access is requested only after the user taps Get current location, the approximate location remains local until Share once, and the map URL/coordinates do not appear in homeserver request traffic. After confirmation, both accounts see the location in their encrypted conversation. The same hosted flow draws a doodle and sends a selected sticker PNG through the encrypted attachment upload path, checks successful encrypted media upload, and confirms both clients receive the attachment preview. Hosted run `39480102015` passed 7/7 Chromium and 7/7 Firefox tests plus all three repeated private-store checks; Ubuntu, Windows, macOS and connector jobs also passed. Physical-device acceptance remains open.
