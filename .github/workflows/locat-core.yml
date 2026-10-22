@@ -74,6 +74,12 @@ jobs:
       - run: npm run lint
       - run: npm run test:all
       - run: npm run build
+      - name: Install Chromium for cross-platform storage acceptance
+        if: runner.os != 'Linux'
+        run: npx playwright install chromium
+      - name: Cross-platform browser storage acceptance
+        if: runner.os != 'Linux'
+        run: npm run test:browser -- foundation.spec.mjs
       - name: Set up isolated Matrix acceptance Python
         if: runner.os == 'Linux'
         uses: actions/setup-python@v5
