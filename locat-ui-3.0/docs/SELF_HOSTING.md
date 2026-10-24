@@ -1,76 +1,64 @@
-# Self-hosted UI 3.0 server
+# Self-host Locat UI 3.0
 
-Node 24+ serves both the built UI and API. This is a development deployment, not a claim of production readiness. Experimental encrypted text conversations now use the optional private Matrix/Synapse service and have actual browser acceptance. Full recovery, broader messaging, native clients and advanced administration remain incomplete. See MESSAGING_QUICKSTART.md for the verified workflow and limits. Progressive FFmpeg conversion is connected with documented limits. Nothing is automatically deployed.
+Locat is currently a self-hosted preview, not a production release. The checked-in service runs the built web UI and same-origin API on Node.js 24 or later. No container image, Compose file, automatic updater, public deployment recipe, Android package or Windows installer is included. Public-network use, native integrations, independent security review and physical-device acceptance remain open.
 
-The web UI's current CSS toolchain requires Chrome/Edge 111+, Firefox 128+, or Safari 16.4+. Keep the embedded Android WebView at a supported Chromium version. Native platform acceptance remains separate.
+## Build and run on one machine
 
-## One machine
+From `locat-ui-3.0/`:
 
-From locat-ui-3.0:
-
-```
+```sh
 npm ci
+npm run check
+npm run lint
+npm run test:all
 npm run build
 npm start
 ```
 
-Open http://127.0.0.1:8787. Vite is unnecessary for the built app. For frontend development use npm run dev and npm run dev:server in separate terminals. Live mode is default; VITE_LOCAT_LIVE=false selects the preview only when building/running Vite.
+The default listener is `127.0.0.1:8787`; open `http://127.0.0.1:8787`. The server serves the production build from `dist/`. For frontend development, use `npm run dev` and `npm run dev:server` in separate terminals. The live UI is the default. Preview fixtures are enabled only by setting `VITE_LOCAT_LIVE=false` when building the preview.
 
-## Same LAN over HTTPS
+The server creates `server/data/locat.sqlite` with restrictive directory permissions. To select another database file, set `LOCAT_DATABASE_FILE` to its absolute path. Do not point this version at the retired JSON store. Unknown future database schemas fail closed; supported migrations are applied at startup.
 
-Supply an existing certificate and private key trusted by your clients. Use a hostname/IP covered by that certificate. Do not disable certificate verification. Certificates are operator-provided; this app does not provision or log keys.
+## Same-LAN HTTPS
 
-PowerShell:
+For a private LAN, provide a certificate trusted by each client and whose subject covers the hostname or IP that clients use. Do not disable certificate verification. Example PowerShell configuration:
 
 ```powershell
 $env:LOCAT_HOST='0.0.0.0'
+$env:LOCAT_PORT='8787'
 $env:LOCAT_PUBLIC_ORIGIN='https://locat.example.local:8787'
 $env:LOCAT_TLS_KEY='D:\Locat\certs\key.pem'
 $env:LOCAT_TLS_CERT='D:\Locat\certs\cert.pem'
-$env:LOCAT_MEDIA_AUTHORIZED_ROOTS='D:\Shared\Movies;D:\Shared\Music'
+$env:LOCAT_DATABASE_FILE='D:\Locat\data\locat.sqlite'
 npm start
 ```
 
-Use your actual hostname and certificate paths. Configure host DNS and permit port 8787 on your private LAN firewall. Same-LAN use does not require Tailscale. Native app onboarding and remote access are separate work. Non-loopback listeners fail startup without TLS and an explicit public origin. Secure cookies and exact Origin/Host checks apply in HTTPS mode; forwarded headers never determine origin. Optional explicit reverse-proxy TLS termination is documented in CONNECT_ARCHITECTURE.md and CLOUDFLARE_DEPLOYMENT.md. Direct TLS remains the default LAN path.
+Replace the sample host and paths. Restrict the firewall to the intended private network. A non-loopback listener requires both TLS and `LOCAT_PUBLIC_ORIGIN`; the server checks the request Host and Origin against that exact origin and uses Secure session cookies.
 
-Optional qualified global identities can be signed by a separate Ed25519 authority key. Generate it with `node tools/generate-server-identity-key.mjs /absolute/private/path/locat-identity.pem`, restrict it to the service owner (on Windows, use an owner-only ACL), and set `LOCAT_IDENTITY_SIGNING_KEY_FILE` before startup. Keep this key out of the database, application backups and Git; protect a separate recovery copy. The browser verifies signed claims and can pin an authority fingerprint per account and origin after you compare it with the operator through another trusted channel. Planned rotation uses `node tools/create-server-identity-rotation.mjs /absolute/old.pem /absolute/new.pem https://your-authority.example SERVER_UUID /absolute/rotation.json`, then deploys the new key with `LOCAT_IDENTITY_ROTATION_FILE`; details are in GLOBAL_IDENTITY_THREAT_MODEL.md. A client requires explicit acceptance before updating a pin. If the old key is lost, compare and pin the new fingerprint out of band. This option does not enable federation or prove domain ownership.
+If TLS terminates in a reverse proxy on the same machine, use `LOCAT_HOST=127.0.0.1`, set `LOCAT_TLS_TERMINATION=proxy`, set `LOCAT_PROXY_PEERS` to the proxy's exact socket IP, and set `LOCAT_PUBLIC_ORIGIN` to the external HTTPS origin. The proxy must preserve the public Host and Origin. Do not expose the app's proxy-mode listener to other network peers. Configure forwarded client IP attribution only when the trusted proxy overwrites the selected header with one canonical address. See [CONNECT_ARCHITECTURE.md](CONNECT_ARCHITECTURE.md) for the trust boundary.
 
-## Shared media
+## Optional Matrix messaging
 
-LOCAT_MEDIA_AUTHORIZED_ROOTS is a platform-delimited list (semicolon on Windows, colon on Linux) of at most 16 operator-approved folders. Roots now default to operator-assigned ownership and explicitly configured accepted friends; unassigned roots are invisible. See [MEDIA_LIBRARY_ACCESS.md](MEDIA_LIBRARY_ACCESS.md) for account bootstrap, policy JSON and the explicit legacy compatibility option. No client supplies a path. Indexing skips symlinks and hidden files, allows raster/audio/video extensions only, and is bounded to 3000 media entries, 20000 visited entries and six directory levels. Index cache lasts 60 seconds; authenticated same-origin Refresh server forces a coalesced scan, bounded to six requests per account and thirty across the server process per minute.
+Encrypted one-to-one messaging needs a separately operated Matrix homeserver and a configured Locat Matrix sidecar. Follow [MESSAGING_QUICKSTART.md](MESSAGING_QUICKSTART.md), keep the application-service file private and readable only by the service account, and verify the homeserver and browser acceptance before enabling real accounts. Locat's Matrix gateway restricts access to accepted contacts and managed device sessions. There is no federation setup in the supported flow.
 
-GET /api/media lists library status and opaque item IDs. GET/HEAD /api/media/stream/<id> requires the current session and supports full/suffix/open-ended byte ranges. Session and library authorization are rechecked on each request; active streams are cancelled within the one-second polling interval after session/contact revocation. Already sent or buffered bytes cannot be recalled. Files cannot be modified/deleted via these endpoints.
+## Database backups
 
-Linux checks containment again against the opened file descriptor; other operating systems still have directory replacement race limitations and need platform hardening before use with an untrusted multi-user filesystem. FFprobe inspection and progressive FFmpeg remux/transcoding are connected. Client-native playback tickets, HLS and per-account media-root ACLs are not connected. Decoder support still depends on the browser.
+Create a consistent SQLite snapshot with a new destination filename:
 
-Server-media favorites/albums/resume are device/account-scoped browser metadata. They do not modify host files and currently do not synchronize between clients. Edited server photos export new browser downloads.
-
-## Docker template
-
-From the repository root, provide certs/key.pem and certs/cert.pem readable by the container's node user, select a read-only media folder, and set LOCAT_PUBLIC_ORIGIN to the actual HTTPS origin. Then run:
-
-```
-docker compose -f compose.local.yml up --build
+```sh
+npm run backup:server -- /absolute/path/backups/locat-YYYYMMDD-HHMM.sqlite
+npm run verify:backup -- /absolute/path/backups/locat-YYYYMMDD-HHMM.sqlite
 ```
 
-The image builds the frontend and runs Node as a non-root user. SQLite uses the locat_data volume. Certificates/media are read-only mounts. The container filesystem is read-only with a temporary /tmp. The health check confirms TCP listener liveness; /api/ready supplies application readiness. Do not use a broad home/system directory as the shared media mount. Docker was not available for local execution; validate this template on an isolated host before using it.
+The backup contains password hashes, session hashes and encrypted payloads. It is **not encrypted**; protect it as sensitive account data. Keep backups outside the web root and database directory. The application does not schedule retention or verify that off-host copies exist. Preserve the operator identity signing key separately if one is configured; it is not included in the database backup. See [server/README.md](../server/README.md) for restore instructions and journal-file handling.
 
-## Backups
+## Release limitations
 
-See server/README.md for consistent SQLite online backups and recovery. Browser media, server host files and certificates are not included in SQLite backups. Preserve those separately. Unknown newer database schemas fail closed, and migrations preserve existing account IDs and sessions.
+- There is no production deployment image or reproducible container build. The prior Compose instructions were removed because the referenced files were not in the repository.
+- Authentication limits are process-local. Multi-worker or multi-host operation is not supported or tested; run one service process with access to one database file.
+- Server backups are not encrypted and automated retention is not implemented.
+- Browser notifications while the app is closed, Android push, native secure storage and native installers are not available.
+- Physical Windows/Android checks, account recovery acceptance, public-network deployment and independent security review are not complete.
+- The Vault and Secrets client-encryption design does not replace review of browser storage, device compromise, server operations or recovery procedures.
 
-## Playback conversion
-
-Install FFmpeg/FFprobe on PATH, or set LOCAT_FFMPEG_PATH and LOCAT_FFPROBE_PATH to trusted operator-owned executables. The updated Docker runtime installs FFmpeg, but this image has not been executed locally.
-
-Cinema > Quality > Playback options opens the UI 3.0 compatibility sheet. GET /api/media/probe/<id> inspects only authorized media. A direct stream remains the default. mode=remux copies eligible H.264/audio streams into fragmented MP4; mode=transcode converts to software H.264/AAC at no more than 1920x1080 without enlarging small inputs. An optional audio=<stream-index> selects a validated audio stream for converted playback. Remux is start-only. Known-duration H264/AAC conversion supports bounded integer-second seek/restart/resume; Linux seeks through the inherited authorized inode, while other platforms retain bounded sequential input and may time out. Unknown-duration conversion cannot seek. Adaptive quality/HLS and hardware acceleration remain open. Two workers, startup/total deadlines and disconnect cancellation remain enforced. Native/browser decoding and performance acceptance remain separate.
-
-Worker stdin is connected to an authorized open file handle. Containers requiring random access (for example some MP4 layouts) may not inspect or convert successfully via this progressive input path. Errors are explicit; no universal-codec guarantee is made. FFmpeg failures after headers have begun terminate the stream and surface as player errors.
-
-Playlists, album overrides, favorites, EQ presets and resume pointers remain scoped to this browser/account (or explicit local device mode). Playlists contain references, not file copies; removing a playlist does not delete its files. They are not synchronized or included in SQLite server backups.
-
-## Browser media editing
-
-Manage playlist supports staged membership/order edits; save applies them, and closing discards them. Missing media references are retained until explicitly removed. Cinema's Continue video playlist switch applies only to the selected filtered playlist, advances after completion and stops at its last item. It attempts browser playback rather than bypassing autoplay policy; any denied attempt is shown as a playback error. Closing stops playback.
-
-Photo crop/text controls render the same composition for preview and exported JPEG copies. Export retains the maximum 1600-pixel edge and bounded JPEG size inherited from the original helper. The host/device original remains unchanged. Canvas color-filter support varies by browser; unsupported adjustments fail explicitly. Freehand drawing, undo history and real browser pixel acceptance remain pending.
+Do not use this preview to store irreplaceable data or expose it directly to the public internet. A release candidate requires closing the tracked gates in [LOCAT_INTEGRATION_EXECUTION_TRACKER.md](LOCAT_INTEGRATION_EXECUTION_TRACKER.md) and [SESSION_HANDOFF.md](SESSION_HANDOFF.md).

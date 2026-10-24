@@ -9,7 +9,7 @@ npm ci
 npm run build
 npm start        # built app + API, after operator configuration
 # For frontend work: npm run dev and npm run dev:server
-npm run check && npm run lint && npm test && npm run build
+npm run check && npm run lint && npm run test:all && npm run build
 ```
 
 - `src/ui`: design-system components
