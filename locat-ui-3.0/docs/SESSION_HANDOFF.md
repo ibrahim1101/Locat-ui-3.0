@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `5f73a24` (`Document Link resume and connection checks`). Offline connection diagnostics are published in `8a1c02f`. Local checkpoint `36e26b6` adds server-authorized, locally decrypted Home conversation summaries and a real two-account browser assertion. Follow-on local cleanup removes mock notification controls and corrects deployment guidance. Branch publication of the local commits is pending automatic-review approval. The active UI retains Obsidian Ember styling and nested navigation.
+Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `5f73a24` (`Document Link resume and connection checks`). Offline connection diagnostics are published in `8a1c02f`. Local checkpoint `36e26b6` adds server-authorized, locally decrypted Home conversation summaries and a real two-account browser assertion. Local commit `41b0adc` removes mock notification controls and corrects deployment guidance. Branch publication of the local commits is pending automatic-review approval. The active UI retains Obsidian Ember styling and nested navigation.
 
 ## Active direction
 
