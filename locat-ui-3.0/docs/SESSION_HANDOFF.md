@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `5f73a24` (`Document Link resume and connection checks`). Offline connection diagnostics are published in `8a1c02f`. Local checkpoint `36e26b6` adds server-authorized, locally decrypted Home conversation summaries and a real two-account browser assertion. Local commit `41b0adc` removes mock notification controls and corrects deployment guidance. Branch publication of the local commits is pending automatic-review approval. The active UI retains Obsidian Ember styling and nested navigation.
+Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published branch checkpoint: `c9434cb` (`Record latest Locat release readiness checkpoint`). Home summaries landed in `65ceb22`; `eaf46db` removes mock notification controls and corrects deployment guidance. The active UI retains Obsidian Ember styling and nested navigation.
 
 ## Active direction
 
@@ -26,7 +26,7 @@ Read `docs/REWORK_SCOPE.md` and `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` fi
 - `9118708` corrects that browser scenario's network-write expectation from 11 to 12; the prior run showed the expected request includes the initial text transfer. Hosted run `40102456079` passed Chromium 7/7, Firefox 7/7, all three repeated private-store runs, Ubuntu, Windows, macOS, and connector checks.
 - `8a1c02f` connects the Offline & LAN “Test connection” button to a bounded same-origin readiness check, reports success/failure/timeout, and aborts when the screen unmounts.
 - `5f73a24` records Link resume and connection-check behavior in the integration handoff.
-- Local `36e26b6` adds an authenticated `matrix/conversations` response restricted to current, accepted one-to-one contacts and ready rooms. Home requests summaries only while the current account's managed Matrix session is active, decrypts previews from that device's SDK timeline, and labels only currently accepted contacts. Group, foreign, unencrypted, removed-contact and malformed rows do not produce summaries. The Matrix browser flow now checks that a peer sees the decrypted message on Home and opens the same conversation from that row.
+- `65ceb22` adds an authenticated `matrix/conversations` response restricted to current, accepted one-to-one contacts and ready rooms. Home requests summaries only while the current account's managed Matrix session is active, decrypts previews from that device's SDK timeline, and labels only currently accepted contacts. Group, foreign, unencrypted, removed-contact and malformed rows do not produce summaries. The Matrix browser flow now checks that a peer sees the decrypted message on Home and opens the same conversation from that row.
 
 Home now projects recent conversations from encrypted rooms authorized for the current account and active managed device. It displays only locally decrypted previews and currently accepted contact names; it does not create rooms or use preview fixtures for live accounts. Settings marks OS notifications unavailable rather than presenting non-persistent mock controls.
 
@@ -39,9 +39,9 @@ Hosted run `40101881052` on `43cafff` failed only in the Link browser assertion:
 ## Remaining work
 
 - Live Home now includes account-owned contact/request counts and a direct nested Requests shortcut. Live Search uses account-owned accepted contacts and modules; encrypted message search stays inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
-- Publish the local source and documentation commits after automatic review approves the branch update; inspect the hosted two-account Matrix Home assertion and full CI result.
+- Inspect hosted CI for `65ceb22` and the follow-up documentation/readiness commits; the new two-account Matrix Home assertion must pass before calling this feature browser-tested.
 - Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
 - Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
 - Physical Windows/Android persistence checks, identity recovery limits, single-writer hosting assumptions, reproducible production deployment validation and independent security review remain open.
 
-Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. The local Home-summary, notification-state and documentation changes pass the checks above; branch publication and hosted Home acceptance are pending review. Continue account/security and encrypted messaging lifecycle work; retain physical-device, reproducible deployment and independent-review gates. Do not merge, deploy or publish a release.
+Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. The published Home-summary, notification-state and documentation changes pass the recorded local checks; hosted validation of the new source is pending. Continue account/security and encrypted messaging lifecycle work; retain physical-device, reproducible deployment and independent-review gates. Do not merge, deploy or publish a release.
