@@ -1,6 +1,6 @@
 # Locat UI 3.0 active execution tracker
 
-Updated 2026-10-20. This tracker follows the current user-directed scope on `rework/locat-core-scope`, superseding older roadmap priorities that include retired standalone modules. The Obsidian Ember theme and nested navigation/options remain required.
+Updated 2026-10-24. This tracker follows the current user-directed scope on `rework/locat-core-scope`, superseding older roadmap priorities that include retired standalone modules. The Obsidian Ember theme and nested navigation/options remain required.
 
 ## Retained scope
 
@@ -11,7 +11,7 @@ Updated 2026-10-20. This tracker follows the current user-directed scope on `rew
 | Link | Devices, Pairings and Transfers are separate Obsidian Ember sections; pairing requires two-device code comparison, and verified peers can send encrypted file/text transfers. Hosted Chromium and Firefox acceptance now covers an 8 MiB file (33 encrypted chunks), a forced interruption at chunk 10, resuming from the original file, and byte-for-byte verified receipt | Continue physical two-device, native and network acceptance |
 | Files & Vault | Entries, Backups and Security are separate nested sections; credential and secure note stay a nested choice inside the Secrets editor; local unlocked search includes note text | Continue workspace integration, permissions and acceptance without restoring standalone media libraries |
 | Workspace | Nested destinations, Search, Home, command palette and grouped Settings using Obsidian Ember; Home labels fixtures in preview; live Home shows account-owned contact/request counts with a direct Requests-section shortcut and states that conversation summaries are not connected; live Search uses account-owned accepted contacts and modules, while encrypted messages remain local to each open conversation | Continue useful retained destinations with server-backed data and truthful unavailable states; live Home conversation summaries are not connected yet |
-| Global readiness | Same-origin service, discovery, session-bound identity proofs and authenticated health | Continue connection and identity prerequisites that support retained Chat/Link features; physical-host and independent-review gates remain open |
+| Global readiness | Same-origin service, discovery, session-bound identity proofs and authenticated health; Offline & LAN now has a user-triggered bounded `/api/ready` diagnostic with result, timeout, and unmount cancellation handling | Continue connection and identity prerequisites that support retained Chat/Link features; physical-host and independent-review gates remain open |
 
 ## Retired scope
 
