@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `9118708` (`Count the existing Link text request in resume check`). Local checkpoint `d41aeb5` wires the Offline & LAN connection diagnostic; automatic review blocked publishing it. The active UI retains Obsidian Ember styling and nested navigation.
+Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `5f73a24` (`Document Link resume and connection checks`). Offline connection diagnostics are published in `8a1c02f`. Local checkpoint `36e26b6` adds server-authorized, locally decrypted Home conversation summaries and a real two-account browser assertion; its branch push is pending automatic-review approval. The active UI retains Obsidian Ember styling and nested navigation.
 
 ## Active direction
 
@@ -24,22 +24,24 @@ Read `docs/REWORK_SCOPE.md` and `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` fi
 - `f352c9c` added an interrupted 8 MiB encrypted Link upload test that resumes from 10/33 chunks and verifies the downloaded bytes; hosted Chromium, Firefox and platform checks passed.
 - `43cafff` rejects a changed file before resuming a Link upload, including changes in chunks not uploaded before interruption. A keyed account/device fingerprint covers all chunk bytes; the journal stores only the HMAC fingerprint. The browser scenario checks that the changed file causes no additional chunk writes.
 - `9118708` corrects that browser scenario's network-write expectation from 11 to 12; the prior run showed the expected request includes the initial text transfer. Hosted run `40102456079` passed Chromium 7/7, Firefox 7/7, all three repeated private-store runs, Ubuntu, Windows, macOS, and connector checks.
-- Local `d41aeb5` connects the Offline & LAN “Test connection” button to a bounded same-origin readiness check, reports success/failure/timeout, and aborts when the screen unmounts. Its source is locally committed but not published.
+- `8a1c02f` connects the Offline & LAN “Test connection” button to a bounded same-origin readiness check, reports success/failure/timeout, and aborts when the screen unmounts.
+- `5f73a24` records Link resume and connection-check behavior in the integration handoff.
+- Local `36e26b6` adds an authenticated `matrix/conversations` response restricted to current, accepted one-to-one contacts and ready rooms. Home requests summaries only while the current account's managed Matrix session is active, decrypts previews from that device's SDK timeline, and labels only currently accepted contacts. Group, foreign, unencrypted, removed-contact and malformed rows do not produce summaries. The Matrix browser flow now checks that a peer sees the decrypted message on Home and opens the same conversation from that row.
 
 Current Home conversation summaries are still not connected. Do not derive “recent conversations” from contact membership or show preview records as live.
 
 ## Validation and hosted status
 
-Local checks for `d41aeb5` pass: `npm run check`, `npm run lint`, `npm run test:all` (292 frontend tests and 108 server tests), and `npm run build`. The build retains the known large Matrix crypto chunk advisory. Focused Offline diagnostic coverage verifies a valid ready response, an unreachable server, and abort on unmount. Local browser execution is blocked because the Chromium headless executable is not installed in this workspace.
+Local checks for `36e26b6` pass: TypeScript, ESLint, 298 frontend tests across 67 files (serial run), 109 backend tests, and production build. Four timing-sensitive frontend failures in the parallel run passed when their two test files were rerun alone and in the serial full suite. The build retains the large Matrix crypto chunk advisory. Browser spec syntax and Playwright discovery pass; real Synapse browser acceptance is hosted because its pinned test environment is unavailable locally.
 
-Hosted run `40101881052` on `43cafff` failed only in the Link browser assertion: the check expected 11 writes but the logged actual scenario correctly made 12 (initial text send plus 11 file attempts). The assertion was corrected in `9118708`. Run `40102456079` then passed 7/7 Chromium, 7/7 Firefox, three repeated private-store foreground runs, Ubuntu, Windows, macOS, and connector preparation. This run does not include local-only `d41aeb5`.
+Hosted run `40101881052` on `43cafff` failed only in the Link browser assertion: the check expected 11 writes but the logged actual scenario correctly made 12 (initial text send plus 11 file attempts). The assertion was corrected in `9118708`. Run `40102456079` then passed 7/7 Chromium, 7/7 Firefox, three repeated private-store foreground runs, Ubuntu, Windows, macOS, and connector preparation. Run `40105232427` on `8a1c02f` has passed Ubuntu, Windows and macOS checks plus connector acceptance; browser-foundation is still running its Firefox and repeated private-store checks. Neither run includes the local-only Home summary change in `36e26b6`.
 
 ## Remaining work
 
 - Live Home now includes account-owned contact/request counts and a direct nested Requests shortcut. Live Search uses account-owned accepted contacts and modules; encrypted message search stays inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
-- Connect Home to actual conversation summaries only if the Matrix session can provide a safe, account-scoped local projection.
+- Publish `36e26b6` after automatic review approves the branch update; inspect its hosted two-account Matrix Home assertion and full CI result.
 - Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
 - Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
-- Physical-device/cross-platform persistence checks, identity recovery limits, single-writer hosting assumptions and independent security review remain open.
+- Physical Windows/Android persistence checks, identity recovery limits, single-writer hosting assumptions, reproducible production deployment validation and independent security review remain open.
 
-Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. Next, publish `d41aeb5` after repository publication review is cleared, then run its hosted checks. Continue account/security and encrypted messaging lifecycle work after this connection diagnostics checkpoint; retain physical-device and independent-review gates.
+Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. The next source checkpoint is `36e26b6`; branch publication and its hosted checks are pending review. Continue account/security and encrypted messaging lifecycle work; retain physical-device, reproducible deployment and independent-review gates. Do not merge, deploy or publish a release.

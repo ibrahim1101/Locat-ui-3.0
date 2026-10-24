@@ -2,6 +2,10 @@
 
 Date: 2026-10-20. Earlier records are preserved in `docs/archive/ENGINEERING_HISTORY_2026-10-20_pre-search.md`.
 
+## Device-local Home conversation summaries
+
+Date: 2026-10-24. Local commit `36e26b6` adds a current-session-only `GET /api/link/matrix/conversations` list of ready rooms for accepted, unblocked contacts. It refuses caller-selected identities, checks the current bound messaging session, and applies the existing Matrix authorization recheck. The browser validates the exact descriptor shape, confirms each local room is encrypted and has only the bound peer plus the local user, and builds previews only from locally decrypted events. Home resolves display names against the latest accepted contact list and shows no summaries when the managed messaging session is inactive. It does not persist previews or create rooms. Tests cover authorization, removed contacts, malformed responses, group-room exclusion, local decryption, lifecycle reuse and the real two-account browser path. Local validation passed TypeScript, ESLint, 298 frontend tests (serial), 109 server tests, production build and Playwright discovery. Parallel frontend execution timed out in four existing image/private-store flows; those tests passed in isolation and the serial full run. Hosted acceptance remains pending because the local commit's push was rejected by automatic review. A malformed Matrix timestamp is skipped before formatting to keep a hostile or corrupted event from crashing Home.
+
 ## Retired feature scope
 
 Cinema and standalone media libraries, Locat Remote, and SentinelLab/integrations were removed from active UI, routes and helper code. Schema 18 drops their dedicated tables; core account, messaging, Link, Vault, Secrets and activity data remain. References to retired feature names in active source are limited to compatibility migration/backup code and tests that assert retired routes and tables are absent.
