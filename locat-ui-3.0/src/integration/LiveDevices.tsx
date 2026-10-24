@@ -2,8 +2,9 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {useSession} from '../app/session';
 import {Screen} from '../layouts/Screen';
 import {Badge,Button,Meter,Sheet,StateView,TextField,formatBytes} from '../ui';
-import {deviceSharedKey,pairingSas,solveDeviceChallenge} from './linkCrypto';
+import {deviceSharedKey,deviceTransferFingerprintKey,pairingSas,solveDeviceChallenge} from './linkCrypto';
 import {LINK_CHUNK_SIZE,encryptLinkPayload,decryptLinkPayload,type LinkPayload} from './linkPayloadCrypto';
+import {fingerprintLinkFile} from './linkFileFingerprint';
 import {loadLinkIdentity,pinLinkPeer,resetLinkIdentity,type StoredLinkIdentity} from './linkIdentityStore';
 import {createLinkTransferJournal,deleteLinkTransferJournal,ensureUploadedLinkChunksAreJournaled,loadLinkTransferJournal,saveLinkTransferChunk,type LinkTransferJournalMeta} from './linkTransferJournal';
 import {linkRequest} from './linkRequest';
@@ -50,8 +51,11 @@ function OwnedDevices({accountId}:{accountId:string}){
  const fileMeta=(payload:LinkPayload):Omit<LinkTransferJournalMeta,'accountId'>=>({payloadId:payload.id,pairId:payload.pairId,peer:payload.toDevice,name:payload.name,mime:payload.mime,size:payload.size,chunkCount:payload.chunkCount});
  async function uploadFileChunks(payload:LinkPayload,file:File,key:CryptoKey,version:number){
   if(file.size!==payload.size||file.name!==payload.name||(file.type||'application/octet-stream')!==payload.mime)throw new Error('Choose the original file with the same name, size and type.');
-  let journal=await loadLinkTransferJournal(accountId,payload.id);if(journal){const wanted=fileMeta(payload);if(JSON.stringify(journal.meta)!==JSON.stringify({accountId,...wanted}))throw new Error('Saved encrypted chunks belong to different transfer metadata.');ensureUploadedLinkChunksAreJournaled(journal.chunks,payload.receivedChunks??0);}
-  else{if((payload.receivedChunks??0)>0)throw new Error('Local encrypted resume data is unavailable. Cancel this transfer and send the original file again.');await createLinkTransferJournal(accountId,fileMeta(payload));journal={meta:{accountId,...fileMeta(payload)},chunks:[]};}
+  const fingerprintKey=await deviceTransferFingerprintKey(identity.current!.privateKey,snapshot!.devices.find(row=>row.id===payload.toDevice)!.publicKey,accountId,payload.pairId);
+  const fingerprint=await fingerprintLinkFile(file,fingerprintKey);
+  if(version!==generation.current)return;
+  let journal=await loadLinkTransferJournal(accountId,payload.id);if(journal){const wanted=fileMeta(payload);if(JSON.stringify(journal.meta)!==JSON.stringify({accountId,...wanted,fingerprint}))throw new Error(journal.meta.fingerprint?'Selected file does not match the saved encrypted transfer.':'Saved transfer predates file verification. Cancel it and send the original file again.');ensureUploadedLinkChunksAreJournaled(journal.chunks,payload.receivedChunks??0);}
+  else{if((payload.receivedChunks??0)>0)throw new Error('Local encrypted resume data is unavailable. Cancel this transfer and send the original file again.');const meta={...fileMeta(payload),fingerprint};await createLinkTransferJournal(accountId,meta);journal={meta:{accountId,...meta},chunks:[]};}
   const envelopes=new Map(journal.chunks.map(chunk=>[chunk.seq,chunk.envelope]));
   for(let seq=0;seq<payload.chunkCount;seq++){
    if(version!==generation.current)return;

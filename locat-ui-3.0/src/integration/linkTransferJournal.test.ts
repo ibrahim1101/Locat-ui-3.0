@@ -10,7 +10,7 @@ afterEach(()=>vi.unstubAllGlobals());
 it('persists only encrypted envelopes and resumes with byte-identical ciphertext per account',async()=>{
  const accountId=crypto.randomUUID(),payload:LinkPayload={id:crypto.randomUUID(),userId:accountId,pairId:'pair-a',fromDevice:1,toDevice:2,kind:'file',name:'sample.txt',mime:'text/plain',size:20,chunkCount:1,status:'uploading',receivedChunks:0,createdAt:Date.now()};
  const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']),plain=new TextEncoder().encode('secret file contents'),envelope=await encryptLinkPayload(key,payload,0,plain);
- await createLinkTransferJournal(accountId,{payloadId:payload.id,pairId:payload.pairId,peer:payload.toDevice,name:payload.name,mime:payload.mime,size:payload.size,chunkCount:payload.chunkCount});
+ await createLinkTransferJournal(accountId,{payloadId:payload.id,pairId:payload.pairId,peer:payload.toDevice,name:payload.name,mime:payload.mime,size:payload.size,chunkCount:payload.chunkCount,fingerprint:'A'.repeat(43)+'='});
  await saveLinkTransferChunk(accountId,payload.id,0,envelope);
  const restored=await loadLinkTransferJournal(accountId,payload.id);
  expect(restored?.chunks).toHaveLength(1);expect(restored?.chunks[0].envelope).toEqual(envelope);expect(JSON.stringify(restored)).not.toContain('secret file contents');
@@ -21,7 +21,7 @@ it('persists only encrypted envelopes and resumes with byte-identical ciphertext
 });
 
 it('refuses a different transfer definition for an existing journal and clears journals on reset',async()=>{
- const accountId=crypto.randomUUID(),meta={payloadId:crypto.randomUUID(),pairId:'pair-b',peer:3,name:'archive.bin',mime:'application/octet-stream',size:0,chunkCount:1};
+ const accountId=crypto.randomUUID(),meta={payloadId:crypto.randomUUID(),pairId:'pair-b',peer:3,name:'archive.bin',mime:'application/octet-stream',size:0,chunkCount:1,fingerprint:'B'.repeat(43)+'='};
  await createLinkTransferJournal(accountId,meta);await expect(createLinkTransferJournal(accountId,{...meta,size:1})).rejects.toThrow();
  await clearLinkTransferJournal(accountId);expect(await loadLinkTransferJournal(accountId,meta.payloadId)).toBeUndefined();
 });

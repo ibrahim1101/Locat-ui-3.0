@@ -35,6 +35,20 @@ export async function deviceSharedKey(myPriv: CryptoKey, theirPubB64: string, us
   );
 }
 
+/** Non-exportable, pair-scoped key for local transfer fingerprints. */
+export async function deviceTransferFingerprintKey(myPriv:CryptoKey,theirPubB64:string,userId:string,pairId:string):Promise<CryptoKey>{
+  const bits=await ecdhBits(myPriv,theirPubB64);
+  let base:CryptoKey;
+  try{base=await crypto.subtle.importKey('raw',bits,'HKDF',false,['deriveKey']);}finally{new Uint8Array(bits).fill(0);}
+  return crypto.subtle.deriveKey(
+    {name:'HKDF',salt:te.encode('locat-ui3-link:v1'),info:te.encode(JSON.stringify(['locat-ui3-link:v1',userId,pairId,'file-fingerprint'])),hash:'SHA-256'},
+    base,
+    {name:'HMAC',hash:'SHA-256',length:256},
+    false,
+    ['sign'],
+  );
+}
+
 /**
  * Six-digit Short Authentication String over the SORTED pair of public keys.
  * Order-independent so both devices compute the same value; MITM key swap
