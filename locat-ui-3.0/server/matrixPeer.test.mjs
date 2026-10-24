@@ -18,3 +18,15 @@ test('peer lookup requires current bound Locat session and exactly one local acc
  await handler(context);assert.equal(status,200);assert.equal(value.accountId,peer);sessionHash='different';await assert.rejects(handler(context),{status:403});assert.equal(called,1);sessionHash=matrixTokenHash('owner-session');
  for(const query of ['','?accountId='+peer+'&accountId='+peer,'?accountId='+peer+'&unknown=1','?accountId=@remote:server'])await assert.rejects(handler({...context,url:new URL('http://localhost/api/link/matrix/peer'+query)}),{status:400});
 });
+
+test('conversation list requires the current bound messaging session and rejects caller-selected identities',async()=>{
+ const session='owner-session',sessionHash=matrixTokenHash(session),rows=[{accountId:'b'.repeat(32),roomId:'!private:matrix.test',matrixUserId:'@peer:matrix.test'}];let listed=0,status,value,rechecked=0;
+ const handler=createMatrixBindingHandler({provider:{},conversations:{list:user=>{listed++;assert.equal(user,'owner');return rows;}},store:{current:()=>({sessionHash,expiresAt:Date.now()+60000})},json:(_res,code,data)=>{status=code;value=data;}});
+ const context={req:{method:'GET'},res:{},url:new URL('http://localhost/api/link/matrix/conversations'),userId:'owner',actor:1,session,recheck(){rechecked++;}};
+ await handler(context);assert.equal(status,200);assert.deepEqual(value,{conversations:rows});assert.equal(listed,1);assert.equal(rechecked,1);
+ await assert.rejects(handler({...context,url:new URL('http://localhost/api/link/matrix/conversations?accountId=foreign')}),{status:400});assert.equal(listed,1);
+ const expired=createMatrixBindingHandler({provider:{},conversations:{list:()=>{throw new Error('must not list');}},store:{current:()=>({sessionHash,expiresAt:Date.now()-1})},json:()=>{}});
+ await assert.rejects(expired(context),{status:403});
+ const wrongSession=createMatrixBindingHandler({provider:{},conversations:{list:()=>{throw new Error('must not list');}},store:{current:()=>({sessionHash:'wrong',expiresAt:Date.now()+60000})},json:()=>{}});
+ await assert.rejects(wrongSession(context),{status:403});
+});

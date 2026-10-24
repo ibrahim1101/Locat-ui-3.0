@@ -6,6 +6,7 @@ import { FIXTURE_CONVERSATIONS, FIXTURE_DEVICES } from "@/fixtures/data";
 import { Screen } from "@/layouts/Screen";
 import { Avatar, Badge, Button, SectionTitle, cn } from "@/ui";
 import { LiveHomeContactSummary } from "@/integration/LiveHomeContactSummary";
+import { LiveHomeConversations } from "@/integration/LiveHomeConversations";
 
 function greeting() { const h = new Date().getHours(); return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; }
 
@@ -35,12 +36,12 @@ export default function Home() {
           <section>
             <SectionTitle action={<Button size="sm" variant="ghost" onClick={() => nav("/messages")}>All chats</Button>}>Recent conversations</SectionTitle>
             {preview && <p className="mb-2 text-xs text-ink-3">Preview sample data</p>}
-            {unread.length ? <div className="divide-y divide-line overflow-hidden rounded-2xl bg-s1 hairline">{unread.slice(0, 4).map((c) => (
+            {preview ? unread.length ? <div className="divide-y divide-line overflow-hidden rounded-2xl bg-s1 hairline">{unread.slice(0, 4).map((c) => (
               <button key={c.id} onClick={() => nav(`/messages/${c.id}`)} className="flex w-full items-center gap-3 p-3 text-left hover:bg-s2" data-testid={`home-unread-${c.id}`}>
                 <Avatar name={c.title} presence={c.peer?.presence.state} />
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{c.title}</span><span className="block truncate text-[13px] text-ink-2">{c.typing?.length ? <em className="not-italic text-ember">typing…</em> : c.lastPreview}</span></span>
                 <Badge tone="ember">{c.unread}</Badge>
-              </button>))}</div> : <p className="rounded-2xl bg-s1 p-4 text-sm text-ink-3 hairline">{preview ? "You're all caught up." : "Recent conversations will appear here when this dashboard is connected to your messaging account."}</p>}
+              </button>))}</div> : <p className="rounded-2xl bg-s1 p-4 text-sm text-ink-3 hairline">You're all caught up.</p> : user ? <LiveHomeConversations accountId={user.id} onOpen={id => nav(`/messages/${id}`)} /> : <p className="rounded-2xl bg-s1 p-4 text-sm text-ink-3 hairline">Sign in to see conversations from this messaging account.</p>}
           </section>
 
           <section>

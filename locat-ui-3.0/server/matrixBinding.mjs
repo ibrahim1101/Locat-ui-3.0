@@ -78,6 +78,13 @@ export function createMatrixBindingHandler({store,provider,provisioner,conversat
    if(!active)fail(403,'Bind this messaging device to the current Locat session first');
    recheck();json(res,200,url.searchParams.has('accountId')?store.peer(userId,actor,url.searchParams.get('accountId')):store.peerByMatrix(userId,actor,url.searchParams.get('matrixUserId')));return true;
   }
+  if(req.method==='GET'&&action==='conversations'){
+   if(url.searchParams.size)fail(400,'Conversation list does not accept query parameters');
+   if(!provider)fail(503,'Matrix sidecar is not configured');
+   const current=store.current(userId,actor);
+   if(!current||current.sessionHash!==matrixTokenHash(session)||current.expiresAt<=Date.now())fail(403,'Bind this messaging device to the current Locat session first');
+   recheck();json(res,200,{conversations:conversations.list(userId)});return true;
+  }
   if(req.method!=='POST'||!['bind','disconnect','logout','provision','cancel-provision','revoke-managed-device','conversation'].includes(action))fail(404,'Unknown Matrix binding action');
   const retryAfter=(isMatrixCleanupAction(action)?cleanupLimit:limit)(userId);if(retryAfter)throw Object.assign(new Error('Matrix binding rate limit exceeded'),{status:429,retryAfter});
   const input=await body(req);if(!input||typeof input!=='object'||Array.isArray(input))fail(400,'Invalid Matrix command');recheck();

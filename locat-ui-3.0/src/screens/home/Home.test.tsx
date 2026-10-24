@@ -15,6 +15,7 @@ const { state, navigate } = vi.hoisted(() => ({
 
 vi.mock("@/app/session", () => ({ useSession: () => state }));
 vi.mock("@/integration/LiveHomeContactSummary", () => ({ LiveHomeContactSummary: () => <div>Live contact summary</div> }));
+vi.mock("@/integration/LiveHomeConversations", () => ({ LiveHomeConversations: () => <div>Locally decrypted conversations</div> }));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router")>()),
   useNavigate: () => navigate,
@@ -24,7 +25,7 @@ afterEach(() => { vi.clearAllMocks(); });
 
 it("does not present preview conversations or devices as live account data", () => {
   render(<MemoryRouter><Home /></MemoryRouter>);
-  expect(screen.getByText(/Recent conversations will appear here/)).toBeVisible();
+  expect(screen.getByText("Locally decrypted conversations")).toBeVisible();
   expect(screen.queryByText("Preview sample data")).toBeNull();
   expect(screen.queryByTestId("home-unread-c-mira")).toBeNull();
   expect(screen.queryByText("Studio Desktop")).toBeNull();
