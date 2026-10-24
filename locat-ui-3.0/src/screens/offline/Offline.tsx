@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { CloudOff, HardDrive, Inbox, Network, RefreshCw, Router, ShieldAlert, Wifi, Radar } from "lucide-react";
 import { useSession } from "@/app/session";
 import { Screen } from "@/layouts/Screen";
@@ -6,6 +7,32 @@ import { Badge, Banner, Button, ListRow, Section, relTime, cn } from "@/ui";
 /** Offline & LAN (M11): honest connection modes. Outbox ≠ serverless LAN messaging. */
 export default function Offline() {
   const { connection, setStage } = useSession();
+  const [checking, setChecking] = useState(false);
+  const [diagnostic, setDiagnostic] = useState("");
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
+  async function testConnection() {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const deadline = setTimeout(() => controller.abort(), 5000);
+    setChecking(true);
+    setDiagnostic("");
+    try {
+      const response = await fetch("/api/ready", { cache: "no-store", credentials: "omit", signal: controller.signal });
+      const body = response.ok ? await response.json() as { app?: unknown } : null;
+      if (request.current !== controller) return;
+      setDiagnostic(body?.app === "Locat" ? "Locat server responded and is ready." : "The configured server did not return a valid Locat readiness response.");
+    } catch {
+      if (request.current === controller) setDiagnostic(controller.signal.aborted ? "Connection check timed out or was cancelled." : "Could not reach the configured Locat server.");
+    } finally {
+      clearTimeout(deadline);
+      if (request.current === controller) {
+        request.current = null;
+        setChecking(false);
+      }
+    }
+  }
   const modes = [
     { id: "server", icon: Wifi, t: "Server connected", d: "Chat, Link, Files, Vault and Secrets available", on: connection.mode === "server" && connection.server === "connected" },
     { id: "disc", icon: CloudOff, t: "Server disconnected", d: "Read local history; new messages wait encrypted in the outbox", on: connection.mode === "server" && connection.server !== "connected" },
@@ -26,7 +53,8 @@ export default function Offline() {
           <ListRow icon={RefreshCw} title="Last sync" subtitle={connection.lastSyncAt ? relTime(connection.lastSyncAt) : "—"} />
         </Section>
         <Section title="Diagnostics" footer="Checks run against your configured server only. Locat never scans your network.">
-          <div className="flex flex-wrap gap-2 p-4"><Button icon={RefreshCw}>Test connection</Button><Button variant="ghost" onClick={() => setStage("server")}>Change server</Button></div>
+          <div className="flex flex-wrap gap-2 p-4"><Button icon={RefreshCw} loading={checking} disabled={checking} onClick={() => void testConnection()}>Test connection</Button><Button variant="ghost" onClick={() => setStage("server")}>Change server</Button></div>
+          {diagnostic && <p role="status" className="px-4 pb-4 text-sm text-ink-2">{diagnostic}</p>}
         </Section>
         <Section title="Planned">
           <ListRow icon={Radar} title="LAN-only messaging without a server" disabledReason="Planned (M11) — needs authenticated peer transport" trailing={<Badge tone="planned">Planned</Badge>} />
