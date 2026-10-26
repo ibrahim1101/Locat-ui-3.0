@@ -77,7 +77,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 23); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 24); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/calendar/events?from=1&to=2')).status,401);
     const calendarFrom=Date.now(),calendarTo=calendarFrom+7*24*60*60_000;
@@ -97,6 +97,11 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/calendar/events','DELETE',{id:calendarSaved.id,expectedUpdatedAt:calendarSaved.updatedAt},aliceCookie)).status,409);
     assert.equal((await request('/api/calendar/events','DELETE',{id:calendarSaved.id,expectedUpdatedAt:calendarEdited.updatedAt},aliceCookie)).status,200);
     assert.equal((await (await request(calendarPath,'GET',undefined,aliceCookie)).json()).events.length,0);
+    const repeatingCalendar=await request('/api/calendar/events','POST',{...calendarEvent,title:'Daily check-in',repeatMs:86_400_000},aliceCookie);assert.equal(repeatingCalendar.status,201);const {event:calendarSeries}=await repeatingCalendar.json();assert.equal(calendarSeries.repeatMs,86_400_000);
+    const calendarOccurrences=(await (await request(calendarPath,'GET',undefined,aliceCookie)).json()).events;assert.equal(calendarOccurrences.length,7);assert.equal(new Set(calendarOccurrences.map(event=>event.id)).size,1);
+    const legacyCalendarUpdate=await request('/api/calendar/events','PATCH',{id:calendarSeries.id,expectedUpdatedAt:calendarSeries.updatedAt,title:'Daily check-in',notes:'Adjusted',startsAt:calendarSeries.startsAt,endsAt:calendarSeries.endsAt,reminderAt:calendarSeries.reminderAt},aliceCookie);assert.equal(legacyCalendarUpdate.status,200);const {event:legacyUpdated}=await legacyCalendarUpdate.json();assert.equal(legacyUpdated.repeatMs,86_400_000);
+    assert.equal((await request('/api/calendar/events','POST',{...calendarEvent,title:'Unsupported cadence',repeatMs:90_000},aliceCookie)).status,400);
+    assert.equal((await request('/api/calendar/events','DELETE',{id:calendarSeries.id,expectedUpdatedAt:legacyUpdated.updatedAt},aliceCookie)).status,200);
     const encryptedShare={iv:Buffer.alloc(12,7).toString('base64'),ciphertext:Buffer.alloc(32,9).toString('base64'),ttlHours:24};
     assert.equal((await request('/api/share','POST',encryptedShare)).status,401);
     assert.equal((await request('/api/share','POST',{...encryptedShare,plaintext:'secret'},aliceCookie)).status,400);

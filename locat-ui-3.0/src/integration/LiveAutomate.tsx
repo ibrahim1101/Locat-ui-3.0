@@ -13,7 +13,7 @@ function emptyForm():Form{return{title:'',details:'',runAt:localValue(Date.now()
 export function LiveAutomate(){
  const {user}=useSession(),accountId=user?.id??'';const [rules,setRules]=useState<Rule[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[editor,setEditor]=useState(false),[editing,setEditing]=useState<Rule|null>(null),[form,setForm]=useState<Form>(emptyForm),[removing,setRemoving]=useState<Rule|null>(null);
  const load=useCallback(async(quiet=false)=>{if(!accountId)return;if(!quiet)setLoading(true);setError('');try{const result=await accountRequest('/api/automate/rules',accountId);setRules(result.rules);}catch(reason){setError(reason instanceof Error?reason.message:'Automations could not be loaded.');}finally{setLoading(false);}},[accountId]);
- useEffect(()=>{void Promise.resolve().then(load);},[load]);
+ useEffect(()=>{void Promise.resolve().then(()=>load());},[load]);
  useEffect(()=>{const refresh=()=>{if(document.visibilityState==='visible')void load(true);},timer=window.setInterval(refresh,30_000);document.addEventListener('visibilitychange',refresh);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[load]);
  function create(){setEditing(null);setForm(emptyForm());setEditor(true);}
  function edit(rule:Rule){setEditing(rule);setForm({title:rule.title,details:rule.details,runAt:localValue(rule.runAt),enabled:rule.enabled,repeatMs:rule.repeatMs});setEditor(true);}

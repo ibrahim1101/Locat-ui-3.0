@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=23;
+export const DATABASE_SCHEMA_VERSION=24;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -147,6 +147,9 @@ export function openDatabase(filename) {
   if(version<23)sql.exec(`BEGIN IMMEDIATE;
     ALTER TABLE automationRules ADD COLUMN repeatMs INTEGER CHECK(repeatMs IS NULL OR repeatMs IN (86400000,604800000));
     PRAGMA user_version=23;COMMIT;`);
+  if(version<24)sql.exec(`BEGIN IMMEDIATE;
+    ALTER TABLE calendarEvents ADD COLUMN repeatMs INTEGER CHECK(repeatMs IS NULL OR repeatMs IN (86400000,604800000));
+    PRAGMA user_version=24;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
@@ -251,15 +254,30 @@ export function openDatabase(filename) {
 
 function calendarStore(sql) {
   const byId=sql.prepare('SELECT * FROM calendarEvents WHERE id=? AND userId=?');
-  const list=sql.prepare('SELECT * FROM calendarEvents WHERE userId=? AND startsAt<? AND endsAt>=? ORDER BY startsAt,id LIMIT 500');
+  const list=sql.prepare('SELECT * FROM calendarEvents WHERE userId=? AND (repeatMs IS NOT NULL OR startsAt<? AND endsAt>=?) ORDER BY startsAt,id LIMIT 5000');
+  function inRange(userId,from,to){
+    const events=[];
+    for(const event of list.all(userId,to,from)){
+      if(event.repeatMs===null){events.push({...event,masterStartsAt:event.startsAt,masterEndsAt:event.endsAt,masterReminderAt:event.reminderAt});continue;}
+      const duration=event.endsAt-event.startsAt,reminderOffset=event.reminderAt===null?null:event.startsAt-event.reminderAt;
+      const first=Math.max(0,Math.ceil((from-duration-event.startsAt)/event.repeatMs));
+      for(let occurrence=first;;occurrence++){
+        const startsAt=event.startsAt+occurrence*event.repeatMs;if(startsAt>=to)break;
+        const endsAt=startsAt+duration;if(endsAt<from)continue;
+        events.push({...event,startsAt,endsAt,reminderAt:reminderOffset===null?null:startsAt-reminderOffset,masterStartsAt:event.startsAt,masterEndsAt:event.endsAt,masterReminderAt:event.reminderAt});
+        if(events.length>=1000){events.sort((a,b)=>a.startsAt-b.startsAt||a.id.localeCompare(b.id));events.length=500;}
+      }
+    }
+    return events.sort((a,b)=>a.startsAt-b.startsAt||a.id.localeCompare(b.id)).slice(0,500);
+  }
   return {
-    list:(userId,from,to)=>list.all(userId,to,from),
+    list:inRange,
     get:(userId,id)=>byId.get(id,userId),
     create(event,now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');
       try {
         if(sql.prepare('SELECT COUNT(*) AS count FROM calendarEvents WHERE userId=?').get(event.userId).count>=5000)throw Object.assign(new Error('This account has reached its calendar event limit'),{status:429});
-        sql.prepare('INSERT INTO calendarEvents(id,userId,title,notes,startsAt,endsAt,reminderAt,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?,?)').run(event.id,event.userId,event.title,event.notes,event.startsAt,event.endsAt,event.reminderAt,now,now);
+        sql.prepare('INSERT INTO calendarEvents(id,userId,title,notes,startsAt,endsAt,reminderAt,createdAt,updatedAt,repeatMs) VALUES(?,?,?,?,?,?,?,?,?,?)').run(event.id,event.userId,event.title,event.notes,event.startsAt,event.endsAt,event.reminderAt,now,now,event.repeatMs??null);
         sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(event.userId,'calendar.event.created','info',now);
         const saved=byId.get(event.id,event.userId);sql.exec('COMMIT');return saved;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
@@ -269,7 +287,7 @@ function calendarStore(sql) {
       try {
         const current=byId.get(id,userId);if(!current||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return null;}
         const updatedAt=Math.max(now,current.updatedAt+1);
-        sql.prepare('UPDATE calendarEvents SET title=?,notes=?,startsAt=?,endsAt=?,reminderAt=?,updatedAt=? WHERE id=? AND userId=? AND updatedAt=?').run(fields.title,fields.notes,fields.startsAt,fields.endsAt,fields.reminderAt,updatedAt,id,userId,expectedUpdatedAt);
+        sql.prepare('UPDATE calendarEvents SET title=?,notes=?,startsAt=?,endsAt=?,reminderAt=?,repeatMs=?,updatedAt=? WHERE id=? AND userId=? AND updatedAt=?').run(fields.title,fields.notes,fields.startsAt,fields.endsAt,fields.reminderAt,fields.repeatMs===undefined?current.repeatMs:fields.repeatMs,updatedAt,id,userId,expectedUpdatedAt);
         sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'calendar.event.updated','info',updatedAt);
         const saved=byId.get(id,userId);sql.exec('COMMIT');return saved;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
