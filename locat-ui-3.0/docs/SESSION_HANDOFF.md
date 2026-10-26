@@ -6,7 +6,7 @@ Updated 2026-10-25. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-
 
 The scratch checkout had been pruned. It was restored from the remote branch at `18f703f`; the previous local-only commit `c6ffc77` and its unpushed source could not be recovered from GitHub or Library. Do not describe its local Calendar/Workspace/Automate/Share code or previous browser results as present in this checkout. The modules have now been rebuilt locally on top of the restored branch. These changes are not published, and the earlier automatic GitHub upload rejection remains in effect; do not bypass it. Continue local implementation and preserve checkpoints.
 
-The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. See `REWORK_SCOPE.md` for limits and the final evidence status.
+The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, downloadable QR codes and local PWA share-target staging, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. PWA incoming text is kept in service-worker IndexedDB for one hour and requires sign-in and user review before an encrypted link is created. See `REWORK_SCOPE.md` for limits and the final evidence status.
 
 ## Active direction
 
@@ -38,7 +38,7 @@ Home now projects recent conversations from encrypted rooms authorized for the c
 
 ## Validation and hosted status
 
-The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 305 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 7 browser specs, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run.
+The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 7 browser specs, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
 
 Older hosted runs below describe earlier, published code and are historical only; they do not validate this restored branch tip or the rebuilt local modules. Physical Windows/Android checks, independent security review, deployment/upgrade/rollback, recovery, and hosting remain open release gates.
 

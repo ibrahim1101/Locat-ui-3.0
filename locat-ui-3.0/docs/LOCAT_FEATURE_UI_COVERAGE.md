@@ -72,7 +72,7 @@ Documents named in the brief that **don't exist** on `release/locat-v1.0`: none 
 | 46 | Full-resolution photo sharing | PART | Composer "Photo (original quality)"; bubble badge Original/Compressed + dimensions | — | `browserImage.ts` pipeline choice |
 | 47 | Encrypted video sharing | PART | Composer "Video" disabled: "#47 not implemented"; `AttachmentView.video` state | — | Encrypted chunk path |
 | 48 | Explicit-permission location sharing | IMPL-U | `LocationSheet` (current / manual, "share once", no background tracking); location bubble | Permission explanation before the native prompt | `LocationShareDialog.tsx`, `lib/location.ts` |
-| 49 | OS/PWA share integration | PLAN | Share module preview footer; `capabilities.shareTarget=false` | — | Web Share Target / Android intents |
+| 49 | OS/PWA share integration | PART | `public/manifest.webmanifest` receives text/title/URL; service worker stages local handoffs; Share reviews content before encryption | Automated UI flow; installed-PWA acceptance pending | Files/photos/videos and Android intents remain unsupported; no background or native integration claim |
 
 All 49 items are mapped. Historical device acceptance (01, 03, 06, 07, 17, 41) and the unaudited "13/44" counter are preserved as evidence only. They aren't treated as unified-build acceptance.
 

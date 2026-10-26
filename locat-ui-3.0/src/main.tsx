@@ -12,6 +12,8 @@ import { FIXTURE_USER } from "./fixtures/data";
 import { LiveLocatRoot } from "./integration/LiveLocatRoot";
 import type { PlatformInfo } from "./contracts";
 
+if(import.meta.env.PROD&&"serviceWorker"in navigator)void navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(error=>console.warn("Locat offline sharing is unavailable",error));
+
 /** Standalone preview entry. The live app starts at integration/LiveLocatRoot. */
 const platform: PlatformInfo = {
   kind: "browser", os: "unknown",

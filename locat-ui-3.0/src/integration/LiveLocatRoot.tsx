@@ -12,6 +12,12 @@ import type { LocatUiAdapter, PlatformInfo, SessionUserView } from "../contracts
 
 const origin = window.location.origin;
 const disconnected = { mode: "server" as const, server: "disconnected" as const, origin, pendingOutbox: 0 };
+function afterAuthRoute(): string {
+  const handoff = new URLSearchParams(window.location.search).get("handoff");
+  if (window.location.pathname !== "/share") return "/home";
+  if (handoff && /^[a-f0-9-]{36}$/i.test(handoff)) return `/share?handoff=${encodeURIComponent(handoff)}`;
+  return /^#([a-f0-9-]{36})\.([A-Za-z0-9_-]{43})$/i.test(window.location.hash) ? `/share${window.location.hash}` : "/home";
+}
 
 function view(account: AuthenticatedAccount): SessionUserView {
   return { id: account.id, username: account.username, displayName: account.displayName, lcCode: account.lcCode ?? "", bio: account.bio ?? "", globalIdentity:account.globalIdentity, isAdmin: false, serverOrigin: origin };
@@ -79,14 +85,14 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
       ...previewAdapter.auth,
       signIn: async (input) => {
         const result = await liveAuthApi.signIn(input);
-        if (result.status === "ok") { await refresh(); nav("/home"); }
+        if (result.status === "ok") { await refresh(); nav(afterAuthRoute()); }
         return result;
       },
       register: async (input) => {
         const created = await liveAuthApi.register(input);
         if (created.status !== "ok") return created;
         const signedIn = await liveAuthApi.signIn({ username: input.username, password: input.password });
-        if (signedIn.status === "ok") { await refresh(); nav("/home"); }
+        if (signedIn.status === "ok") { await refresh(); nav(afterAuthRoute()); }
         return signedIn;
       },
       enterLocalMode: async () => {
