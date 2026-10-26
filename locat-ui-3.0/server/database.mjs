@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=25;
+export const DATABASE_SCHEMA_VERSION=26;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -154,6 +154,10 @@ export function openDatabase(filename) {
     ALTER TABLE calendarEvents ADD COLUMN workspaceId TEXT REFERENCES workspaces(id) ON DELETE CASCADE;
     CREATE INDEX calendar_events_workspace_range ON calendarEvents(workspaceId,startsAt,endsAt);
     PRAGMA user_version=25;COMMIT;`);
+  if(version<26)sql.exec(`BEGIN IMMEDIATE;
+    ALTER TABLE encryptedShares ADD COLUMN downloadLimit INTEGER NOT NULL DEFAULT 100 CHECK(downloadLimit BETWEEN 1 AND 100);
+    ALTER TABLE encryptedShares ADD COLUMN downloadCount INTEGER NOT NULL DEFAULT 0 CHECK(downloadCount BETWEEN 0 AND downloadLimit);
+    PRAGMA user_version=26;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
@@ -321,15 +325,14 @@ function calendarStore(sql) {
 }
 
 function encryptedShareStore(sql) {
-  const get=sql.prepare('SELECT id,iv,ciphertext,expiresAt,createdAt FROM encryptedShares WHERE id=? AND expiresAt>?');
   return {
-    list:(userId,now=Date.now())=>sql.prepare('SELECT id,expiresAt,createdAt FROM encryptedShares WHERE userId=? AND expiresAt>? ORDER BY createdAt DESC LIMIT 20').all(userId,now),
-    create({id,userId,iv,ciphertext,expiresAt},now=Date.now()) {
+    list:(userId,now=Date.now())=>sql.prepare('SELECT id,expiresAt,createdAt,downloadLimit,downloadCount FROM encryptedShares WHERE userId=? AND expiresAt>? ORDER BY createdAt DESC LIMIT 20').all(userId,now),
+    create({id,userId,iv,ciphertext,expiresAt,downloadLimit},now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');
-      try { sql.prepare('DELETE FROM encryptedShares WHERE expiresAt<=?').run(now);if(sql.prepare('SELECT COUNT(*) AS count FROM encryptedShares WHERE userId=?').get(userId).count>=20)throw Object.assign(new Error('This account has reached its active encrypted-share limit'),{status:429,retryAfter:3600});sql.prepare('INSERT INTO encryptedShares(id,userId,iv,ciphertext,expiresAt,createdAt) VALUES(?,?,?,?,?,?)').run(id,userId,iv,ciphertext,expiresAt,now);sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'share.link.created','info',now);const saved=get.get(id,now);sql.exec('COMMIT');return saved; }
+      try { sql.prepare('DELETE FROM encryptedShares WHERE expiresAt<=?').run(now);if(sql.prepare('SELECT COUNT(*) AS count FROM encryptedShares WHERE userId=?').get(userId).count>=20)throw Object.assign(new Error('This account has reached its active encrypted-share limit'),{status:429,retryAfter:3600});sql.prepare('INSERT INTO encryptedShares(id,userId,iv,ciphertext,expiresAt,createdAt,downloadLimit,downloadCount) VALUES(?,?,?,?,?,?,?,0)').run(id,userId,iv,ciphertext,expiresAt,now,downloadLimit??100);sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'share.link.created','info',now);const saved=sql.prepare('SELECT id,iv,ciphertext,expiresAt,createdAt,downloadLimit,downloadCount FROM encryptedShares WHERE id=? AND expiresAt>?').get(id,now);sql.exec('COMMIT');return saved; }
       catch(error) { sql.exec('ROLLBACK');throw error; }
     },
-    get:(id,now=Date.now())=>get.get(id,now),
+    get(id,now=Date.now()) {sql.exec('BEGIN IMMEDIATE');try{const consumed=sql.prepare('UPDATE encryptedShares SET downloadCount=downloadCount+1 WHERE id=? AND expiresAt>? AND downloadCount<downloadLimit').run(id,now).changes;if(!consumed){sql.exec('COMMIT');return undefined;}const share=sql.prepare('SELECT id,iv,ciphertext,expiresAt,createdAt,downloadLimit,downloadCount FROM encryptedShares WHERE id=?').get(id);sql.exec('COMMIT');return share;}catch(error){sql.exec('ROLLBACK');throw error;}},
     remove(userId,id,now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');try { const result=sql.prepare('DELETE FROM encryptedShares WHERE id=? AND userId=? AND expiresAt>?').run(id,userId,now);if(result.changes)sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'share.link.revoked','warn',now);sql.exec('COMMIT');return result.changes===1; }
       catch(error) { sql.exec('ROLLBACK');throw error; }

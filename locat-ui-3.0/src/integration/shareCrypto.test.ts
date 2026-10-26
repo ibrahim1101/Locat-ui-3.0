@@ -16,4 +16,11 @@ describe('encrypted Share links',()=>{
   await expect(decryptShare(encrypted.iv,tampered,encrypted.secret)).rejects.toThrow();
   await expect(encryptShare('x'.repeat(1_500_001))).rejects.toThrow('1.5 MB');
  });
+ it('adds an optional passphrase wrapper without sending the passphrase to the server',async()=>{
+  const encrypted=await encryptShare('A protected note.','a long local share passphrase');expect(encrypted.ciphertext).not.toContain('A protected note.');
+  await expect(decryptShare(encrypted.iv,encrypted.ciphertext,encrypted.secret)).rejects.toMatchObject({name:'SharePassphraseRequiredError'});
+  await expect(decryptShare(encrypted.iv,encrypted.ciphertext,encrypted.secret,'incorrect passphrase')).rejects.toThrow('did not unlock');
+  await expect(decryptShare(encrypted.iv,encrypted.ciphertext,encrypted.secret,'a long local share passphrase')).resolves.toBe('A protected note.');
+  await expect(encryptShare('note','short')).rejects.toThrow('between 8 and 256');
+ });
 });

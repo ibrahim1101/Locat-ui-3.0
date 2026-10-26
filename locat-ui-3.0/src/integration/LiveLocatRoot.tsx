@@ -8,6 +8,7 @@ import { SessionProvider, type LiveSessionSnapshot } from "../app/SessionProvide
 import { previewAdapter } from "../fixtures/previewAdapter";
 import { liveAuthApi, type AuthenticatedAccount } from "./liveAuthApi";
 import { liveModuleAvailability } from "./liveModuleAvailability";
+import { PublicShareViewer } from "./PublicShareViewer";
 import type { LocatUiAdapter, PlatformInfo, SessionUserView } from "../contracts";
 
 const origin = window.location.origin;
@@ -114,6 +115,8 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
     },
   }), [nav, refresh]);
 
+  const publicShare=/^#([a-f0-9-]{36})\.([A-Za-z0-9_-]{43})$/i.test(window.location.hash);
+  if(session.authStatus==='signedOut'&&window.location.pathname==='/share'&&publicShare)return <PublicShareViewer/>;
   return <SessionProvider key={session.authStatus === "local" ? "local-device" : session.user?.id ?? "signed-out"} adapter={adapter} initialUser={null} initialConnection={disconnected} platform={platform} liveSession={session}>
     <MatrixOwnerProvider accountId={session.user?.id??''}><App /></MatrixOwnerProvider>
   </SessionProvider>;

@@ -77,7 +77,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 25); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 26); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/calendar/events?from=1&to=2')).status,401);
     const calendarFrom=Date.now(),calendarTo=calendarFrom+7*24*60*60_000;
@@ -105,6 +105,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const encryptedShare={iv:Buffer.alloc(12,7).toString('base64'),ciphertext:Buffer.alloc(32,9).toString('base64'),ttlHours:24};
     assert.equal((await request('/api/share','POST',encryptedShare)).status,401);
     assert.equal((await request('/api/share','POST',{...encryptedShare,plaintext:'secret'},aliceCookie)).status,400);
+    assert.equal((await request('/api/share','POST',{...encryptedShare,downloadLimit:2},aliceCookie)).status,400);
     assert.equal((await request('/api/share','POST',encryptedShare,aliceCookie,{Origin:'https://evil.invalid'})).status,403);
     const shareCreated=await request('/api/share','POST',encryptedShare,aliceCookie);assert.equal(shareCreated.status,201);const {share:storedShare}=await shareCreated.json();assert.ok(storedShare.id);assert.equal(storedShare.ciphertext,encryptedShare.ciphertext);assert.ok(!('userId' in storedShare));
     assert.equal((await request('/api/share','GET',undefined,bobCookie)).status,200);assert.equal((await (await request('/api/share','GET',undefined,aliceCookie)).json()).shares[0].id,storedShare.id);
@@ -112,6 +113,8 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/share/'+storedShare.id,'DELETE',{expected:true},bobCookie)).status,404);
     assert.equal((await request('/api/share/'+storedShare.id,'DELETE',{expected:true},aliceCookie)).status,200);
     assert.equal((await request('/api/share/'+storedShare.id)).status,404);
+    const limitedShare=await request('/api/share','POST',{...encryptedShare,downloadLimit:1},aliceCookie);assert.equal(limitedShare.status,201);const {share:openLimited}=await limitedShare.json();assert.equal(openLimited.downloadLimit,1);assert.equal(openLimited.downloadCount,0);const firstOpen=await request('/api/share/'+openLimited.id);assert.equal(firstOpen.status,200);assert.equal(firstOpen.headers.get('cache-control'),'private, no-store');assert.equal((await firstOpen.json()).share.downloadCount,1);assert.equal((await request('/api/share/'+openLimited.id)).status,404);assert.equal((await (await request('/api/share','GET',undefined,aliceCookie)).json()).shares[0].downloadCount,1);
+    const concurrentShare=await request('/api/share','POST',{...encryptedShare,downloadLimit:5},aliceCookie),{share:concurrent}=await concurrentShare.json();const opens=await Promise.all(Array.from({length:6},()=>request('/api/share/'+concurrent.id)));assert.equal(opens.filter(response=>response.status===200).length,5);assert.equal(opens.filter(response=>response.status===404).length,1);assert.equal((await (await request('/api/share','GET',undefined,aliceCookie)).json()).shares.find(row=>row.id===concurrent.id).downloadCount,5);
     assert.equal((await request('/api/workspaces')).status,401);
     assert.equal((await request('/api/workspaces','POST',{name:'Core team'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
     const workspaceCreated=await request('/api/workspaces','POST',{name:'Core team'},aliceCookie);assert.equal(workspaceCreated.status,201);const {workspace}=await workspaceCreated.json();

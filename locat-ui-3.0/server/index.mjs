@@ -43,6 +43,7 @@ const matrixProvisioner=matrixServiceFile?createManagedMatrixProvisioner({provid
 const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.matrixRevocations,revoke:(job,recheck)=>matrixProvisioner.revokeQueuedDevice(job,recheck)}):null;
 const { host, port } = config;
 const authLimit = createLayeredRateLimiter({clientAddress:req=>requestClientAddress(req,config)});
+const shareReadLimit=createLayeredRateLimiter({peerMaximum:1200,clientMaximum:60,windowMs:60000,clientAddress:req=>requestClientAddress(req,config)});
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -93,7 +94,7 @@ const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provid
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
 const calendarHandler=createCalendarHandler({store:db.calendar,sessionUser,body,json});
-const shareHandler=createShareHandler({store:db.encryptedShares,sessionUser,body,json});
+const shareHandler=createShareHandler({store:db.encryptedShares,sessionUser,body,json,readLimit:shareReadLimit});
 const workspaceHandler=createWorkspaceHandler({store:db.workspaces,sessionUser,body,json});
 const automationHandler=createAutomationHandler({store:db.automations,sessionUser,body,json});
 try{db.encryptedShares.purgeExpired();}catch(error){console.error('Encrypted share startup cleanup failed:',error instanceof Error?error.message:'unknown error');}

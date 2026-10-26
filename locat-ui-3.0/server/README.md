@@ -25,6 +25,8 @@ Open http://127.0.0.1:5173. Vite proxies /api to 127.0.0.1:8787. Run `npm run te
 | GET | /api/auth/me | Current authenticated account |
 | POST | /api/auth/logout | Revoke session |
 | GET | /api/users/search?q=username | Exact username lookup (authenticated) |
+| GET/POST | /api/share | List owned links or create an encrypted link with expiry and bounded opens |
+| GET/DELETE | /api/share/:id | Rate-limited ciphertext retrieval or owner revocation |
 | GET | /api/messages | Retired route: 501 |
 | POST | /api/messages | Retired route: 501; no plaintext fallback |
 
@@ -58,7 +60,7 @@ With a configured key, `GET /.well-known/locat` publishes a domain-separated sig
 
 Run `npm run backup:server -- ./server/data/backups/manual.sqlite` from the app directory. Choose a new filename each time; existing backups are never overwritten. SQLite's online backup API creates a consistent snapshot even with WAL enabled. Backups contain password hashes, session hashes and ciphertext: restrict access just like the live database.
 
-Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Supported migrations through schema 25 are applied in transactions; schema 18 removes retired media-sharing, Remote, and Sentinel tables, schemas 19–25 add Calendar, Share, Workspace and Automate data, and future unknown schemas fail closed.
+Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. Supported migrations through schema 26 are applied in transactions; schema 18 removes retired media-sharing, Remote, and Sentinel tables, schemas 19–26 add Calendar, Share, Workspace and Automate data, and future unknown schemas fail closed.
 
 ## Live integration endpoints
 
@@ -77,6 +79,6 @@ The active app scope is Chat, Link, Files & Vault, account settings, and the sur
 
 Standalone Cinema/video playback, Music/audio libraries, Photos library, media-library streaming and sharing, remote control, and Sentinel/vendor alert integrations are retired from the UI and server routes. Their API paths are unavailable. Ordinary image, voice, and file attachments in Chat remain part of messaging. Link's verified device pairing and encrypted file/text transfers remain active.
 
-Schema 18 removes the retired media-sharing, Remote session/signal, and Sentinel incident/token tables. Fresh databases never create these tables. The migration does not change accounts, sessions, encrypted messages, Link identities/pairings/transfers, Vault or Secrets records, or account activity. Backup verification supports older backup versions without requiring retired tables in schema 18. Retired API paths return not-found; account activity remains available within Settings → Security. Schemas 19–25 add Calendar events, recurring series and workspace sharing, encrypted Share payloads, Workspace membership and items, and Automate reminders with bounded fixed 24-hour/7-day recurrence. Existing rows migrate as personal, nonrecurring data.
+Schema 18 removes the retired media-sharing, Remote session/signal, and Sentinel incident/token tables. Fresh databases never create these tables. The migration does not change accounts, sessions, encrypted messages, Link identities/pairings/transfers, Vault or Secrets records, or account activity. Backup verification supports older backup versions without requiring retired tables in schema 18. Retired API paths return not-found; account activity remains available within Settings → Security. Schemas 19–26 add Calendar events, recurring series and workspace sharing, encrypted Share payloads and atomic open limits, Workspace membership and items, and Automate reminders with bounded fixed 24-hour/7-day recurrence. Existing Calendar rows migrate as personal, nonrecurring data; existing Share rows migrate with a 100-open allowance.
 
 Diagnostics report connection, TLS, runtime, database and messaging state only. They do not scan or index host media folders. Legacy historical implementation notes elsewhere in this repository describe prior behavior and are not active endpoint guidance; see [REWORK_SCOPE.md](../docs/REWORK_SCOPE.md) for the current scope and [ENGINEERING_HISTORY.md](../docs/ENGINEERING_HISTORY.md) for provenance.
