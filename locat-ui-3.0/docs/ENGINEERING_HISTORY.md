@@ -132,3 +132,14 @@ Local validation now passes TypeScript, ESLint, 305 frontend tests across 73 fil
 
 
 2026-10-27 validation checkpoint: after the Workspace activity/file routes, per-member unread cursor baseline on invitation acceptance, file quota checks, browser desktop notification consent and backup manifest updates, local `npm run check`, `npm run lint`, `npm run test:all` (319 frontend tests across 74 files and 119 server tests), and `npm run build` all pass. The build still warns about the ~1 MB Matrix crypto chunk. Browser acceptance, hosted CI, physical-device and deployment checks remain open; the browser binaries are not installed in this workspace. The user explicitly approved publishing the current 15-commit branch range to `ibrahim1101/Locat-ui-3.0` on `rework/locat-core-scope` after these checks.
+
+## Workspace refresh isolation
+
+Workspace polling is sequence-guarded so late responses from a previous selection cannot replace the currently selected workspace. The screen hides the prior workspace payload while the next membership, board, file and activity bundle loads; if any part fails, it clears the cached view and offers an explicit retry. Regression coverage exercises a delayed first-team response arriving after a second-team switch. Final local validation is pending for this batch.
+
+
+## Single-host self-hosting recipe and Workspace privacy
+
+Added a systemd service, loopback-only Nginx example, environment template and installation/upgrade/backup guide for a single-host Linux preview deployment. The setup preserves strict Host/Origin validation, trusts only the exact local proxy peer, and overwrites client-IP attribution at Nginx. It does not change the documented single-process limit or claim real-host acceptance. Local check, lint, all 321 frontend tests across 74 files, all 119 server tests, production build and `git diff --check` pass; the Matrix crypto bundle warning remains.
+
+The first full validation attempt caught a duplicated-text assertion in the new failure-state test; the assertion now targets the alert region, and all eight Workspace UI tests pass. The effect cleanup was also adjusted to avoid an ESLint ref warning. `systemd-analyze verify` accepts the unit, and the environment template passes `serverConfig` validation. Final full checks pass.

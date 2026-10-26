@@ -1,0 +1,33 @@
+[Unit]
+Description=Locat UI 3.0 self-hosted service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=locat
+Group=locat
+WorkingDirectory=/opt/locat
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+EnvironmentFile=/etc/locat/locat.env
+ExecStart=/usr/bin/env node /opt/locat/server/index.mjs
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/locat
+
+[Install]
+WantedBy=multi-user.target

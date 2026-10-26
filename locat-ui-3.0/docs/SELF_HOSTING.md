@@ -21,6 +21,10 @@ The server creates `server/data/locat.sqlite` with restrictive directory permiss
 
 Production builds serve the PWA manifest and register the service worker, which supplies an offline app shell and text/title/URL share reception on browsers that support Web Share Target. Install/share-target support requires HTTPS or localhost and is not a native Android intent or a substitute for browser/device acceptance. The service worker never caches `/api/` responses.
 
+## Repeatable Linux service installation
+
+The repository includes a single-host systemd unit, an environment template, and an Nginx reverse-proxy example in [`deploy/`](../deploy/README.md). The recipe runs one Node process with SQLite on the same machine and enforces the existing exact-origin and trusted-proxy checks. It is an installation path for the current self-hosted preview, not multi-host support or release certification. Follow the build, permission, HTTPS, upgrade and backup steps in that guide.
+
 ## Same-LAN HTTPS
 
 For a private LAN, provide a certificate trusted by each client and whose subject covers the hostname or IP that clients use. Do not disable certificate verification. Example PowerShell configuration:
@@ -56,7 +60,7 @@ The backup contains password hashes, session hashes and encrypted payloads. It i
 
 ## Release limitations
 
-- There is no production deployment image or reproducible container build. The prior Compose instructions were removed because the referenced files were not in the repository.
+- There is no production container image or Compose deployment. The checked-in systemd/Nginx recipe supports a single-host preview installation and has not passed independent host or recovery acceptance.
 - Authentication limits are process-local. Multi-worker or multi-host operation is not supported or tested; run one service process with access to one database file.
 - Server backups are not encrypted and automated retention is not implemented.
 - Browser notifications while the app is closed, Android push, native secure storage and native installers are not available.
