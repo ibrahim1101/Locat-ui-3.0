@@ -19,6 +19,8 @@ The default listener is `127.0.0.1:8787`; open `http://127.0.0.1:8787`. The serv
 
 The server creates `server/data/locat.sqlite` with restrictive directory permissions. To select another database file, set `LOCAT_DATABASE_FILE` to its absolute path. Do not point this version at the retired JSON store. Unknown future database schemas fail closed; supported migrations are applied at startup.
 
+Production builds serve the PWA manifest and register the service worker, which supplies an offline app shell and text/title/URL share reception on browsers that support Web Share Target. Install/share-target support requires HTTPS or localhost and is not a native Android intent or a substitute for browser/device acceptance. The service worker never caches `/api/` responses.
+
 ## Same-LAN HTTPS
 
 For a private LAN, provide a certificate trusted by each client and whose subject covers the hostname or IP that clients use. Do not disable certificate verification. Example PowerShell configuration:

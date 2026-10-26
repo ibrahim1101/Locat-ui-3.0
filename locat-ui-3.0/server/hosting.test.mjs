@@ -23,6 +23,8 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     await writeFile(join(web, 'index.html'), '<title>Locat test shell</title>');
     await writeFile(join(web,'assets','crypto.wasm'),Buffer.from([0,97,115,109,1,0,0,0]));
     await writeFile(join(web, 'assets', 'app.js'), 'export const app = "Locat";');
+    await writeFile(join(web,'manifest.webmanifest'),JSON.stringify({name:'Locat',share_target:{action:'/share-target',method:'POST'}}));
+    await writeFile(join(web,'sw.js'),'self.addEventListener("fetch",()=>{});');
     await writeFile(join(dir, 'private.js'), 'DO NOT EXPOSE');
     try { await symlink(join(dir, 'private.js'), join(web, 'assets', 'escape.js')); } catch {}
     await exec('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=IP:127.0.0.1,DNS:localhost']);
@@ -48,6 +50,8 @@ test('HTTPS serves the built shell safely and issues Secure authenticated cookie
     assert.equal(signatureValid([serverProof.kind,serverProof.version,serverProof.serverId,serverProof.origin],serverProof.signature),true);
     const shell = await request('/files/secrets'); assert.equal(shell.status, 200); assert.match(shell.body, /Locat test shell/); assert.match(shell.headers['content-security-policy'], /frame-ancestors 'none'/);
     const wasm=await request('/assets/crypto.wasm');assert.equal(wasm.status,200);assert.equal(wasm.headers['content-type'],'application/wasm');assert.ok(shell.headers['content-security-policy'].includes("'wasm-unsafe-eval'"));assert.ok(!shell.headers['content-security-policy'].includes("'unsafe-eval'"));
+    const manifest=await request('/manifest.webmanifest');assert.equal(manifest.status,200);assert.equal(manifest.headers['content-type'],'application/manifest+json');assert.equal(JSON.parse(manifest.body).share_target.action,'/share-target');
+    const worker=await request('/sw.js');assert.equal(worker.status,200);assert.equal(worker.headers['content-type'],'text/javascript; charset=utf-8');assert.match(worker.body,/addEventListener/);
     assert.equal((await request('/assets/app.js')).status, 200);
     assert.equal((await request('/assets/app.js', 'HEAD')).body, '');
     assert.equal((await request('/assets/escape.js')).status, 404);
