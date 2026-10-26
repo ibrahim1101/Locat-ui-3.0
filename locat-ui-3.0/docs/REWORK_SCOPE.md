@@ -36,6 +36,6 @@ This is a code and interface scope change. It does not deploy, publish, or modif
 
 ## Verification
 
-The reconstructed source passes TypeScript, ESLint, all 306 frontend tests across 73 files, all 111 server tests, and the production build. Playwright discovers seven browser specs; browser execution is blocked in this workspace because Chromium and Firefox binaries are absent. The build still reports the existing large Matrix bundle warning. API tests assert that retired media and Sentinel paths are not served; Link tests continue to cover device pairing and encrypted payload delivery. Legacy browser tests dedicated to removed screens are retired with those screens.
+The reconstructed source passes TypeScript, ESLint, all 306 frontend tests across 73 files, all 111 server tests, and the production build. Playwright discovers eight browser specs, including the new PWA share-target handoff flow; browser execution is blocked in this workspace because Chromium and Firefox binaries are absent. The build still reports the existing large Matrix bundle warning. API tests assert that retired media and Sentinel paths are not served; Link tests continue to cover device pairing and encrypted payload delivery. Legacy browser tests dedicated to removed screens are retired with those screens.
 
 For active server setup and safety limits, use [server/README.md](../server/README.md). For the historical record, see [ENGINEERING_HISTORY.md](ENGINEERING_HISTORY.md).

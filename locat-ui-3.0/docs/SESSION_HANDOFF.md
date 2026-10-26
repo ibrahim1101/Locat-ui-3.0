@@ -8,6 +8,8 @@ The scratch checkout had been pruned. It was restored from the remote branch at 
 
 The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, downloadable QR codes and local PWA share-target staging, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. PWA incoming text is kept in service-worker IndexedDB for one hour and requires sign-in and user review before an encrypted link is created. See `REWORK_SCOPE.md` for limits and the final evidence status.
 
+Local-only checkpoint `11df2b0` adds QR generation/download, PWA manifest/service-worker share reception, bounded one-use local handoffs, auth continuation for both PWA handoffs and encrypted-link fragments, and updated scope/evidence. `browser-tests/share-pwa.spec.mjs` now covers the installed service-worker path and sign-in continuation but cannot run until a browser binary is available. Keep all work local; do not push after the earlier automatic upload rejection.
+
 ## Active direction
 
 Preserve the Obsidian Ember theme and nested navigation/options. Continue retained Locat work in Chat, Link, Files & Vault, account/security and workspace foundations. Standalone media libraries, Locat Remote and SentinelLab are retired. Fresh install is acceptable; no data recovery is requested. Development-branch commits and publication are authorized; do not merge, deploy or publish a release.
@@ -38,7 +40,7 @@ Home now projects recent conversations from encrypted rooms authorized for the c
 
 ## Validation and hosted status
 
-The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 7 browser specs, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
+The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 8 browser specs, including a new PWA share handoff flow, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
 
 Older hosted runs below describe earlier, published code and are historical only; they do not validate this restored branch tip or the rebuilt local modules. Physical Windows/Android checks, independent security review, deployment/upgrade/rollback, recovery, and hosting remain open release gates.
 
