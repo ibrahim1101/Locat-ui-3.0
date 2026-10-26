@@ -20,7 +20,7 @@ test('private room bootstrap is pair-idempotent, encrypted, bounded to accepted 
   assert.deepEqual(await create(bob,alice),{roomId:result.roomId,created:false});assert.equal(count,1);db.removeContact(alice,bob);assert.equal(db.matrixConversations.permits(alice,result.roomId),false);assert.deepEqual(db.matrixConversations.list(alice),[]);await assert.rejects(create(alice,bob),{status:404});db.requestContact(alice,bob);db.respondContact(bob,alice,true);db.block(alice,bob,true);assert.equal(db.matrixConversations.permits(bob,result.roomId),false);assert.deepEqual(db.matrixConversations.list(bob),[]);
   db.requestContact(alice,eve);db.respondContact(eve,alice,true);mode='hold';const pending=create(alice,eve);while(!release)await new Promise(resolve=>setTimeout(resolve,5));await assert.rejects(create(eve,alice),{status:409});valid=false;release();await assert.rejects(pending,{status:401});assert.equal(count,2);valid=true;assert.equal((await create(alice,eve)).created,false);assert.equal(count,2);
   db.requestContact(bob,eve);db.respondContact(eve,bob,true);mode='invalid';await assert.rejects(create(bob,eve),{status:502});await assert.rejects(create(eve,bob),{status:409});assert.equal(count,3);
-  db.close();db=openDatabase(join(root,'db.sqlite'));assert.equal((await create(alice,eve)).roomId,'!synthetic2:matrix.test');assert.equal(db.health().schemaVersion,24);
+  db.close();db=openDatabase(join(root,'db.sqlite'));assert.equal((await create(alice,eve)).roomId,'!synthetic2:matrix.test');assert.equal(db.health().schemaVersion,25);
  }finally{release?.();if(upstream)await new Promise(resolve=>upstream.close(resolve));db?.close();await rm(root,{recursive:true,force:true});}
 });
 

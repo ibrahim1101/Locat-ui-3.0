@@ -77,7 +77,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 24); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 25); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/calendar/events?from=1&to=2')).status,401);
     const calendarFrom=Date.now(),calendarTo=calendarFrom+7*24*60*60_000;
@@ -116,10 +116,12 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/workspaces','POST',{name:'Core team'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
     const workspaceCreated=await request('/api/workspaces','POST',{name:'Core team'},aliceCookie);assert.equal(workspaceCreated.status,201);const {workspace}=await workspaceCreated.json();
     assert.equal((await request('/api/workspaces/'+workspace.id+'/items','GET',undefined,bobCookie)).status,404);
+    const workspaceCalendarPath=`/api/calendar/events?from=${calendarFrom}&to=${calendarTo}&workspaceId=${workspace.id}`,reminderFeedPath=`/api/calendar/reminders?from=${calendarFrom}&to=${calendarTo}`;assert.equal((await request(workspaceCalendarPath,'GET',undefined,bobCookie)).status,404);assert.equal((await request(reminderFeedPath,'GET',undefined,bobCookie)).status,200);assert.equal((await request(`/api/calendar/reminders?from=${calendarFrom}&to=${calendarTo}&workspaceId=${workspace.id}`,'GET',undefined,bobCookie)).status,400);
     assert.equal((await request(`/api/workspaces/${workspace.id}/export`,'POST',{},bobCookie)).status,404);
     assert.equal((await request('/api/workspaces/'+workspace.id+'/invite','POST',{userId:bob.id},aliceCookie)).status,201);
     let bobInvites=(await (await request('/api/workspaces/invitations','GET',undefined,bobCookie)).json()).invitations;assert.equal(bobInvites.length,1);assert.equal(bobInvites[0].name,'Core team');
     assert.equal((await request(`/api/workspaces/${workspace.id}/invitations`,'POST',{accept:true},bobCookie)).status,200);
+    const sharedCalendarEvent=await request('/api/calendar/events','POST',{...calendarEvent,title:'Team calendar item',workspaceId:workspace.id},aliceCookie);assert.equal(sharedCalendarEvent.status,201);const {event:sharedEvent}=await sharedCalendarEvent.json();assert.equal(sharedEvent.workspaceId,workspace.id);const bobCalendar=(await (await request(workspaceCalendarPath,'GET',undefined,bobCookie)).json()).events;assert.equal(bobCalendar.length,1);assert.equal(bobCalendar[0].id,sharedEvent.id);const reminders=(await (await request(reminderFeedPath,'GET',undefined,bobCookie)).json()).events;assert.equal(reminders.some(event=>event.id===sharedEvent.id),true);
     const roleChange=await request(`/api/workspaces/${workspace.id}/members/${bob.id}`,'PATCH',{role:'admin'},aliceCookie);assert.equal(roleChange.status,200,await roleChange.text());
     const memberList=(await (await request(`/api/workspaces/${workspace.id}/members`,'GET',undefined,bobCookie)).json()).members;assert.equal(memberList.find(row=>row.userId===bob.id).role,'admin');
     const workspaceItem=await request(`/api/workspaces/${workspace.id}/items`,'POST',{kind:'task',title:'Review release',content:'Check migration',state:'open'},aliceCookie);assert.equal(workspaceItem.status,201);const {item}=await workspaceItem.json();
@@ -134,6 +136,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request(`/api/workspaces/${workspace.id}`,'DELETE',{expected:true},aliceCookie)).status,403);
     assert.equal((await request(`/api/workspaces/${workspace.id}`,'DELETE',{expected:true},bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items`,'GET',undefined,bobCookie)).status,404);
+    assert.equal((await request(workspaceCalendarPath,'GET',undefined,aliceCookie)).status,404);
     assert.equal((await request('/api/automate/rules','GET',undefined,aliceCookie)).status,200);
     const scheduledAt=Date.now()+5*60_000,scheduled=await request('/api/automate/rules','POST',{title:'Take a break',details:'Stretch',runAt:scheduledAt,repeatMs:86_400_000},aliceCookie);assert.equal(scheduled.status,201);const {rule}=await scheduled.json();assert.equal(rule.repeatMs,86_400_000);
     assert.equal((await request('/api/automate/rules','POST',{title:'Unsupported cadence',details:'',runAt:Date.now()+5*60_000,repeatMs:90_000},aliceCookie)).status,400);

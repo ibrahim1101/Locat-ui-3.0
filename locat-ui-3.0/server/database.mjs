@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=24;
+export const DATABASE_SCHEMA_VERSION=25;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -150,6 +150,10 @@ export function openDatabase(filename) {
   if(version<24)sql.exec(`BEGIN IMMEDIATE;
     ALTER TABLE calendarEvents ADD COLUMN repeatMs INTEGER CHECK(repeatMs IS NULL OR repeatMs IN (86400000,604800000));
     PRAGMA user_version=24;COMMIT;`);
+  if(version<25)sql.exec(`BEGIN IMMEDIATE;
+    ALTER TABLE calendarEvents ADD COLUMN workspaceId TEXT REFERENCES workspaces(id) ON DELETE CASCADE;
+    CREATE INDEX calendar_events_workspace_range ON calendarEvents(workspaceId,startsAt,endsAt);
+    PRAGMA user_version=25;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
@@ -253,11 +257,14 @@ export function openDatabase(filename) {
 }
 
 function calendarStore(sql) {
-  const byId=sql.prepare('SELECT * FROM calendarEvents WHERE id=? AND userId=?');
-  const list=sql.prepare('SELECT * FROM calendarEvents WHERE userId=? AND (repeatMs IS NOT NULL OR startsAt<? AND endsAt>=?) ORDER BY startsAt,id LIMIT 5000');
-  function inRange(userId,from,to){
+  const byId=sql.prepare('SELECT * FROM calendarEvents WHERE id=?');
+  const personalList=sql.prepare('SELECT * FROM calendarEvents WHERE userId=? AND workspaceId IS NULL AND (repeatMs IS NOT NULL OR startsAt<? AND endsAt>=?) ORDER BY startsAt,id LIMIT 5000');
+  const sharedList=sql.prepare('SELECT * FROM calendarEvents WHERE workspaceId=? AND (repeatMs IS NOT NULL OR startsAt<? AND endsAt>=?) ORDER BY startsAt,id LIMIT 5000');
+  const allList=sql.prepare("SELECT e.* FROM calendarEvents e WHERE (e.workspaceId IS NULL AND e.userId=? OR e.workspaceId IN (SELECT workspaceId FROM workspaceMembers WHERE userId=? AND status='active')) AND (e.repeatMs IS NOT NULL OR e.startsAt<? AND e.endsAt>=?) ORDER BY e.startsAt,e.id LIMIT 5000");
+  const activeMember=sql.prepare("SELECT 1 FROM workspaceMembers WHERE workspaceId=? AND userId=? AND status='active'");
+  function expand(rows,from,to){
     const events=[];
-    for(const event of list.all(userId,to,from)){
+    for(const event of rows){
       if(event.repeatMs===null){events.push({...event,masterStartsAt:event.startsAt,masterEndsAt:event.endsAt,masterReminderAt:event.reminderAt});continue;}
       const duration=event.endsAt-event.startsAt,reminderOffset=event.reminderAt===null?null:event.startsAt-event.reminderAt;
       const first=Math.max(0,Math.ceil((from-duration-event.startsAt)/event.repeatMs));
@@ -270,38 +277,46 @@ function calendarStore(sql) {
     }
     return events.sort((a,b)=>a.startsAt-b.startsAt||a.id.localeCompare(b.id)).slice(0,500);
   }
+  function inRange(userId,from,to,workspaceId=null){
+    if(!workspaceId)return expand(personalList.all(userId,to,from),from,to);
+    sql.exec('BEGIN');try{if(!activeMember.get(workspaceId,userId)){sql.exec('ROLLBACK');return null;}const rows=sharedList.all(workspaceId,to,from),events=expand(rows,from,to);sql.exec('COMMIT');return events;}catch(error){sql.exec('ROLLBACK');throw error;}
+  }
+  const allInRange=(userId,from,to)=>expand(allList.all(userId,userId,to,from),from,to);
+  function canAccess(event,userId){return event&&(event.workspaceId?!!activeMember.get(event.workspaceId,userId):event.userId===userId);}
   return {
     list:inRange,
-    get:(userId,id)=>byId.get(id,userId),
+    listAll:allInRange,
+    get:(userId,id)=>{const event=byId.get(id);return canAccess(event,userId)?event:undefined;},
     create(event,now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');
       try {
-        if(sql.prepare('SELECT COUNT(*) AS count FROM calendarEvents WHERE userId=?').get(event.userId).count>=5000)throw Object.assign(new Error('This account has reached its calendar event limit'),{status:429});
-        sql.prepare('INSERT INTO calendarEvents(id,userId,title,notes,startsAt,endsAt,reminderAt,createdAt,updatedAt,repeatMs) VALUES(?,?,?,?,?,?,?,?,?,?)').run(event.id,event.userId,event.title,event.notes,event.startsAt,event.endsAt,event.reminderAt,now,now,event.repeatMs??null);
+        if(event.workspaceId){if(!activeMember.get(event.workspaceId,event.userId))throw Object.assign(new Error('Workspace is unavailable'),{status:404});if(sql.prepare('SELECT COUNT(*) AS count FROM calendarEvents WHERE workspaceId=?').get(event.workspaceId).count>=5000)throw Object.assign(new Error('This workspace has reached its calendar event limit'),{status:429});}
+        else if(sql.prepare('SELECT COUNT(*) AS count FROM calendarEvents WHERE userId=? AND workspaceId IS NULL').get(event.userId).count>=5000)throw Object.assign(new Error('This account has reached its calendar event limit'),{status:429});
+        sql.prepare('INSERT INTO calendarEvents(id,userId,title,notes,startsAt,endsAt,reminderAt,createdAt,updatedAt,repeatMs,workspaceId) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(event.id,event.userId,event.title,event.notes,event.startsAt,event.endsAt,event.reminderAt,now,now,event.repeatMs??null,event.workspaceId??null);
         sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(event.userId,'calendar.event.created','info',now);
-        const saved=byId.get(event.id,event.userId);sql.exec('COMMIT');return saved;
+        const saved=byId.get(event.id);sql.exec('COMMIT');return saved;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
     },
     update(userId,id,expectedUpdatedAt,fields,now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');
       try {
-        const current=byId.get(id,userId);if(!current||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return null;}
+        const current=byId.get(id);if(!canAccess(current,userId)||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return null;}
         const updatedAt=Math.max(now,current.updatedAt+1);
-        sql.prepare('UPDATE calendarEvents SET title=?,notes=?,startsAt=?,endsAt=?,reminderAt=?,repeatMs=?,updatedAt=? WHERE id=? AND userId=? AND updatedAt=?').run(fields.title,fields.notes,fields.startsAt,fields.endsAt,fields.reminderAt,fields.repeatMs===undefined?current.repeatMs:fields.repeatMs,updatedAt,id,userId,expectedUpdatedAt);
+        sql.prepare('UPDATE calendarEvents SET title=?,notes=?,startsAt=?,endsAt=?,reminderAt=?,repeatMs=?,updatedAt=? WHERE id=? AND updatedAt=?').run(fields.title,fields.notes,fields.startsAt,fields.endsAt,fields.reminderAt,fields.repeatMs===undefined?current.repeatMs:fields.repeatMs,updatedAt,id,expectedUpdatedAt);
         sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'calendar.event.updated','info',updatedAt);
-        const saved=byId.get(id,userId);sql.exec('COMMIT');return saved;
+        const saved=byId.get(id);sql.exec('COMMIT');return saved;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
     },
     remove(userId,id,expectedUpdatedAt,now=Date.now()) {
       sql.exec('BEGIN IMMEDIATE');
       try {
-        const current=byId.get(id,userId);if(!current||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return false;}
-        sql.prepare('DELETE FROM calendarEvents WHERE id=? AND userId=? AND updatedAt=?').run(id,userId,expectedUpdatedAt);
+        const current=byId.get(id);if(!canAccess(current,userId)||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return false;}
+        sql.prepare('DELETE FROM calendarEvents WHERE id=? AND updatedAt=?').run(id,expectedUpdatedAt);
         sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'calendar.event.deleted','warn',now);
         sql.exec('COMMIT');return true;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
     },
-    dueReminders:(userId,now)=>sql.prepare('SELECT id,title,startsAt,reminderAt FROM calendarEvents WHERE userId=? AND reminderAt IS NOT NULL AND reminderAt<=? AND startsAt>? ORDER BY reminderAt,id LIMIT 100').all(userId,now,now),
+    dueReminders:(userId,now)=>sql.prepare('SELECT id,title,startsAt,reminderAt FROM calendarEvents WHERE userId=? AND workspaceId IS NULL AND reminderAt IS NOT NULL AND reminderAt<=? AND startsAt>? ORDER BY reminderAt,id LIMIT 100').all(userId,now,now),
   };
 }
 
