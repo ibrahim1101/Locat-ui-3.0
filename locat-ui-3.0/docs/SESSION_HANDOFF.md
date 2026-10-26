@@ -1,6 +1,12 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-24. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published branch checkpoint: `c9434cb` (`Record latest Locat release readiness checkpoint`). Home summaries landed in `65ceb22`; `eaf46db` removes mock notification controls and corrects deployment guidance. The active UI retains Obsidian Ember styling and nested navigation.
+Updated 2026-10-25. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The restored remote checkpoint is `18f703f` (`Update Locat hosted release checkpoint`). Home summaries landed in `65ceb22`; `eaf46db` removes mock notification controls and corrects deployment guidance. The active UI retains Obsidian Ember styling and nested navigation.
+
+## Current restore and rebuild status
+
+The scratch checkout had been pruned. It was restored from the remote branch at `18f703f`; the previous local-only commit `c6ffc77` and its unpushed source could not be recovered from GitHub or Library. Do not describe its local Calendar/Workspace/Automate/Share code or previous browser results as present in this checkout. The modules have now been rebuilt locally on top of the restored branch. These changes are not published, and the earlier automatic GitHub upload rejection remains in effect; do not bypass it. Continue local implementation and preserve checkpoints.
+
+The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. See `REWORK_SCOPE.md` for limits and the final evidence status.
 
 ## Active direction
 
@@ -32,16 +38,8 @@ Home now projects recent conversations from encrypted rooms authorized for the c
 
 ## Validation and hosted status
 
-Local checks for the current worktree pass: TypeScript, ESLint, 299 frontend tests across 68 files (serial run), 109 backend tests, and production build. Four timing-sensitive frontend failures in the parallel run passed when their two test files were rerun alone and in the serial full suite. The build retains the large Matrix crypto chunk advisory. Browser spec syntax and Playwright discovery pass; real Synapse browser acceptance is hosted because its pinned test environment is unavailable locally.
+The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 305 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 7 browser specs, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run.
 
-Hosted run `40101881052` on `43cafff` failed only in the Link browser assertion: the check expected 11 writes but the logged actual scenario correctly made 12 (initial text send plus 11 file attempts). The assertion was corrected in `9118708`. Run `40102456079` then passed 7/7 Chromium, 7/7 Firefox, three repeated private-store foreground runs, Ubuntu, Windows, macOS, and connector preparation. Run `40105232427` on `8a1c02f` passed Ubuntu, Windows, macOS, connector acceptance, browser-foundation and repeated private-store foreground checks. Neither hosted run includes the Home summary change in `36e26b6` or the subsequent notification UI and guide corrections.
+Older hosted runs below describe earlier, published code and are historical only; they do not validate this restored branch tip or the rebuilt local modules. Physical Windows/Android checks, independent security review, deployment/upgrade/rollback, recovery, and hosting remain open release gates.
 
-## Remaining work
-
-- Live Home now includes account-owned contact/request counts and a direct nested Requests shortcut. Live Search uses account-owned accepted contacts and modules; encrypted message search stays inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
-- Inspect hosted CI for `65ceb22` and the follow-up documentation/readiness commits; the new two-account Matrix Home assertion must pass before calling this feature browser-tested.
-- Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
-- Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
-- Physical Windows/Android persistence checks, identity recovery limits, single-writer hosting assumptions, reproducible production deployment validation and independent security review remain open.
-
-Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. The published Home-summary, notification-state and documentation changes pass the recorded local checks; hosted validation of the new source is pending. Continue account/security and encrypted messaging lifecycle work; retain physical-device, reproducible deployment and independent-review gates. Do not merge, deploy or publish a release.
+Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. Rerun every local check after completing this rebuild. Continue until the retained scope is built; no manual user test is needed before that point. Do not merge, deploy or publish a release.

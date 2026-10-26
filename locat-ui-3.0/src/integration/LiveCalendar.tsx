@@ -1,0 +1,59 @@
+import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
+import {CalendarDays,ChevronLeft,ChevronRight,Clock3,Plus,Trash2} from 'lucide-react';
+import {useSession} from '../app/session';
+import {Screen} from '../layouts/Screen';
+import {Button,Sheet,StateView,TextField} from '../ui';
+import {accountRequest} from './accountRequest';
+
+type Event={id:string;title:string;notes:string;startsAt:number;endsAt:number;reminderAt:number|null;createdAt:number;updatedAt:number};
+type Form={title:string;notes:string;startsAt:string;endsAt:string;reminder:string};
+const pad=(n:number)=>String(n).padStart(2,'0');
+function localInput(value:number){const d=new Date(value);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+function blankForm(){const start=new Date(Date.now()+60*60_000);start.setSeconds(0,0);const end=new Date(start.getTime()+60*60_000);return{title:'',notes:'',startsAt:localInput(start.getTime()),endsAt:localInput(end.getTime()),reminder:'none'};}
+function dayKey(value:number){const d=new Date(value);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+
+function EventEditor({initial,onSave,onClose,busy}:{initial:Form;onSave:(form:Form)=>void;onClose:()=>void;busy:boolean}){
+ const [value,setValue]=useState(initial),[validation,setValidation]=useState('');
+ function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const start=Date.parse(value.startsAt),end=Date.parse(value.endsAt);if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start){setValidation('Choose an end time after the start time.');return;}if(end-start>14*24*60*60_000){setValidation('An event can last up to 14 days.');return;}setValidation('');onSave(value);}
+ return <form onSubmit={submit} className="space-y-4"><TextField label="Event name" required maxLength={120} value={value.title} onChange={e=>setValue(old=>({...old,title:e.target.value}))}/><label className="block text-sm font-semibold">Starts<input aria-label="Starts" type="datetime-local" required value={value.startsAt} onChange={e=>setValue(old=>({...old,startsAt:e.target.value}))} className="mt-2 w-full rounded-xl bg-s2 p-3 hairline"/></label><label className="block text-sm font-semibold">Ends<input aria-label="Ends" type="datetime-local" required value={value.endsAt} onChange={e=>setValue(old=>({...old,endsAt:e.target.value}))} className="mt-2 w-full rounded-xl bg-s2 p-3 hairline"/></label><label className="block text-sm font-semibold">Notes<textarea aria-label="Notes" rows={4} maxLength={4000} value={value.notes} onChange={e=>setValue(old=>({...old,notes:e.target.value}))} className="mt-2 w-full rounded-xl bg-s2 p-3 hairline"/></label><label className="block text-sm font-semibold">In-app reminder<select aria-label="In-app reminder" value={value.reminder} onChange={e=>setValue(old=>({...old,reminder:e.target.value}))} className="mt-2 w-full rounded-xl bg-s2 p-3 hairline"><option value="none">No reminder</option><option value="10">10 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>{validation&&<p role="alert" className="text-sm text-danger">{validation}</p>}<p className="text-xs leading-5 text-ink-3">Events are stored on this Locat server and are not end-to-end encrypted. Reminders can appear only while Locat is open, visible and unlocked.</p><div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy?'Saving…':'Save event'}</Button></div></form>;
+}
+
+export function LiveCalendar(){
+ const {user}=useSession(),accountId=user?.id;const [month,setMonth]=useState(()=>new Date(new Date().getFullYear(),new Date().getMonth(),1));const [events,setEvents]=useState<Event[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[editing,setEditing]=useState<Event|null>(null),[form,setForm]=useState<Form>(blankForm),[editor,setEditor]=useState(false),[removing,setRemoving]=useState<Event|null>(null);const controller=useRef<AbortController|null>(null),actionBusy=useRef(false);
+ const range=useMemo(()=>({from:new Date(month.getFullYear(),month.getMonth(),1).getTime(),to:new Date(month.getFullYear(),month.getMonth()+1,1).getTime()}),[month]);
+ const load=useCallback(async(signal?:AbortSignal)=>{if(!accountId)return;setLoading(true);setError('');try{const data=await accountRequest(`/api/calendar/events?from=${range.from}&to=${range.to}`,accountId,undefined,signal);if(!signal?.aborted)setEvents(data.events);}catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:'Calendar could not be loaded.');}finally{if(!signal?.aborted)setLoading(false);}},[accountId,range]);
+ useEffect(()=>{const c=new AbortController();controller.current=c;void Promise.resolve().then(()=>load(c.signal));return()=>{c.abort();if(controller.current===c)controller.current=null;};},[load]);
+ const grouped=useMemo(()=>{const groups=new Map<string,Event[]>();for(const event of events){const key=dayKey(event.startsAt);groups.set(key,[...(groups.get(key)??[]),event]);}return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b));},[events]);
+ function newEvent(){setEditing(null);setForm(blankForm());setEditor(true);}
+ function editEvent(event:Event){setEditing(event);setForm({title:event.title,notes:event.notes,startsAt:localInput(event.startsAt),endsAt:localInput(event.endsAt),reminder:event.reminderAt===null?'none':String(Math.max(0,Math.round((event.startsAt-event.reminderAt)/60_000)))});setEditor(true);}
+ async function save(value:Form){if(!accountId||actionBusy.current)return;actionBusy.current=true;setBusy(true);setError('');setNotice('');const start=Date.parse(value.startsAt),end=Date.parse(value.endsAt),fields={title:value.title,notes:value.notes,startsAt:start,endsAt:end,reminderAt:value.reminder==='none'?null:start-Number(value.reminder)*60_000};try{if(editing)await accountRequest('/api/calendar/events',accountId,{...fields,id:editing.id,expectedUpdatedAt:editing.updatedAt},controller.current?.signal,'PATCH');else await accountRequest('/api/calendar/events',accountId,fields,controller.current?.signal);setEditor(false);setEditing(null);setNotice(editing?'Event updated.':'Event saved.');await load(controller.current?.signal);}catch(e){if(!controller.current?.signal.aborted)setError(e instanceof Error?e.message:'Event could not be saved.');}finally{actionBusy.current=false;if(!controller.current?.signal.aborted)setBusy(false);}}
+ async function remove(){if(!accountId||!removing||actionBusy.current)return;actionBusy.current=true;setBusy(true);setError('');try{await accountRequest('/api/calendar/events',accountId,{id:removing.id,expectedUpdatedAt:removing.updatedAt},controller.current?.signal,'DELETE');setRemoving(null);setNotice('Event deleted.');await load(controller.current?.signal);}catch(e){if(!controller.current?.signal.aborted)setError(e instanceof Error?e.message:'Event could not be deleted.');}finally{actionBusy.current=false;if(!controller.current?.signal.aborted)setBusy(false);}}
+ if(!user)return <Screen title="Calendar" subtitle="Account events and reminders"><StateView kind="offline" title="Sign in to use Calendar" body="Calendar events belong to your signed-in account."/></Screen>;
+ return <Screen title="Calendar" subtitle="Events and in-app reminders" actions={<Button icon={Plus} disabled={busy} onClick={newEvent}>New event</Button>}>
+  <div className="mx-auto max-w-4xl space-y-5">
+   <section className="flex items-center justify-between rounded-2xl bg-s1 p-3 hairline">
+    <Button aria-label="Previous month" variant="ghost" icon={ChevronLeft} onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))}/>
+    <h2 className="font-semibold">{month.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</h2>
+    <Button aria-label="Next month" variant="ghost" icon={ChevronRight} onClick={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))}/>
+   </section>
+   <div className="rounded-2xl border border-ember/15 bg-ember/5 p-4 text-sm leading-6 text-ink-2">
+    <p className="flex items-center gap-2 font-semibold"><CalendarDays className="size-4 text-ember"/>Your account calendar</p>
+    <p className="mt-1">Event details are readable by this Locat server. In-app reminders require the app to stay open, visible and unlocked; operating-system notifications are unavailable.</p>
+   </div>
+   {error&&<p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}<Button size="sm" variant="ghost" className="ml-2" onClick={()=>void load()}>Retry</Button></p>}
+   {notice&&<p role="status" className="text-sm text-ink-2">{notice}</p>}
+   {loading?<p role="status" className="py-8 text-center text-sm text-ink-3">Loading events…</p>:!grouped.length?
+    <StateView kind="empty" title="No events this month" body="Add an event to start planning. Events are scoped to your account."/>:
+    <div className="space-y-4">{grouped.map(([key,items])=><section key={key} aria-label={new Date(key+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}>
+     <h3 className="mb-2 text-sm font-semibold text-ink-2">{new Date(key+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}</h3>
+     <div className="space-y-2">{items.map(event=><article key={event.id} className="flex items-start gap-3 rounded-2xl bg-s1 p-4 hairline">
+      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-ember/10 text-ember"><Clock3 className="size-4"/></div>
+      <div className="min-w-0 flex-1"><h4 className="font-semibold">{event.title}</h4><p className="mt-1 text-xs text-ink-3">{new Date(event.startsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})} – {new Date(event.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</p>{event.notes&&<p className="mt-2 whitespace-pre-wrap text-sm text-ink-2">{event.notes}</p>}{event.reminderAt!==null&&<p className="mt-2 text-xs text-ember">In-app reminder · {new Date(event.reminderAt).toLocaleString()}</p>}</div>
+      <div className="flex shrink-0 gap-1"><Button size="sm" variant="ghost" onClick={()=>editEvent(event)}>Edit</Button><Button size="sm" variant="ghost" icon={Trash2} aria-label={'Delete '+event.title} disabled={busy} onClick={()=>setRemoving(event)}/></div>
+     </article>)}</div>
+    </section>)}</div>}
+  </div>
+  <Sheet open={editor} onClose={()=>!busy&&setEditor(false)} title={editing?'Edit event':'New event'} description="Saved to your signed-in account." size="sm"><EventEditor key={editing?.id??'new'} initial={form} busy={busy} onSave={value=>void save(value)} onClose={()=>setEditor(false)}/></Sheet>
+  <Sheet open={!!removing} onClose={()=>!busy&&setRemoving(null)} title="Delete event?" size="sm"><p className="text-sm text-ink-2">Delete “{removing?.title}” from this account calendar?</p><div className="mt-4 flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={()=>setRemoving(null)}>Keep event</Button><Button variant="danger" disabled={busy} onClick={()=>void remove()}>Delete event</Button></div></Sheet>
+ </Screen>;
+}

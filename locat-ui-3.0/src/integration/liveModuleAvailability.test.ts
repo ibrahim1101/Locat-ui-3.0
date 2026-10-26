@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AvailabilityContext } from "../contracts/adapter";
+import type { ModuleId } from "../app/registry";
 import { liveModuleAvailability } from "./liveModuleAvailability";
 
 const context: AvailabilityContext = {
@@ -12,8 +13,9 @@ const context: AvailabilityContext = {
 };
 
 describe("live integration module policy", () => {
-  it("does not enable planned features", () => {
-    expect(liveModuleAvailability("calendar", context).availability).toBe("planned");
+  it("rejects unknown modules and marks reconstructed slices in beta", () => {
+    expect(liveModuleAvailability("unknown" as ModuleId,context).availability).toBe("unsupported");
+    for(const id of ["calendar","automate","workspace","share"] as const)expect(liveModuleAvailability(id,context).availability).toBe("beta");
   });
   it("blocks server-only modules when disconnected", () => {
     expect(liveModuleAvailability("messages", { ...context, connection: { ...context.connection, server: "disconnected" } }).availability).toBe("offline");

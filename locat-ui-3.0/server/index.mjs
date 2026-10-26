@@ -24,6 +24,10 @@ import { promisify } from "node:util";
 import { createLayeredRateLimiter } from "./rateLimit.mjs";
 import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
+import { createCalendarHandler } from './calendar.mjs';
+import { createShareHandler } from './share.mjs';
+import { createWorkspaceHandler } from './workspace.mjs';
+import { createAutomationHandler } from './automate.mjs';
 import { openDatabase } from "./database.mjs";
 
 const scrypt = promisify(scryptCallback);
@@ -88,6 +92,13 @@ const matrixGateway = createMatrixGateway({provider:matrix,store:db.matrixBindin
 const matrixBinding = createMatrixBindingHandler({store:db.matrixBindings,provider:matrix,provisioner:matrixProvisioner,conversations:db.matrixConversations,body,json,audit:db.audit});
 const linkHandler = createLinkHandler({store:db.link,sessionUser,sessionToken:cookie,body,json,audit:db.audit,connectivity,matrixBinding});
 const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,sessionToken:cookie,body,json});
+const calendarHandler=createCalendarHandler({store:db.calendar,sessionUser,body,json});
+const shareHandler=createShareHandler({store:db.encryptedShares,sessionUser,body,json});
+const workspaceHandler=createWorkspaceHandler({store:db.workspaces,sessionUser,body,json});
+const automationHandler=createAutomationHandler({store:db.automations,sessionUser,body,json});
+try{db.encryptedShares.purgeExpired();}catch(error){console.error('Encrypted share startup cleanup failed:',error instanceof Error?error.message:'unknown error');}
+const shareExpirySweep=setInterval(()=>{try{db.encryptedShares.purgeExpired();}catch(error){console.error('Encrypted share cleanup failed:',error instanceof Error?error.message:'unknown error');}},60*60_000);
+shareExpirySweep.unref();
 async function handle(req, res) {
   const trustedOrigin = requestOrigin(req, config);
   if (!trustedOrigin) return json(res, 403, { error: "Host not trusted" });
@@ -100,6 +111,10 @@ async function handle(req, res) {
   if (await matrixGateway(req,res,url,trustedOrigin)) return;
   if (await linkHandler(req,res,url,trustedOrigin)) return;
   if (await privateHandler(req,res,url,trustedOrigin)) return;
+  if (await calendarHandler(req,res,url,trustedOrigin)) return;
+  if (await shareHandler(req,res,url,trustedOrigin)) return;
+  if (await workspaceHandler(req,res,url,trustedOrigin)) return;
+  if (await automationHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
     app:'Locat',protocolVersion:1,serverId:db.serverId,origin:trustedOrigin,
     identity:serverIdentityAttestation(config.origin,db.serverId,config.identitySigningKey,config.identityRotation),

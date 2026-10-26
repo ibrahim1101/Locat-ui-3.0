@@ -11,7 +11,7 @@ import {writeServerSnapshot} from './backupSnapshot.mjs';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-export const DATABASE_SCHEMA_VERSION=18;
+export const DATABASE_SCHEMA_VERSION=22;
 
 /** Versioned relational store. Each write is durable before the API responds. */
 export function openDatabase(filename) {
@@ -123,6 +123,27 @@ export function openDatabase(filename) {
     DROP TABLE IF EXISTS remoteSessions;
     DROP TABLE IF EXISTS mediaShareOverrides;
     PRAGMA user_version=18;COMMIT;`);
+  if(version<19)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE calendarEvents(id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,title TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',startsAt INTEGER NOT NULL,endsAt INTEGER NOT NULL,reminderAt INTEGER,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL,CHECK(endsAt>startsAt));
+    CREATE INDEX calendar_events_range ON calendarEvents(userId,startsAt,endsAt);
+    CREATE INDEX calendar_events_reminders ON calendarEvents(userId,reminderAt);
+    PRAGMA user_version=19;COMMIT;`);
+  if(version<20)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE encryptedShares(id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,iv TEXT NOT NULL,ciphertext TEXT NOT NULL,expiresAt INTEGER NOT NULL,createdAt INTEGER NOT NULL);
+    CREATE INDEX encrypted_shares_expiry ON encryptedShares(expiresAt);
+    CREATE INDEX encrypted_shares_owner ON encryptedShares(userId,createdAt);
+    PRAGMA user_version=20;COMMIT;`);
+  if(version<21)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,createdBy TEXT NOT NULL REFERENCES users(id),createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL);
+    CREATE TABLE workspaceMembers(workspaceId TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,role TEXT NOT NULL CHECK(role IN ('owner','admin','member')),status TEXT NOT NULL CHECK(status IN ('pending','active')),invitedBy TEXT NOT NULL REFERENCES users(id),createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL,PRIMARY KEY(workspaceId,userId));
+    CREATE INDEX workspace_members_user ON workspaceMembers(userId,status,updatedAt);
+    CREATE TABLE workspaceItems(id TEXT PRIMARY KEY,workspaceId TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,authorId TEXT NOT NULL REFERENCES users(id),kind TEXT NOT NULL CHECK(kind IN ('note','task')),title TEXT NOT NULL,content TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('open','in-progress','done')),revision INTEGER NOT NULL,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL);
+    CREATE INDEX workspace_items_board ON workspaceItems(workspaceId,kind,state,updatedAt);
+    PRAGMA user_version=21;COMMIT;`);
+  if(version<22)sql.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE automationRules(id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,title TEXT NOT NULL,details TEXT NOT NULL DEFAULT '',runAt INTEGER NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),firedAt INTEGER,revision INTEGER NOT NULL,createdAt INTEGER NOT NULL,updatedAt INTEGER NOT NULL);
+    CREATE INDEX automation_due ON automationRules(userId,enabled,firedAt,runAt);
+    PRAGMA user_version=22;COMMIT;`);
   const matrixRevocations=matrixRevocationStore(sql);
   const matrixManagedDevices=managedMatrixDeviceStore(sql,matrixRevocations);
   const link=linkStore(sql,matrixRevocations);
@@ -136,6 +157,10 @@ export function openDatabase(filename) {
     matrixManagedDevices,
     matrixBindings,
     matrixConversations:matrixConversationStore(sql,matrixBindings),
+    calendar: calendarStore(sql),
+    encryptedShares: encryptedShareStore(sql),
+    workspaces: workspaceStore(sql),
+    automations: automationStore(sql),
     privateStore: privateStore(sql),
     acceptedContact: (a,b) => { const [low,high]=[a,b].sort(); return !!sql.prepare("SELECT 1 FROM contacts WHERE lowId=? AND highId=? AND status='accepted'").get(low,high); },
     savePrivacy: (id,profile,username,requests) => sql.prepare('UPDATE users SET profileVisibility=?,usernameVisibility=?,allowContactRequests=? WHERE id=?').run(profile,username,Number(requests),id),
@@ -219,4 +244,92 @@ export function openDatabase(filename) {
     },
     close: () => sql.close(),
   };
+}
+
+function calendarStore(sql) {
+  const byId=sql.prepare('SELECT * FROM calendarEvents WHERE id=? AND userId=?');
+  const list=sql.prepare('SELECT * FROM calendarEvents WHERE userId=? AND startsAt<? AND endsAt>=? ORDER BY startsAt,id LIMIT 500');
+  return {
+    list:(userId,from,to)=>list.all(userId,to,from),
+    get:(userId,id)=>byId.get(id,userId),
+    create(event,now=Date.now()) {
+      sql.exec('BEGIN IMMEDIATE');
+      try {
+        if(sql.prepare('SELECT COUNT(*) AS count FROM calendarEvents WHERE userId=?').get(event.userId).count>=5000)throw Object.assign(new Error('This account has reached its calendar event limit'),{status:429});
+        sql.prepare('INSERT INTO calendarEvents(id,userId,title,notes,startsAt,endsAt,reminderAt,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?,?)').run(event.id,event.userId,event.title,event.notes,event.startsAt,event.endsAt,event.reminderAt,now,now);
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(event.userId,'calendar.event.created','info',now);
+        const saved=byId.get(event.id,event.userId);sql.exec('COMMIT');return saved;
+      } catch(error) { sql.exec('ROLLBACK');throw error; }
+    },
+    update(userId,id,expectedUpdatedAt,fields,now=Date.now()) {
+      sql.exec('BEGIN IMMEDIATE');
+      try {
+        const current=byId.get(id,userId);if(!current||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return null;}
+        const updatedAt=Math.max(now,current.updatedAt+1);
+        sql.prepare('UPDATE calendarEvents SET title=?,notes=?,startsAt=?,endsAt=?,reminderAt=?,updatedAt=? WHERE id=? AND userId=? AND updatedAt=?').run(fields.title,fields.notes,fields.startsAt,fields.endsAt,fields.reminderAt,updatedAt,id,userId,expectedUpdatedAt);
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'calendar.event.updated','info',updatedAt);
+        const saved=byId.get(id,userId);sql.exec('COMMIT');return saved;
+      } catch(error) { sql.exec('ROLLBACK');throw error; }
+    },
+    remove(userId,id,expectedUpdatedAt,now=Date.now()) {
+      sql.exec('BEGIN IMMEDIATE');
+      try {
+        const current=byId.get(id,userId);if(!current||current.updatedAt!==expectedUpdatedAt){sql.exec('ROLLBACK');return false;}
+        sql.prepare('DELETE FROM calendarEvents WHERE id=? AND userId=? AND updatedAt=?').run(id,userId,expectedUpdatedAt);
+        sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'calendar.event.deleted','warn',now);
+        sql.exec('COMMIT');return true;
+      } catch(error) { sql.exec('ROLLBACK');throw error; }
+    },
+    dueReminders:(userId,now)=>sql.prepare('SELECT id,title,startsAt,reminderAt FROM calendarEvents WHERE userId=? AND reminderAt IS NOT NULL AND reminderAt<=? AND startsAt>? ORDER BY reminderAt,id LIMIT 100').all(userId,now,now),
+  };
+}
+
+function encryptedShareStore(sql) {
+  const get=sql.prepare('SELECT id,iv,ciphertext,expiresAt,createdAt FROM encryptedShares WHERE id=? AND expiresAt>?');
+  return {
+    list:(userId,now=Date.now())=>sql.prepare('SELECT id,expiresAt,createdAt FROM encryptedShares WHERE userId=? AND expiresAt>? ORDER BY createdAt DESC LIMIT 20').all(userId,now),
+    create({id,userId,iv,ciphertext,expiresAt},now=Date.now()) {
+      sql.exec('BEGIN IMMEDIATE');
+      try { sql.prepare('DELETE FROM encryptedShares WHERE expiresAt<=?').run(now);if(sql.prepare('SELECT COUNT(*) AS count FROM encryptedShares WHERE userId=?').get(userId).count>=20)throw Object.assign(new Error('This account has reached its active encrypted-share limit'),{status:429,retryAfter:3600});sql.prepare('INSERT INTO encryptedShares(id,userId,iv,ciphertext,expiresAt,createdAt) VALUES(?,?,?,?,?,?)').run(id,userId,iv,ciphertext,expiresAt,now);sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'share.link.created','info',now);const saved=get.get(id,now);sql.exec('COMMIT');return saved; }
+      catch(error) { sql.exec('ROLLBACK');throw error; }
+    },
+    get:(id,now=Date.now())=>get.get(id,now),
+    remove(userId,id,now=Date.now()) {
+      sql.exec('BEGIN IMMEDIATE');try { const result=sql.prepare('DELETE FROM encryptedShares WHERE id=? AND userId=? AND expiresAt>?').run(id,userId,now);if(result.changes)sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'share.link.revoked','warn',now);sql.exec('COMMIT');return result.changes===1; }
+      catch(error) { sql.exec('ROLLBACK');throw error; }
+    },
+    purgeExpired:(now=Date.now())=>sql.prepare('DELETE FROM encryptedShares WHERE expiresAt<=?').run(now).changes,
+  };
+}
+
+function workspaceStore(sql) {
+ const active=sql.prepare("SELECT role FROM workspaceMembers WHERE workspaceId=? AND userId=? AND status='active'");
+ const workspace=sql.prepare('SELECT id,name,createdBy,createdAt,updatedAt FROM workspaces WHERE id=?');
+ const item=sql.prepare('SELECT id,workspaceId,authorId,kind,title,content,state,revision,createdAt,updatedAt FROM workspaceItems WHERE id=? AND workspaceId=?');
+ const audit=(userId,event,now)=>sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,event,'info',now);
+ return {
+  list:userId=>sql.prepare("SELECT w.id,w.name,m.role,m.status,w.createdAt,w.updatedAt FROM workspaceMembers m JOIN workspaces w ON w.id=m.workspaceId WHERE m.userId=? AND m.status='active' ORDER BY w.name,w.id").all(userId),
+  pending:userId=>sql.prepare("SELECT w.id,w.name,m.role,m.invitedBy,m.createdAt FROM workspaceMembers m JOIN workspaces w ON w.id=m.workspaceId WHERE m.userId=? AND m.status='pending' ORDER BY m.createdAt DESC").all(userId),
+  create({id,userId,name},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(sql.prepare('SELECT COUNT(*) AS count FROM workspaces WHERE createdBy=?').get(userId).count>=20)throw Object.assign(new Error('This account has reached its workspace limit'),{status:429});sql.prepare('INSERT INTO workspaces VALUES(?,?,?,?,?)').run(id,name,userId,now,now);sql.prepare("INSERT INTO workspaceMembers VALUES(?,?,?,'active',?,?,?)").run(id,userId,'owner',userId,now,now);audit(userId,'workspace.created',now);sql.exec('COMMIT');return{id,name,role:'owner',status:'active',createdAt:now,updatedAt:now};}catch(error){sql.exec('ROLLBACK');throw error;}},
+  members(workspaceId,userId){if(!active.get(workspaceId,userId))return null;return sql.prepare('SELECT m.userId,u.username,u.displayName,m.role,m.status,m.invitedBy,m.createdAt,m.updatedAt FROM workspaceMembers m JOIN users u ON u.id=m.userId WHERE m.workspaceId=? ORDER BY CASE m.role WHEN \'owner\' THEN 0 WHEN \'admin\' THEN 1 ELSE 2 END,u.username').all(workspaceId);},
+  invite(workspaceId,actorId,targetId,now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const role=active.get(workspaceId,actorId)?.role;if(!['owner','admin'].includes(role)){sql.exec('ROLLBACK');return null;}if(!workspace.get(workspaceId)||!sql.prepare('SELECT 1 FROM users WHERE id=?').get(targetId)){sql.exec('ROLLBACK');return false;}const existing=sql.prepare('SELECT status FROM workspaceMembers WHERE workspaceId=? AND userId=?').get(workspaceId,targetId);if(existing){sql.exec('ROLLBACK');return existing.status==='active'?'active':'pending';}if(sql.prepare('SELECT COUNT(*) AS count FROM workspaceMembers WHERE workspaceId=?').get(workspaceId).count>=200)throw Object.assign(new Error('This workspace has reached its member and invitation limit'),{status:429});sql.prepare("INSERT INTO workspaceMembers VALUES(?,?, 'member','pending',?,?,?)").run(workspaceId,targetId,actorId,now,now);audit(actorId,'workspace.member.invited',now);sql.exec('COMMIT');return'pending';}catch(error){sql.exec('ROLLBACK');throw error;}},
+  respond(workspaceId,userId,accept,now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const pending=sql.prepare("SELECT 1 FROM workspaceMembers WHERE workspaceId=? AND userId=? AND status='pending'").get(workspaceId,userId);if(!pending){sql.exec('ROLLBACK');return false;}if(accept)sql.prepare("UPDATE workspaceMembers SET status='active',updatedAt=? WHERE workspaceId=? AND userId=? AND status='pending'").run(now,workspaceId,userId);else sql.prepare("DELETE FROM workspaceMembers WHERE workspaceId=? AND userId=? AND status='pending'").run(workspaceId,userId);audit(userId,accept?'workspace.invite.accepted':'workspace.invite.declined',now);sql.exec('COMMIT');return true;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  setRole(workspaceId,actorId,targetId,role,now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(active.get(workspaceId,actorId)?.role!=='owner'||!['admin','member'].includes(role)){sql.exec('ROLLBACK');return false;}const changed=sql.prepare("UPDATE workspaceMembers SET role=?,updatedAt=? WHERE workspaceId=? AND userId=? AND status='active' AND role!='owner'").run(role,now,workspaceId,targetId).changes;if(!changed){sql.exec('ROLLBACK');return false;}audit(actorId,'workspace.member.role.changed',now);sql.exec('COMMIT');return true;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  remove(workspaceId,actorId,targetId,now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const actorRole=active.get(workspaceId,actorId)?.role,target=active.get(workspaceId,targetId);if(!target||target.role==='owner'||!(actorRole==='owner'||actorRole==='admin'&&target.role==='member'||actorId===targetId&&target.role!=='owner')){sql.exec('ROLLBACK');return false;}sql.prepare("DELETE FROM workspaceMembers WHERE workspaceId=? AND userId=? AND status='active'").run(workspaceId,targetId);audit(actorId,'workspace.member.removed',now);sql.exec('COMMIT');return true;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  items(workspaceId,userId){if(!active.get(workspaceId,userId))return null;return sql.prepare('SELECT id,workspaceId,authorId,kind,title,content,state,revision,createdAt,updatedAt FROM workspaceItems WHERE workspaceId=? ORDER BY kind,state,updatedAt DESC,id LIMIT 500').all(workspaceId);},
+  createItem({id,workspaceId,userId,kind,title,content,state='open'},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(!active.get(workspaceId,userId)){sql.exec('ROLLBACK');return null;}if(sql.prepare('SELECT COUNT(*) AS count FROM workspaceItems WHERE workspaceId=?').get(workspaceId).count>=500)throw Object.assign(new Error('This workspace has reached its shared board limit'),{status:429});sql.prepare('INSERT INTO workspaceItems VALUES(?,?,?,?,?,?,?,1,?,?)').run(id,workspaceId,userId,kind,title,content,state,now,now);audit(userId,'workspace.item.created',now);const saved=item.get(id,workspaceId);sql.exec('COMMIT');return saved;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  updateItem({id,workspaceId,userId,expectedRevision,title,content,state},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(!active.get(workspaceId,userId)){sql.exec('ROLLBACK');return null;}const current=item.get(id,workspaceId);if(!current||current.revision!==expectedRevision){sql.exec('ROLLBACK');return false;}sql.prepare('UPDATE workspaceItems SET title=?,content=?,state=?,revision=revision+1,updatedAt=? WHERE id=? AND workspaceId=? AND revision=?').run(title,content,state,Math.max(now,current.updatedAt+1),id,workspaceId,expectedRevision);audit(userId,'workspace.item.updated',now);const saved=item.get(id,workspaceId);sql.exec('COMMIT');return saved;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  deleteItem({id,workspaceId,userId,expectedRevision},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(!active.get(workspaceId,userId)){sql.exec('ROLLBACK');return false;}const changes=sql.prepare('DELETE FROM workspaceItems WHERE id=? AND workspaceId=? AND revision=?').run(id,workspaceId,expectedRevision).changes;if(!changes){sql.exec('ROLLBACK');return false;}audit(userId,'workspace.item.deleted',now);sql.exec('COMMIT');return true;}catch(error){sql.exec('ROLLBACK');throw error;}},
+ };
+}
+
+function automationStore(sql) {
+ const byId=sql.prepare('SELECT id,userId,title,details,runAt,enabled,firedAt,revision,createdAt,updatedAt FROM automationRules WHERE id=? AND userId=?');
+ return {
+  list:(userId)=>sql.prepare('SELECT id,title,details,runAt,enabled,firedAt,revision,createdAt,updatedAt FROM automationRules WHERE userId=? ORDER BY runAt,id LIMIT 500').all(userId).map(row=>({...row,enabled:!!row.enabled})),
+  create({id,userId,title,details,runAt,enabled=true},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{if(sql.prepare('SELECT COUNT(*) AS count FROM automationRules WHERE userId=?').get(userId).count>=500)throw Object.assign(new Error('This account has reached its scheduled reminder limit'),{status:429});sql.prepare('INSERT INTO automationRules VALUES(?,?,?,?,?,?,NULL,1,?,?)').run(id,userId,title,details,runAt,Number(enabled),now,now);sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'automate.reminder.created','info',now);const saved=byId.get(id,userId);sql.exec('COMMIT');return{...saved,enabled:!!saved.enabled};}catch(error){sql.exec('ROLLBACK');throw error;}},
+  update({id,userId,expectedRevision,title,details,runAt,enabled},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const current=byId.get(id,userId);if(!current||current.revision!==expectedRevision){sql.exec('ROLLBACK');return null;}sql.prepare('UPDATE automationRules SET title=?,details=?,runAt=?,enabled=?,firedAt=NULL,revision=revision+1,updatedAt=? WHERE id=? AND userId=? AND revision=?').run(title,details,runAt,Number(enabled),Math.max(now,current.updatedAt+1),id,userId,expectedRevision);sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'automate.reminder.updated','info',now);const saved=byId.get(id,userId);sql.exec('COMMIT');return{...saved,enabled:!!saved.enabled};}catch(error){sql.exec('ROLLBACK');throw error;}},
+  remove({id,userId,expectedRevision},now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const changes=sql.prepare('DELETE FROM automationRules WHERE id=? AND userId=? AND revision=?').run(id,userId,expectedRevision).changes;if(!changes){sql.exec('ROLLBACK');return false;}sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'automate.reminder.deleted','warn',now);sql.exec('COMMIT');return true;}catch(error){sql.exec('ROLLBACK');throw error;}},
+  dispatch(userId,now=Date.now()){sql.exec('BEGIN IMMEDIATE');try{const due=sql.prepare('SELECT id,title,details,runAt,revision FROM automationRules WHERE userId=? AND enabled=1 AND firedAt IS NULL AND runAt<=? ORDER BY runAt,id LIMIT 100').all(userId,now);const update=sql.prepare('UPDATE automationRules SET firedAt=?,updatedAt=? WHERE id=? AND userId=? AND enabled=1 AND firedAt IS NULL');for(const row of due){const result=update.run(now,now,row.id,userId);if(!result.changes)continue;sql.prepare('INSERT INTO audit(userId,event,severity,createdAt) VALUES(?,?,?,?)').run(userId,'automate.reminder.delivered','info',now);}sql.exec('COMMIT');return due;}catch(error){sql.exec('ROLLBACK');throw error;}},
+ };
 }

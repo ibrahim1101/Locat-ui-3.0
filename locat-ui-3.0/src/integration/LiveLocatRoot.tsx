@@ -71,6 +71,7 @@ export function LiveLocatRoot({ platform }: { platform: PlatformInfo }) {
       if (id === "messages") return { availability: "beta", reason: "Verified one-to-one encrypted messaging; cross-device and physical-device acceptance remains open" };
       if (id === "files") return { availability: "beta", reason: "Experimental client-encrypted private storage; native storage and independent review pending" };
       if (["search", "modules", "diagnostics", "offline"].includes(id)) return { availability: "available" };
+      if (id === "calendar" || id === "share" || id === "workspace" || id === "automate") return liveModuleAvailability(id, ctx);
       if (id !== "settings" && id !== "profile" && id !== "home") return { availability: "planned", reason: "Live backend module not yet implemented" };
       return liveModuleAvailability(id, ctx);
     },

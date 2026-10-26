@@ -1,15 +1,19 @@
 # Feature evidence matrix
 
-Implemented, tested, platform-verified and independently security-reviewed are separate statuses. No entire module is certified complete or independently audited.
+Implemented, tested, platform-verified and independently security-reviewed are separate statuses. No entire module is certified complete or independently audited. Current local work follows [REWORK_SCOPE.md](REWORK_SCOPE.md); rows marked retired describe the historical full roadmap and are excluded from the October 2026 rework.
 
 | Scope | Implemented live subset | Tests | Platform verified | Remaining state |
 | --- | --- | --- | --- | --- |
 | Accounts/Contacts | Auth, LC/bio, session security, preferences, cancel/remove/block and server privacy | API + UI/unit, built login/cookie browser flow | Three-OS source/API CI; isolated Chromium/Linux login | Avatars/MFA/native/app lock planned |
 | Connect | Discovery/manual browser navigation, retry monitor, proxy termination, authenticated health WebSockets and qualified local addresses | Local client/config/HTTP/TLS | No real LAN/global/Docker | Device subscriptions/global trust/E2EE/federation pending |
-| Link/Remote | Proved paired browser identities, encrypted chunks/signaling, account isolation and consent/cleanup | Crypto/API/UI; actual two-context Link SAS, text/file/revocation | Isolated Chromium/Linux Link; Remote capture/WebRTC mocked | Actual streaming, resume/LAN/native/control/TURN pending |
-| Cinema/Music/Photos | Local/server media, conversion, playlists/EQ/crop/text | Unit/API/real FFmpeg | No physical codec/browser acceptance | Broader roadmap remains planned |
+| Link | Proved paired browser identities and encrypted text/file chunks, account isolation, consent and cleanup | Crypto/API/UI plus prior two-context Link acceptance; reconstructed modules still need final suite | Prior isolated Chromium/Linux; no physical-device recheck on this checkout | Real LAN, mobile/native and deployment acceptance pending; Remote is retired |
+| Cinema/Music/Photos | Retired by current scope | — | — | No live routes, APIs or tables in this rework |
 | Vault/Secrets | Experimental client-encrypted records/files/backup and wrapping-passphrase change | Crypto/API/UI; actual Secrets create/rewrap/reload/reopen | Isolated Chromium/Linux round-trip; no native/independent review | Full data-key rotation/recovery/autofill expansion planned |
-| Sentinel | Scoped token webhooks, paged incidents/history, actions and bounded loaded JSON export | API/unit/UI; actual Chromium token/webhook/actions/export/revocation | Isolated Chromium/Linux; no native agents | Monitoring/notifications/retention/full archives planned |
+| Calendar | Account-scoped events, bounded month reads, revision-checked edits/deletes and app-level foreground reminders | API/database and UI tests pass | None on restored checkout | Server can read event data; no E2EE or OS notifications; browser acceptance pending |
+| Automate | One-time scheduled reminders with edit/pause/delete and shared cross-tab dispatch | API/database and UI tests pass | None on restored checkout | Foreground visible/unlocked delivery only; no recurring rules or arbitrary code; browser acceptance pending |
+| Workspace | Teams, pending invites, owner/admin/member roles, shared notes and task board | API/database and UI tests pass; two-account browser acceptance pending | None on restored checkout | Server-readable content; workspace delete/owner transfer not implemented |
+| Share | AES-GCM text links with fragment-held key, expiry, ciphertext retrieval and owner revocation | API/database, UI and crypto tests pass | None on restored checkout | Text-only, 1.5 MB, max 20 active links; bearer-link access; browser recipient acceptance pending |
+| SentinelLab | Retired by current scope | — | — | No live routes, APIs or tables in this rework |
 | Messages/Calls | Live experimental managed Matrix setup, native browser crypto lifecycle, room-free peer SAS and history workers; no live conversations/calls | Real Synapse/HTTPS plus actual Chromium setup, exclusive writer, key continuity, mutual SAS, workers/logout | Isolated Chromium/Linux and synthetic Synapse; no native/federation/full recovery | Conversation/call security gate closed |
 | Remaining master ecosystem | Truthful unavailable live states | Some preview contract tests only | None | Planned; see full MASTER_ROADMAP.md sections A–AM |
 

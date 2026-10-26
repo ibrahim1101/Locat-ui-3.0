@@ -15,6 +15,12 @@ import { LivePrivateStore } from "./integration/LivePrivateStore";
 import { LiveModuleNotice } from "./integration/LiveModuleNotice";
 import { FilesLayout } from "./screens/private/FilesLayout";
 import { LiveAppLockGate } from "./integration/LiveAppLockGate";
+import { LiveCalendar } from "./integration/LiveCalendar";
+import { LiveShare } from "./integration/LiveShare";
+import { LiveWorkspace } from "./integration/LiveWorkspace";
+import { LiveAutomate } from "./integration/LiveAutomate";
+import { LiveAutomationMonitor } from "./integration/LiveAutomationMonitor";
+import { LiveCalendarReminderMonitor } from "./integration/LiveCalendarReminderMonitor";
 
 const Home = lazy(() => import("./screens/home/Home"));
 const Modules = lazy(() => import("./screens/home/Modules"));
@@ -47,6 +53,8 @@ export function App() {
   return (
     <LiveAppLockGate><BackProvider rootPath={root}>
       <ContextMenuProvider><DropProvider><ErrorBoundary>
+        {live&&<LiveAutomationMonitor/>}
+        {live&&<LiveCalendarReminderMonitor/>}
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to={root} replace />} />
@@ -64,10 +72,10 @@ export function App() {
             <Route path="admin" element={live ? <LiveModuleNotice title="Admin" /> : <Admin />} />
             <Route path="diagnostics" element={live ? <LiveDiagnostics /> : <Diagnostics />} />
             <Route path="offline" element={live ? <LiveDiagnostics offline /> : <Offline />} />
-            <Route path="workspace" element={live ? <LiveModuleNotice title="workspace" /> : <Planned id="workspace" />} />
-            <Route path="calendar" element={live ? <LiveModuleNotice title="calendar" /> : <Planned id="calendar" />} />
-            <Route path="automate" element={live ? <LiveModuleNotice title="automate" /> : <Planned id="automate" />} />
-            <Route path="share" element={live ? <LiveModuleNotice title="share" /> : <Planned id="share" />} />
+            <Route path="workspace" element={live ? <LiveWorkspace /> : <Planned id="workspace" />} />
+            <Route path="calendar" element={live ? <LiveCalendar /> : <Planned id="calendar" />} />
+            <Route path="automate" element={live ? <LiveAutomate /> : <Planned id="automate" />} />
+            <Route path="share" element={live ? <LiveShare /> : <Planned id="share" />} />
             <Route path="extensions" element={live ? <LiveModuleNotice title="extensions" /> : <Planned id="extensions" />} />
             {adapter.mode === "preview" && <Route path="gallery" element={<Gallery />} />}
             <Route path="settings/*" element={live ? <LiveModuleNotice title="Settings" /> : <Settings />} />
