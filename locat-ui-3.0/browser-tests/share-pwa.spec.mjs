@@ -9,7 +9,7 @@ test.afterAll(async()=>{await fixture?.stop();});
 test('PWA share target keeps incoming text local until signed-in review',async({browser})=>{
  const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'allow'}),page=await context.newPage(),apiWrites=[];
  await context.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
- page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/share'))apiWrites.push({path:new URL(request.url()).pathname,body:request.postData()});});
+ page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/share')&&request.method()!=='GET')apiWrites.push({path:new URL(request.url()).pathname,body:request.postData()});});
  const username='share_'+randomBytes(6).toString('hex'),password='Synthetic share password '+randomBytes(24).toString('hex'),marker='Synthetic local handoff '+randomBytes(24).toString('hex');
  try{
   await page.goto(fixture.origin);

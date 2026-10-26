@@ -20,9 +20,10 @@ it('encrypts text before creating a bearer link and keeps its key in the fragmen
 
 it('restores a locally received PWA share for review without sending it to the server',async()=>{
  vi.spyOn(handoff,'consumePwaShareHandoff').mockResolvedValue({title:'A note',text:'Shared words',url:'',review:'A note\n\nShared words',createdAt:Date.now()});
- window.history.replaceState(null,'','/share?handoff=11111111-1111-4111-8111-111111111111');vi.stubGlobal('fetch',vi.fn());
+ window.history.replaceState(null,'','/share?handoff=11111111-1111-4111-8111-111111111111');const requests=vi.fn(async(_path:string,_options:RequestInit={})=>reply({shares:[]}));vi.stubGlobal('fetch',requests);
  render(<MemoryRouter><LiveShare/></MemoryRouter>);
  expect(await screen.findByLabelText('Message')).toHaveValue('A note\n\nShared words');
  expect(screen.getByRole('status')).toHaveTextContent('Shared text staged locally. Review it before creating the encrypted link.');
- expect(fetch).not.toHaveBeenCalled();
+ await waitFor(()=>expect(requests).toHaveBeenCalledWith('/api/share',expect.objectContaining({headers:expect.objectContaining({'X-Locat-Account':session.user.id})})));
+ expect(requests.mock.calls.every(([path,options])=>path==='/api/share'&&(!options?.method||options.method==='GET'))).toBe(true);
 });
