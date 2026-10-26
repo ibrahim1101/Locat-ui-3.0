@@ -41,3 +41,9 @@ it("shows an honest empty result when the live account has no contacts", async (
   expect(await screen.findByText('No results for "Mira"')).toBeVisible();
   expect(screen.queryByText("Loading your contacts…")).toBeNull();
 });
+
+
+it("finds real active Workspace notes through the scoped server search",async()=>{
+ accountRequest.mockImplementation(async(path:string)=>path==="/api/contacts"?{contacts:[]}:{results:[{id:"item-a",workspaceId:"workspace-a",workspaceName:"Release team",type:"task",title:"Prepare launch",snippet:"Confirm migration plan",updatedAt:1}]});
+ render(<MemoryRouter><Search /></MemoryRouter>);fireEvent.change(screen.getByTestId("global-search-input"),{target:{value:"launch"}});expect(await screen.findByText("Prepare launch")).toBeVisible();expect(screen.getByText(/Release team · task · Confirm migration plan/)).toBeVisible();await waitFor(()=>expect(accountRequest).toHaveBeenCalledWith("/api/workspaces/search?q=launch","account-a",undefined,expect.any(AbortSignal)));
+});

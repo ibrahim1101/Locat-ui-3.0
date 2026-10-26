@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {createRateLimiter} from './rateLimit.mjs';
 
 const owns=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(key=>keys.includes(key));
 const uuid=value=>typeof value==='string'&&/^[a-f0-9-]{36}$/i.test(value);
@@ -7,6 +8,7 @@ const content=value=>typeof value==='string'&&value.length<=20_000;
 const states=new Set(['open','in-progress','done']);
 
 export function createWorkspaceHandler({store,sessionUser,body,json}){
+ const searchLimit=createRateLimiter(30,60_000);
  return async function workspaceHandler(req,res,url,trustedOrigin){
   if(url.pathname==='/api/workspaces'){
    const user=sessionUser(req);if(!user){json(res,401,{error:'Not authenticated'});return true;}
@@ -17,6 +19,13 @@ export function createWorkspaceHandler({store,sessionUser,body,json}){
    if(req.aborted||sessionUser(req)?.id!==user.id){json(res,401,{error:'Session changed during workspace creation'});return true;}
    if(!owns(input,['name'])||!name(input.name)){json(res,400,{error:'Choose a workspace name up to 100 characters'});return true;}
    json(res,201,{workspace:store.create({id:randomUUID(),userId:user.id,name:input.name.trim()})});return true;
+  }
+  if(url.pathname==='/api/workspaces/search'){
+   const user=sessionUser(req);if(!user){json(res,401,{error:'Not authenticated'});return true;}
+   if(req.method!=='GET'){json(res,405,{error:'Method not allowed'},{Allow:'GET'});return true;}
+   const terms=url.searchParams.getAll('q');if(terms.length!==1||terms[0].trim().length<2||terms[0].trim().length>100){json(res,400,{error:'Search needs between 2 and 100 characters'});return true;}
+   const retryAfter=searchLimit(user.id);if(retryAfter){json(res,429,{error:'Workspace search is temporarily rate limited'},{'Retry-After':String(retryAfter)});return true;}
+   json(res,200,{results:store.search(user.id,terms[0].trim())});return true;
   }
   if(url.pathname==='/api/workspaces/invitations'){
    const user=sessionUser(req);if(!user){json(res,401,{error:'Not authenticated'});return true;}
