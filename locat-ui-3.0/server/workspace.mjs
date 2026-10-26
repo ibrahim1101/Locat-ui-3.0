@@ -29,7 +29,7 @@ export function createWorkspaceHandler({store,sessionUser,body,json}){
    if(!store.respond(input.workspaceId,user.id,input.accept)){json(res,404,{error:'Invitation is unavailable'});return true;}
    json(res,200,{ok:true});return true;
   }
-  const match=/^\/api\/workspaces\/([a-f0-9-]{36})(?:\/(members(?:\/([a-f0-9-]{32,36}))?|invite|invitations|items(?:\/([a-f0-9-]{36}))?|owner))?$/i.exec(url.pathname);
+  const match=/^\/api\/workspaces\/([a-f0-9-]{36})(?:\/(members(?:\/([a-f0-9-]{32,36}))?|invite|invitations|items(?:\/([a-f0-9-]{36}))?|owner|export))?$/i.exec(url.pathname);
   if(!match)return false;
   const user=sessionUser(req);if(!user){json(res,401,{error:'Not authenticated'});return true;}
   const workspaceId=match[1],section=match[2]??'',resource=section.split('/')[0],targetId=match[3],itemId=match[4];
@@ -39,6 +39,13 @@ export function createWorkspaceHandler({store,sessionUser,body,json}){
    if(section==='invitations'){json(res,400,{error:'Use the account invitations endpoint'});return true;}
    if(resource==='items'&&!itemId){const items=store.items(workspaceId,user.id);if(!items){json(res,404,{error:'Workspace is unavailable'});return true;}json(res,200,{items});return true;}
    json(res,405,{error:'Method not allowed'});return true;
+  }
+  if(req.method==='POST'&&section==='export'){
+   if(req.headers.origin!==trustedOrigin){json(res,403,{error:'Origin mismatch'});return true;}
+   let input;try{input=await body(req,1024);}catch(error){json(res,error.status??400,{error:error.message});return true;}
+   if(!owns(input,[])){json(res,400,{error:'Workspace export request must be empty'});return true;}
+   if(req.aborted||sessionUser(req)?.id!==user.id){json(res,401,{error:'Session changed during workspace export'});return true;}
+   const data=store.exportData(workspaceId,user.id);if(!data){json(res,404,{error:'Workspace is unavailable'});return true;}json(res,200,{export:data});return true;
   }
   if(req.method==='DELETE'&&resource==='members'&&targetId){
    if(req.headers.origin!==trustedOrigin){json(res,403,{error:'Origin mismatch'});return true;}

@@ -116,15 +116,18 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/workspaces','POST',{name:'Core team'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
     const workspaceCreated=await request('/api/workspaces','POST',{name:'Core team'},aliceCookie);assert.equal(workspaceCreated.status,201);const {workspace}=await workspaceCreated.json();
     assert.equal((await request('/api/workspaces/'+workspace.id+'/items','GET',undefined,bobCookie)).status,404);
+    assert.equal((await request(`/api/workspaces/${workspace.id}/export`,'POST',{},bobCookie)).status,404);
     assert.equal((await request('/api/workspaces/'+workspace.id+'/invite','POST',{userId:bob.id},aliceCookie)).status,201);
     let bobInvites=(await (await request('/api/workspaces/invitations','GET',undefined,bobCookie)).json()).invitations;assert.equal(bobInvites.length,1);assert.equal(bobInvites[0].name,'Core team');
     assert.equal((await request(`/api/workspaces/${workspace.id}/invitations`,'POST',{accept:true},bobCookie)).status,200);
     const roleChange=await request(`/api/workspaces/${workspace.id}/members/${bob.id}`,'PATCH',{role:'admin'},aliceCookie);assert.equal(roleChange.status,200,await roleChange.text());
     const memberList=(await (await request(`/api/workspaces/${workspace.id}/members`,'GET',undefined,bobCookie)).json()).members;assert.equal(memberList.find(row=>row.userId===bob.id).role,'admin');
     const workspaceItem=await request(`/api/workspaces/${workspace.id}/items`,'POST',{kind:'task',title:'Review release',content:'Check migration',state:'open'},aliceCookie);assert.equal(workspaceItem.status,201);const {item}=await workspaceItem.json();
+    assert.equal((await request(`/api/workspaces/${workspace.id}/export`,'POST',{extra:true},aliceCookie)).status,400);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items`,'GET',undefined,bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},aliceCookie)).status,409);
+    const workspaceExport=await request(`/api/workspaces/${workspace.id}/export`,'POST',{},bobCookie);assert.equal(workspaceExport.status,200);const {export:exportedWorkspace}=await workspaceExport.json();assert.equal(exportedWorkspace.format,'locat-workspace-export-v1');assert.equal(exportedWorkspace.workspace.id,workspace.id);assert.equal(exportedWorkspace.members.length,2);assert.equal(exportedWorkspace.items[0].id,item.id);
     assert.equal((await request(`/api/workspaces/${workspace.id}/owner`,'PATCH',{userId:bob.id},bobCookie)).status,403);
     assert.equal((await request(`/api/workspaces/${workspace.id}/owner`,'PATCH',{userId:bob.id},aliceCookie)).status,200);
     const transferredMembers=(await (await request(`/api/workspaces/${workspace.id}/members`,'GET',undefined,bobCookie)).json()).members;assert.equal(transferredMembers.find(row=>row.userId===bob.id).role,'owner');assert.equal(transferredMembers.find(row=>row.username==='alice').role,'admin');
