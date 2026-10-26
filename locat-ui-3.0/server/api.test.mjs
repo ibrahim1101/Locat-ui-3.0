@@ -125,6 +125,12 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request(`/api/workspaces/${workspace.id}/items`,'GET',undefined,bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},aliceCookie)).status,409);
+    assert.equal((await request(`/api/workspaces/${workspace.id}/owner`,'PATCH',{userId:bob.id},bobCookie)).status,403);
+    assert.equal((await request(`/api/workspaces/${workspace.id}/owner`,'PATCH',{userId:bob.id},aliceCookie)).status,200);
+    const transferredMembers=(await (await request(`/api/workspaces/${workspace.id}/members`,'GET',undefined,bobCookie)).json()).members;assert.equal(transferredMembers.find(row=>row.userId===bob.id).role,'owner');assert.equal(transferredMembers.find(row=>row.username==='alice').role,'admin');
+    assert.equal((await request(`/api/workspaces/${workspace.id}`,'DELETE',{expected:true},aliceCookie)).status,403);
+    assert.equal((await request(`/api/workspaces/${workspace.id}`,'DELETE',{expected:true},bobCookie)).status,200);
+    assert.equal((await request(`/api/workspaces/${workspace.id}/items`,'GET',undefined,bobCookie)).status,404);
     assert.equal((await request('/api/automate/rules','GET',undefined,aliceCookie)).status,200);
     const scheduledAt=Date.now()+5*60_000,scheduled=await request('/api/automate/rules','POST',{title:'Take a break',details:'Stretch',runAt:scheduledAt,repeatMs:86_400_000},aliceCookie);assert.equal(scheduled.status,201);const {rule}=await scheduled.json();assert.equal(rule.repeatMs,86_400_000);
     assert.equal((await request('/api/automate/rules','POST',{title:'Unsupported cadence',details:'',runAt:Date.now()+5*60_000,repeatMs:90_000},aliceCookie)).status,400);

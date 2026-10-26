@@ -29,7 +29,7 @@ export function createWorkspaceHandler({store,sessionUser,body,json}){
    if(!store.respond(input.workspaceId,user.id,input.accept)){json(res,404,{error:'Invitation is unavailable'});return true;}
    json(res,200,{ok:true});return true;
   }
-  const match=/^\/api\/workspaces\/([a-f0-9-]{36})(?:\/(members(?:\/([a-f0-9-]{32,36}))?|invite|invitations|items(?:\/([a-f0-9-]{36}))?))?$/i.exec(url.pathname);
+  const match=/^\/api\/workspaces\/([a-f0-9-]{36})(?:\/(members(?:\/([a-f0-9-]{32,36}))?|invite|invitations|items(?:\/([a-f0-9-]{36}))?|owner))?$/i.exec(url.pathname);
   if(!match)return false;
   const user=sessionUser(req);if(!user){json(res,401,{error:'Not authenticated'});return true;}
   const workspaceId=match[1],section=match[2]??'',resource=section.split('/')[0],targetId=match[3],itemId=match[4];
@@ -46,6 +46,20 @@ export function createWorkspaceHandler({store,sessionUser,body,json}){
    if(!owns(input,['expected'])||input.expected!==true){json(res,400,{error:'Confirm member removal'});return true;}
    if(req.aborted||sessionUser(req)?.id!==user.id){json(res,401,{error:'Session changed during member removal'});return true;}
    if(!store.remove(workspaceId,user.id,targetId)){json(res,404,{error:'Member cannot be removed'});return true;}json(res,200,{ok:true});return true;
+  }
+  if(req.method==='DELETE'&&section===''){
+   if(req.headers.origin!==trustedOrigin){json(res,403,{error:'Origin mismatch'});return true;}
+   let input;try{input=await body(req,1024);}catch(error){json(res,error.status??400,{error:error.message});return true;}
+   if(!owns(input,['expected'])||input.expected!==true){json(res,400,{error:'Confirm workspace deletion'});return true;}
+   if(req.aborted||sessionUser(req)?.id!==user.id){json(res,401,{error:'Session changed during workspace deletion'});return true;}
+   if(!store.deleteWorkspace(workspaceId,user.id)){json(res,403,{error:'Only the workspace owner can delete it'});return true;}json(res,200,{ok:true});return true;
+  }
+  if(req.method==='PATCH'&&section==='owner'){
+   if(req.headers.origin!==trustedOrigin){json(res,403,{error:'Origin mismatch'});return true;}
+   let input;try{input=await body(req,1024);}catch(error){json(res,error.status??400,{error:error.message});return true;}
+   if(!owns(input,['userId'])||typeof input.userId!=='string'||input.userId.length<1||input.userId.length>100){json(res,400,{error:'Choose an active workspace member'});return true;}
+   if(req.aborted||sessionUser(req)?.id!==user.id){json(res,401,{error:'Session changed during ownership transfer'});return true;}
+   if(!store.transferOwner(workspaceId,user.id,input.userId)){json(res,403,{error:'Only the owner can transfer ownership to an active member'});return true;}json(res,200,{ok:true});return true;
   }
   if(req.method==='DELETE'&&resource==='items'&&itemId){
    if(req.headers.origin!==trustedOrigin){json(res,403,{error:'Origin mismatch'});return true;}
