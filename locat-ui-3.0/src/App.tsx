@@ -7,18 +7,8 @@ import { EntryFlow } from "./screens/auth/Entry";
 import { StateView, Button } from "./ui";
 import { ContextMenuProvider } from "./ui/ContextMenuProvider";
 import { DropProvider } from "./app/DropProvider";
-import { LiveDiagnostics } from "./integration/LiveDiagnostics";
-import { LiveContacts } from "./integration/LiveContacts";
-import { LiveOverview } from "./integration/LiveOverview";
-import { LiveDevices } from "./integration/LiveDevices";
-import { LivePrivateStore } from "./integration/LivePrivateStore";
-import { LiveModuleNotice } from "./integration/LiveModuleNotice";
 import { FilesLayout } from "./screens/private/FilesLayout";
 import { LiveAppLockGate } from "./integration/LiveAppLockGate";
-import { LiveCalendar } from "./integration/LiveCalendar";
-import { LiveShare } from "./integration/LiveShare";
-import { LiveWorkspace } from "./integration/LiveWorkspace";
-import { LiveAutomate } from "./integration/LiveAutomate";
 import { LiveAutomationMonitor } from "./integration/LiveAutomationMonitor";
 import { LiveCalendarReminderMonitor } from "./integration/LiveCalendarReminderMonitor";
 
@@ -35,6 +25,16 @@ const Offline = lazy(() => import("./screens/offline/Offline"));
 const Planned = lazy(() => import("./screens/planned/Planned"));
 const Gallery = lazy(() => import("./screens/gallery/Gallery"));
 const Settings = lazy(() => import("./screens/settings/Settings"));
+const LiveCalendar = lazy(() => import("./integration/LiveCalendar").then(module => ({ default: module.LiveCalendar })));
+const LiveShare = lazy(() => import("./integration/LiveShare").then(module => ({ default: module.LiveShare })));
+const LiveWorkspace = lazy(() => import("./integration/LiveWorkspace").then(module => ({ default: module.LiveWorkspace })));
+const LiveAutomate = lazy(() => import("./integration/LiveAutomate").then(module => ({ default: module.LiveAutomate })));
+const LiveDiagnostics = lazy(() => import("./integration/LiveDiagnostics").then(module => ({ default: module.LiveDiagnostics })));
+const LiveContacts = lazy(() => import("./integration/LiveContacts").then(module => ({ default: module.LiveContacts })));
+const LiveOverview = lazy(() => import("./integration/LiveOverview").then(module => ({ default: module.LiveOverview })));
+const LiveDevices = lazy(() => import("./integration/LiveDevices").then(module => ({ default: module.LiveDevices })));
+const LivePrivateStore = lazy(() => import("./integration/LivePrivateStore").then(module => ({ default: module.LivePrivateStore })));
+const LiveModuleNotice = lazy(() => import("./integration/LiveModuleNotice").then(module => ({ default: module.LiveModuleNotice })));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error?: Error }> {
   state: { error?: Error } = {};

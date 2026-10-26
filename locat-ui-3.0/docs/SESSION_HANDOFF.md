@@ -8,7 +8,7 @@ The scratch checkout had been pruned. It was restored from the remote branch at 
 
 The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, downloadable QR codes and local PWA share-target staging, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. PWA incoming text is kept in service-worker IndexedDB for one hour and requires sign-in and user review before an encrypted link is created. See `REWORK_SCOPE.md` for limits and the final evidence status.
 
-Local-only checkpoint `11df2b0` adds QR generation/download, PWA manifest/service-worker share reception, bounded one-use local handoffs, auth continuation for both PWA handoffs and encrypted-link fragments, and updated scope/evidence. `browser-tests/share-pwa.spec.mjs` now covers the installed service-worker path and sign-in continuation but cannot run until a browser binary is available. Keep all work local; do not push after the earlier automatic upload rejection.
+Local-only checkpoint `11df2b0` adds QR generation/download and PWA receive. Follow-up `88d7f65` adds the installed-service-worker browser spec; `d1f92b3` fixes one-use record consumption and adds a Node IndexedDB harness for queue bounds, expiry, and input rejection. Route splitting reduces the initial app JS chunk from 598 KB (181 KB gzip) to 339 KB (107 KB gzip); the separate Matrix crypto chunk remains about 1 MB. Keep all work local; do not push after the earlier automatic upload rejection.
 
 ## Active direction
 
