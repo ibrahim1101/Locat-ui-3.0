@@ -8,7 +8,7 @@ The scratch checkout had been pruned. It was restored from the remote branch at 
 
 The current source adds schema 19–22, account-scoped Calendar CRUD and foreground reminders, client-encrypted text Share links with expiry/revocation, downloadable QR codes and local PWA share-target staging, Workspace invitations/roles/shared notes/tasks, and one-time Automate reminders. PWA incoming text is kept in service-worker IndexedDB for one hour and requires sign-in and user review before an encrypted link is created. See `REWORK_SCOPE.md` for limits and the final evidence status.
 
-Local-only checkpoint `11df2b0` adds QR generation/download and PWA receive. Follow-up `88d7f65` adds the installed-service-worker browser spec; `d1f92b3` fixes one-use record consumption and adds a Node IndexedDB harness for queue bounds, expiry, and input rejection. After consuming a staged share, the owner's active links reload. Route splitting reduces the initial app JS chunk from 598 KB (181 KB gzip) to 339 KB (107 KB gzip); the separate Matrix crypto chunk remains about 1 MB. Keep all work local; do not push after the earlier automatic upload rejection.
+Local-only checkpoints `11df2b0`, `88d7f65`, `d1f92b3`, and `133b985` add QR/PWA share, browser and Node service-worker coverage, fix one-use consumption, and split live screens by route. The Share screen reloads active links after consumption and guides installation through the browser prompt or menu. Route splitting reduces the initial app JS chunk from 598 KB (181 KB gzip) to 339 KB (107 KB gzip); the separate Matrix crypto chunk remains about 1 MB. Keep all work local; do not push after the earlier automatic upload rejection.
 
 ## Active direction
 
@@ -40,7 +40,7 @@ Home now projects recent conversations from encrypted rooms authorized for the c
 
 ## Validation and hosted status
 
-The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 112 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 8 browser specs, including a new PWA share handoff flow, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI and service-worker harness coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
+The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 307 frontend tests across 73 files and 112 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 8 browser specs, including a new PWA share handoff flow, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI and service-worker harness coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
 
 Older hosted runs below describe earlier, published code and are historical only; they do not validate this restored branch tip or the rebuilt local modules. Physical Windows/Android checks, independent security review, deployment/upgrade/rollback, recovery, and hosting remain open release gates.
 

@@ -27,3 +27,9 @@ it('restores a locally received PWA share for review without sending it to the s
  await waitFor(()=>expect(requests).toHaveBeenCalledWith('/api/share',expect.objectContaining({headers:expect.objectContaining({'X-Locat-Account':session.user.id})})));
  expect(requests.mock.calls.every(([path,options])=>path==='/api/share'&&(!options?.method||options.method==='GET'))).toBe(true);
 });
+
+it('offers browser installation and hides the prompt after acceptance',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>reply({shares:[]})));const prompt=vi.fn(async()=>{}),event=Object.assign(new Event('beforeinstallprompt',{cancelable:true}),{prompt,userChoice:Promise.resolve({outcome:'accepted' as const})});
+ render(<MemoryRouter><LiveShare/></MemoryRouter>);window.dispatchEvent(event);fireEvent.click(await screen.findByRole('button',{name:'Install Locat'}));
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Install Locat'})).not.toBeInTheDocument());expect(prompt).toHaveBeenCalledOnce();
+});
