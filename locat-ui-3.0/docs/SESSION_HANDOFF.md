@@ -40,7 +40,7 @@ Home now projects recent conversations from encrypted rooms authorized for the c
 
 ## Validation and hosted status
 
-The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 111 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 8 browser specs, including a new PWA share handoff flow, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
+The restored source has no hosted CI result yet. Local TypeScript and ESLint pass; `npm run test:all` passes 306 frontend tests across 73 files and 112 server tests; production build succeeds with the existing large Matrix chunk advisory. Playwright discovers 8 browser specs, including a new PWA share handoff flow, but no Chromium or Firefox executable is installed in this restored workspace, so browser acceptance for this source has not run. Share QR and PWA staging/review have UI and service-worker harness coverage, but installed-PWA receive, sign-in continuation and recipient flow still need real-browser acceptance.
 
 Older hosted runs below describe earlier, published code and are historical only; they do not validate this restored branch tip or the rebuilt local modules. Physical Windows/Android checks, independent security review, deployment/upgrade/rollback, recovery, and hosting remain open release gates.
 
