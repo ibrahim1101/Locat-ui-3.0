@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DATABASE_SCHEMA_VERSION} from './database.mjs';
 const MAX_BYTES=2*1024*1024*1024;
-const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides'],['linkProofChallenges','linkProofTokens'],[],['calendarEvents'],['encryptedShares'],['workspaces','workspaceMembers','workspaceItems'],['automationRules']];
+const groups=[['users','sessions','envelopes'],['preferences','audit'],['contacts','blocks'],[],['sentinelTokens','sentinelIncidents','sentinelEvents'],['privateStores','privateObjects'],['linkDevices','linkPairs'],['linkPayloads','linkPayloadChunks'],['remoteSessions','remoteSignals'],[],['serverMetadata'],['matrixAccounts','matrixBindings'],['matrixRevocations'],['matrixManagedDevices'],['matrixConversations'],['mediaShareOverrides'],['linkProofChallenges','linkProofTokens'],[],['calendarEvents'],['encryptedShares'],['workspaces','workspaceMembers','workspaceItems'],['automationRules'],[]];
 const retiredTables=new Set(['sentinelTokens','sentinelIncidents','sentinelEvents','remoteSessions','remoteSignals','mediaShareOverrides']);
 const columns={
  mediaShareOverrides:['libraryId','ownerId','friendId','allowed','updatedAt'],
@@ -53,6 +53,7 @@ export async function withVerifiedServerBackup(filename,{expectedSha256}={},cons
   for(const name of requiredTables){
    const actual=new Set(sql.prepare('PRAGMA table_info('+name+')').all().map(row=>row.name)),required=[...columns[name]];
    if(name==='users'&&schemaVersion>=4)required.push('lcCode','bio');if(name==='users'&&schemaVersion>=10)required.push('profileVisibility','usernameVisibility','allowContactRequests');
+   if(name==='automationRules'&&schemaVersion>=23)required.push('repeatMs');
    for(const column of required)if(!actual.has(column))throw new Error('Backup is missing required Locat columns');
   }
   const counts={};for(const name of ['users','envelopes','privateObjects','linkDevices','matrixBindings'])if(tables.has(name))counts[name]=sql.prepare('SELECT COUNT(*) AS n FROM '+name).get().n;

@@ -77,7 +77,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
-    assert.equal(diagnostics.database.schemaVersion, 22); assert.equal(diagnostics.database.accessible, true);
+    assert.equal(diagnostics.database.schemaVersion, 23); assert.equal(diagnostics.database.accessible, true);
     assert.equal(diagnostics.privateMessaging, "not-enabled"); assert.ok(!JSON.stringify(diagnostics).includes(dir));
     assert.equal((await request('/api/calendar/events?from=1&to=2')).status,401);
     const calendarFrom=Date.now(),calendarTo=calendarFrom+7*24*60*60_000;
@@ -121,9 +121,10 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},bobCookie)).status,200);
     assert.equal((await request(`/api/workspaces/${workspace.id}/items/${item.id}`,'PATCH',{expectedRevision:item.revision,title:item.title,content:item.content,state:'done'},aliceCookie)).status,409);
     assert.equal((await request('/api/automate/rules','GET',undefined,aliceCookie)).status,200);
-    const scheduledAt=Date.now()+5*60_000,scheduled=await request('/api/automate/rules','POST',{title:'Take a break',details:'Stretch',runAt:scheduledAt},aliceCookie);assert.equal(scheduled.status,201);const {rule}=await scheduled.json();
+    const scheduledAt=Date.now()+5*60_000,scheduled=await request('/api/automate/rules','POST',{title:'Take a break',details:'Stretch',runAt:scheduledAt,repeatMs:86_400_000},aliceCookie);assert.equal(scheduled.status,201);const {rule}=await scheduled.json();assert.equal(rule.repeatMs,86_400_000);
+    assert.equal((await request('/api/automate/rules','POST',{title:'Unsupported cadence',details:'',runAt:Date.now()+5*60_000,repeatMs:90_000},aliceCookie)).status,400);
     assert.equal((await request('/api/automate/rules','POST',{title:'Too soon',details:'',runAt:Date.now()+10_000},aliceCookie)).status,400);
-    assert.equal((await request('/api/automate/rules/'+rule.id,'PATCH',{expectedRevision:rule.revision,title:'Water break',details:'Drink water',runAt:scheduledAt,enabled:false},aliceCookie)).status,200);
+    const changed=await request('/api/automate/rules/'+rule.id,'PATCH',{expectedRevision:rule.revision,title:'Water break',details:'Drink water',runAt:scheduledAt,enabled:false,repeatMs:604_800_000},aliceCookie);assert.equal(changed.status,200);assert.equal((await changed.json()).rule.repeatMs,604_800_000);
     assert.equal((await request('/api/automate/rules/'+rule.id,'DELETE',{expectedRevision:rule.revision},aliceCookie)).status,409);
     const changedRule=(await (await request('/api/automate/rules','GET',undefined,aliceCookie)).json()).rules[0];assert.equal(changedRule.enabled,false);
     assert.equal((await request('/api/automate/dispatch','POST',{},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
