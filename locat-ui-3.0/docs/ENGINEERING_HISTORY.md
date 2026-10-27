@@ -156,3 +156,5 @@ GitHub publication checkpoint: the approved development-branch push was attempte
 ## Optional scheduled backup timer
 
 Added an opt-in systemd oneshot and daily timer for the single-host Linux package. It uses SQLite's online snapshot CLI, verifies each unique timestamped output before success, keeps files owner-only and never overwrites or prunes them. This improves backup execution repeatability while leaving retention and off-host copying under explicit operator control. Shell syntax and systemd unit/timer verification pass. Physical timer execution and restore drills remain open acceptance.
+
+The backup script was exercised end-to-end against a temporary SQLite database: it created a new timestamped snapshot, the verifier reported `ok` integrity and foreign keys for schema 28, and the temporary files were removed afterward. The sample systemd units also pass `systemd-analyze verify`; this does not replace a physical timer or restore drill.
