@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
 import { LiveOverview } from "./LiveOverview";
@@ -9,6 +9,9 @@ vi.mock("../app/session", () => ({ useSession: () => ({
   availability: () => ({ availability: "available", reason: "" }),
 }) }));
 vi.mock("./accountRequest", () => ({ accountRequest }));
+vi.mock("./LiveHomeConversations", () => ({
+  LiveHomeConversations: ({ onOpen }: { onOpen(accountId: string): void }) => <button type="button" onClick={() => onOpen("peer-account")}>Synthetic decrypted conversation</button>,
+}));
 
 function CurrentLocation() {
   const location = useLocation();
@@ -21,7 +24,10 @@ it("shows truthful live Home state and opens the server-backed Requests section"
   accountRequest.mockResolvedValue({ contacts: [{ status: "pending", direction: "incoming", user: { id: "requester", displayName: "Synthetic requester" } }] });
   render(<MemoryRouter initialEntries={["/home"]}><LiveOverview kind="home" /><CurrentLocation /></MemoryRouter>);
   expect(screen.getByRole("heading", { name: "Welcome, Synthetic browser account" })).toBeVisible();
-  expect(screen.getByRole("region", { name: "Recent conversations" })).toHaveTextContent("not connected to this dashboard yet");
+  const conversations = screen.getByRole("region", { name: "Recent conversations" });
+  expect(within(conversations).getByRole("button", { name: "Synthetic decrypted conversation" })).toBeVisible();
+  fireEvent.click(within(conversations).getByRole("button", { name: "Synthetic decrypted conversation" }));
+  expect(screen.getByTestId("current-location")).toHaveTextContent("/messages/peer-account");
   expect(screen.queryByText("Mira Okafor")).toBeNull();
   expect(screen.queryByText("Studio Desktop")).toBeNull();
   expect(await screen.findByText("Incoming requests")).toBeVisible();
