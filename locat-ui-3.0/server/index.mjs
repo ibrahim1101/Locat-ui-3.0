@@ -239,6 +239,7 @@ async function handle(req, res) {
   }
   if (url.pathname === "/api/users/search") {
     if(req.method!=='POST')return json(res,405,{error:'User search requires POST.'},{Allow:'POST'});
+    if(url.search)return json(res,400,{error:'Search terms must be sent in the request body.'});
     if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });

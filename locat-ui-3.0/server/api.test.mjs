@@ -63,6 +63,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     const bobLogin = await request("/api/auth/login", "POST", { username: "bob", password });
     const bobCookie = bobLogin.headers.get("set-cookie").split(";")[0];
     assert.equal((await request('/api/users/search?q=bob')).status,405,'Discovery queries are not accepted in URLs');
+    assert.equal((await request('/api/users/search?q=leaked','POST',{q:'bob'},aliceCookie)).status,400,'POST discovery also rejects URL query parameters');
     assert.equal((await request('/api/users/search','POST',{q:'bob'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
     assert.equal((await request('/api/users/search','POST',{q:'bob',extra:true},aliceCookie)).status,400);
     const bob = (await (await request("/api/users/search", "POST", {q:"bob"}, aliceCookie)).json()).users[0];
