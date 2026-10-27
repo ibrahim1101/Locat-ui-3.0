@@ -10,7 +10,7 @@ export async function privateStoreRequest(path:string,input?:unknown,signal?:Abo
   if(!response.ok)throw new Error(data.error??'Private-store request failed');
   return data;
  }catch(error){
-  if(timedOut)throw new Error(input===undefined?'Encrypted-store request timed out. Try again when the server is reachable.':'Encrypted-store request timed out. A change may have completed; lock and unlock to refresh before retrying.');
+  if(timedOut)throw new Error(input===undefined?'Encrypted-store request timed out. Try again when the server is reachable.':'Encrypted-store request timed out. A change may have completed; lock and unlock to refresh before retrying.',{cause:error});
   throw error;
  }finally{clearTimeout(deadline);signal?.removeEventListener('abort',cancel);}
 }

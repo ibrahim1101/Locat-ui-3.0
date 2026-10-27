@@ -8,6 +8,6 @@ export async function linkRequest(path:string,input?:unknown,proof?:string,signa
  try{
   const response=await fetch('/api/link/'+path,{signal:controller.signal,credentials:'same-origin',cache:'no-store',headers:{...(input===undefined?{}:{'Content-Type':'application/json'}),...(proof?{'X-Locat-Device-Proof':proof}:{}),...(accountId?{'X-Locat-Account':accountId}:{})},...(input===undefined?{}:{method:'POST',body:JSON.stringify(input)})});
   const data=await response.json();if(!response.ok)throw new LinkResponseError(response.status,data.error??'Device operation failed');return data;
- }catch(error){if(timedOut)throw new Error(input===undefined?'Link request timed out. Refresh when the server is reachable.':'Link request timed out. The action may have completed; refresh before trying again.');throw error;}
+ }catch(error){if(timedOut)throw new Error(input===undefined?'Link request timed out. Refresh when the server is reachable.':'Link request timed out. The action may have completed; refresh before trying again.',{cause:error});throw error;}
  finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
 }

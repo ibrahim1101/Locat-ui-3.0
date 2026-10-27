@@ -110,6 +110,6 @@ export function currentState(storage = browserStorage("localStorage"), session =
 export function shouldAutoLock(now: number, storage = browserStorage("localStorage"), session = browserStorage("sessionStorage")) {
   const state = currentState(storage, session); if (!state.configured || !state.unlocked || !state.config) return false;
   const option = AUTO_LOCK_OPTIONS.find(item => item.id === state.config!.autoLockOption)!; if (!Number.isFinite(option.ms)) return false;
-  let raw: string | null = null; try { raw = session?.getItem(ACTIVITY_KEY) ?? null; } catch { return true; }
+  let raw: string | null; try { raw = session?.getItem(ACTIVITY_KEY) ?? null; } catch { return true; }
   const last = Number(raw); return !raw || !Number.isFinite(last) || now - last >= option.ms;
 }

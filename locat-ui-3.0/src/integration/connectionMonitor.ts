@@ -8,7 +8,7 @@ export function monitorConnection(report:(state:ConnectionHealth)=>void){
   clearTimeout(timer);
   if(navigator.onLine===false){report('unreachable');return;}
   const controller=new AbortController();request=controller;const deadline=setTimeout(()=>controller.abort(),5000);
-  let reachable=false;
+  let reachable:boolean;
   try{const response=await fetch('/api/ready',{cache:'no-store',credentials:'omit',signal:controller.signal});reachable=response.ok&&(await response.json()).app==='Locat';}catch{reachable=false;}finally{clearTimeout(deadline);request=null;}
   if(stopped)return;
   report(reachable?'connected':'unreachable');failures=reachable?0:Math.min(failures+1,6);
