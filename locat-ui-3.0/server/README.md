@@ -25,7 +25,7 @@ Open http://127.0.0.1:5173. Vite proxies /api to 127.0.0.1:8787. Run `npm run te
 | GET | /api/auth/me | Current authenticated account |
 | POST | /api/auth/logout | Revoke session |
 | GET | /api/users/search?q=username | Exact username lookup (authenticated) |
-| GET | /api/workspaces/search?q=term | Active-member note/task/file-name search; 50 results and 30 requests per minute per account |
+| POST | /api/search with {q} | Active-member Workspace note/task/file names and personal or active-workspace Calendar title/note search; Origin-checked, 50 results and 30 requests per minute per account. Terms are sent in the body, not the URL. |
 | GET/POST | /api/share | List owned links or create an encrypted link with expiry and bounded opens |
 | GET/DELETE | /api/share/:id | Rate-limited ciphertext retrieval or owner revocation |
 | GET | /api/messages | Retired route: 501 |

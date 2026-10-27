@@ -334,6 +334,7 @@ function calendarStore(sql) {
         sql.exec('COMMIT');return true;
       } catch(error) { sql.exec('ROLLBACK');throw error; }
     },
+    search(userId,query){const term=query.trim();if(term.length<2)return[];return sql.prepare(`SELECT e.id,e.workspaceId,COALESCE(w.name,'Personal calendar') AS workspaceName,'calendar' AS type,e.title,CASE WHEN instr(lower(e.notes),lower(?))>0 THEN substr(e.notes,max(1,instr(lower(e.notes),lower(?))-80),160) ELSE '' END AS snippet,e.startsAt AS updatedAt,e.startsAt FROM calendarEvents e LEFT JOIN workspaces w ON w.id=e.workspaceId WHERE ((e.workspaceId IS NULL AND e.userId=?) OR (e.workspaceId IS NOT NULL AND EXISTS(SELECT 1 FROM workspaceMembers m WHERE m.workspaceId=e.workspaceId AND m.userId=? AND m.status='active'))) AND (instr(lower(e.title),lower(?))>0 OR instr(lower(e.notes),lower(?))>0) ORDER BY e.startsAt DESC,e.id LIMIT 50`).all(term,term,userId,userId,term,term);},
     dueReminders:(userId,now)=>sql.prepare('SELECT id,title,startsAt,reminderAt FROM calendarEvents WHERE userId=? AND workspaceId IS NULL AND reminderAt IS NOT NULL AND reminderAt<=? AND startsAt>? ORDER BY reminderAt,id LIMIT 100').all(userId,now,now),
   };
 }

@@ -51,5 +51,5 @@ export interface AdminAdapter {
 }
 
 /* ── Search (M4) ─────────────────────────────────────────────────── */
-export type SearchScope = "messages" | "attachments" | "contacts" | "modules" | "settings" | "workspace";
+export type SearchScope = "messages" | "attachments" | "contacts" | "modules" | "settings" | "workspace" | "calendar";
 export type SearchResultView = { id: Id; scope: SearchScope; title: string; subtitle: string; route: string };

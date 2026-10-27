@@ -27,6 +27,7 @@ import { createPrivateHandler } from "./privateStore.mjs";
 import { createCalendarHandler } from './calendar.mjs';
 import { createShareHandler } from './share.mjs';
 import { createWorkspaceHandler } from './workspace.mjs';
+import { createSearchHandler } from './search.mjs';
 import { createAutomationHandler } from './automate.mjs';
 import { openDatabase } from "./database.mjs";
 
@@ -96,6 +97,7 @@ const privateHandler = createPrivateHandler({store:db.privateStore,sessionUser,s
 const calendarHandler=createCalendarHandler({store:db.calendar,sessionUser,body,json});
 const shareHandler=createShareHandler({store:db.encryptedShares,sessionUser,body,json,readLimit:shareReadLimit});
 const workspaceHandler=createWorkspaceHandler({store:db.workspaces,sessionUser,body,json});
+const searchHandler=createSearchHandler({workspaces:db.workspaces,calendar:db.calendar,sessionUser,body,json});
 const automationHandler=createAutomationHandler({store:db.automations,sessionUser,body,json});
 try{db.encryptedShares.purgeExpired();}catch(error){console.error('Encrypted share startup cleanup failed:',error instanceof Error?error.message:'unknown error');}
 const shareExpirySweep=setInterval(()=>{try{db.encryptedShares.purgeExpired();}catch(error){console.error('Encrypted share cleanup failed:',error instanceof Error?error.message:'unknown error');}},60*60_000);
@@ -114,6 +116,7 @@ async function handle(req, res) {
   if (await privateHandler(req,res,url,trustedOrigin)) return;
   if (await calendarHandler(req,res,url,trustedOrigin)) return;
   if (await shareHandler(req,res,url,trustedOrigin)) return;
+  if (await searchHandler(req,res,url,trustedOrigin)) return;
   if (await workspaceHandler(req,res,url,trustedOrigin)) return;
   if (await automationHandler(req,res,url,trustedOrigin)) return;
   if (req.method === "GET" && url.pathname === "/.well-known/locat") return json(res,200,{
