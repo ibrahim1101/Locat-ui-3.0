@@ -1,6 +1,6 @@
 # Locat UI 3.0 session handoff
 
-Updated 2026-10-27. Continue the development branch `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The 36-commit feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; documentation-only follow-ups record the final validation and publication details. The latest remote tree matches local `HEAD`. GitHub's connector recreated the commits, so remote commit SHAs differ. The local branch still contains the original SHAs and must not be pushed directly over the published branch.
+Updated 2026-10-27. Continue the development branch `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The 36-commit feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; documentation-only follow-ups record the final validation and publication details. The latest remote tree matches local `HEAD`. GitHub's connector recreated the commits, so remote commit SHAs differ. The active local checkout tracks the connector-created history at `8eaebb7cb514003503d025a48ea3f9bb136c09e9`; the original local history is preserved in `archive/local-original-history-2026-10-27`.
 
 Read [REWORK_SCOPE.md](REWORK_SCOPE.md) and [LOCAT_INTEGRATION_EXECUTION_TRACKER.md](LOCAT_INTEGRATION_EXECUTION_TRACKER.md) first. [ENGINEERING_HISTORY.md](ENGINEERING_HISTORY.md) records implementation and validation decisions. The repository-level [session handoff](../../docs/SESSION_HANDOFF.md) records publication and remaining release gates.
 
