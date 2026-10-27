@@ -72,7 +72,7 @@ export default function Search() {
   const termReady = q.trim().length >= 2;
 
   return (
-    <Screen title="Search" testId="search-screen" toolbar={<><SearchField autoFocus value={q} onChange={setQ} placeholder="Search people, workspace and modules" testId="global-search-input" />
+    <Screen title="Search" testId="search-screen" toolbar={<><SearchField autoFocus value={q} onChange={setQ} maxLength={100} placeholder="Search people, Workspace, Calendar and modules" testId="global-search-input" />
       <ChipRow label="Scope" value={scope} onChange={setScope} options={[{ value: "all", label: "All" }, { value: "contacts", label: "People" }, { value: "workspace", label: "Workspace" }, { value: "calendar", label: "Calendar" }, { value: "modules", label: "Modules" }, { value: "messages", label: "Messages" }, { value: "attachments", label: "Files" }]} /></>}>
       <div className="mx-auto max-w-3xl">
         <Banner className="mb-5" tone="info" icon={Lock} title={preview ? "Preview search uses fictional content" : "Private messages stay on this device"}>
@@ -82,7 +82,7 @@ export default function Search() {
         {contactError && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-danger/10 p-3 text-sm text-danger"><span role="alert">Contacts could not be loaded: {contactError}</span><Button size="sm" variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></div>}
         {!preview && user && !contactsLoaded && !contactError && <p role="status" className="mb-4 text-sm text-ink-3">Loading your contacts…</p>}
         {!termReady ? <StateView compact kind="empty" title="Type at least 2 characters" body="Results are grouped into people, shared content, Calendar and modules." />
-          : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body={preview ? "Try a sample name, message or module." : scope === "messages" || scope === "attachments" ? "Open a conversation to search its locally decrypted messages." : "Try another name or module."} />
+          : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body={preview ? "Try a sample name, message or module." : scope === "messages" || scope === "attachments" ? "Open a conversation to search its locally decrypted messages." : "Try another name, content term or module."} />
           : groups.map((group) => <Section key={group} title={group}>{results.filter((result) => result.scope === group).map((result) => <ListRow key={result.id} icon={ICON[result.scope]} title={result.title} subtitle={result.subtitle} onClick={() => nav(result.route)} chevron testId={`result-${result.id}`} />)}</Section>)}
       </div>
     </Screen>

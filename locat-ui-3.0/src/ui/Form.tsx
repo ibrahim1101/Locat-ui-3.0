@@ -22,11 +22,11 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps>(function TextF
   );
 });
 
-export function SearchField({ value, onChange, placeholder, className, autoFocus, testId }: { value: string; onChange(v: string): void; placeholder: string; className?: string; autoFocus?: boolean; testId?: string }) {
+export function SearchField({ value, onChange, placeholder, className, autoFocus, testId, maxLength }: { value: string; onChange(v: string): void; placeholder: string; className?: string; autoFocus?: boolean; testId?: string; maxLength?: number }) {
   return (
     <div className={cn("flex h-11 items-center gap-2 rounded-xl bg-s2 px-3 hairline focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--ember))] md:h-10", className)}>
       <Search className="size-[18px] shrink-0 text-ink-3" aria-hidden />
-      <input data-testid={testId} autoFocus={autoFocus} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
+      <input data-testid={testId} autoFocus={autoFocus} maxLength={maxLength} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
         className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-hidden placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ember md:text-sm [&::-webkit-search-cancel-button]:hidden" />
       {value && <button aria-label="Clear search" onClick={() => onChange("")} className="grid size-7 place-items-center rounded-md text-ink-3 hover:text-ink"><X className="size-4" /></button>}
     </div>
