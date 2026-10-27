@@ -307,6 +307,11 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.ok(events.some(event => event.event === "password.changed"));
     assert.ok(events.some(event => event.event === "login.failed"));
     assert.equal((await request("/api/security/events")).status, 401);
+    let limitedSearch;
+    for(let attempt=0;attempt<60;attempt++)limitedSearch=await request('/api/users/search?q=bob','GET',undefined,updatedCookie);
+    assert.equal(limitedSearch.status,429);
+    assert.ok(Number(limitedSearch.headers.get('retry-after'))>0);
+    assert.equal((await request('/api/users/search?q=alice','GET',undefined,bobCookie)).status,200,'User search quota is scoped to the authenticated account');
     assert.equal((await request("/api/auth/logout", "POST", undefined, updatedCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, updatedCookie)).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);

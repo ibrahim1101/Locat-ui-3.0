@@ -21,7 +21,7 @@ import { serverConfig, requestClientAddress, requestOrigin } from "./config.mjs"
 import { serveStatic } from "./static.mjs";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
-import { createLayeredRateLimiter } from "./rateLimit.mjs";
+import { createLayeredRateLimiter, createRateLimiter } from "./rateLimit.mjs";
 import { createLinkHandler } from "./link.mjs";
 import { createPrivateHandler } from "./privateStore.mjs";
 import { createCalendarHandler } from './calendar.mjs';
@@ -45,6 +45,8 @@ const matrixCleanup=matrixProvisioner?createMatrixRevocationWorker({store:db.mat
 const { host, port } = config;
 const authLimit = createLayeredRateLimiter({clientAddress:req=>requestClientAddress(req,config)});
 const shareReadLimit=createLayeredRateLimiter({peerMaximum:1200,clientMaximum:60,windowMs:60000,clientAddress:req=>requestClientAddress(req,config)});
+const userSearchPeerLimit=createLayeredRateLimiter({peerMaximum:600,clientMaximum:300,windowMs:60000,clientAddress:req=>requestClientAddress(req,config)});
+const userSearchLimit=createRateLimiter(60,60000);
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 let queue = Promise.resolve();
 
@@ -238,6 +240,8 @@ async function handle(req, res) {
   if (req.method === "GET" && url.pathname === "/api/users/search") {
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });
+    const retryAfter=Math.max(userSearchPeerLimit(req),userSearchLimit(viewer.id));
+    if(retryAfter)return json(res,429,{error:"Too many user searches. Try again later."},{"Retry-After":String(retryAfter)});
     const query = localDiscoveryQuery(url.searchParams.get("q") ?? "",config.origin);
     const code = /^(?:lc-)?([1-9][0-9]{3})$/.exec(query)?.[1];
     if (!code && !/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires an exact username or LC-1234 identity" });
