@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
 import Search from "./Search";
 
@@ -12,6 +12,7 @@ vi.mock("@/app/session", () => ({ useSession: () => state }));
 vi.mock("@/integration/accountRequest", () => ({ accountRequest }));
 
 afterEach(() => { vi.clearAllMocks(); state.adapter.mode = "server"; });
+function LocationEcho(){const location=useLocation();return <output data-testid="current-location">{location.pathname+location.search}</output>; }
 
 it("searches account-owned contacts in live mode without leaking preview messages or people", async () => {
   accountRequest.mockResolvedValue({ contacts: [{ status: "accepted", user: { id: "peer-1", displayName: "Morgan Vale", username: "morgan", lcCode: "LC-2345" } }] });
@@ -45,5 +46,5 @@ it("shows an honest empty result when the live account has no contacts", async (
 
 it("finds real active Workspace notes through the scoped server search",async()=>{
  accountRequest.mockImplementation(async(path:string)=>path==="/api/contacts"?{contacts:[]}:{results:[{id:"item-a",workspaceId:"workspace-a",workspaceName:"Release team",type:"task",title:"Prepare launch",snippet:"Confirm migration plan",updatedAt:1}]});
- render(<MemoryRouter><Search /></MemoryRouter>);fireEvent.change(screen.getByTestId("global-search-input"),{target:{value:"launch"}});expect(await screen.findByText("Prepare launch")).toBeVisible();expect(screen.getByText(/Release team · task · Confirm migration plan/)).toBeVisible();await waitFor(()=>expect(accountRequest).toHaveBeenCalledWith("/api/workspaces/search?q=launch","account-a",undefined,expect.any(AbortSignal)));
+ render(<MemoryRouter><Search /><LocationEcho /></MemoryRouter>);fireEvent.change(screen.getByTestId("global-search-input"),{target:{value:"launch"}});expect(await screen.findByText("Prepare launch")).toBeVisible();expect(screen.getByText(/Release team · task · Confirm migration plan/)).toBeVisible();await waitFor(()=>expect(accountRequest).toHaveBeenCalledWith("/api/workspaces/search?q=launch","account-a",undefined,expect.any(AbortSignal)));fireEvent.click(screen.getByTestId("result-item-a"));expect(screen.getByTestId("current-location")).toHaveTextContent("/workspace?workspace=workspace-a&item=item-a");
 });
