@@ -36,13 +36,20 @@ it("keeps clearly fictional search results in preview mode", async () => {
 });
 
 it("shows an honest empty result when the live account has no contacts", async () => {
-  accountRequest.mockResolvedValue({ contacts: [] });
+  accountRequest.mockImplementation(async(path:string)=>path==="/api/contacts"?{contacts:[]}:{results:[]});
   render(<MemoryRouter><Search /></MemoryRouter>);
   fireEvent.change(screen.getByTestId("global-search-input"), { target: { value: "Mira" } });
   expect(await screen.findByText('No results for "Mira"')).toBeVisible();
   expect(screen.queryByText("Loading your contacts…")).toBeNull();
 });
 
+it("shows server search progress until the bounded search request finishes",async()=>{
+ let finishSearch!:(value:{results:never[]})=>void;
+ accountRequest.mockImplementation((path:string)=>path==="/api/contacts"?Promise.resolve({contacts:[]}):new Promise<{results:never[]}>(resolve=>{finishSearch=resolve;}));
+ render(<MemoryRouter><Search /></MemoryRouter>);fireEvent.change(screen.getByTestId("global-search-input"),{target:{value:"launch"}});
+ expect(await screen.findByText("Searching Workspace and Calendar…")).toBeVisible();expect(screen.queryByText('No results for "launch"')).toBeNull();await waitFor(()=>expect(accountRequest).toHaveBeenCalledWith("/api/search","account-a",{q:"launch"},expect.any(AbortSignal)));finishSearch({results:[]});
+ expect(await screen.findByText('No results for "launch"')).toBeVisible();expect(screen.queryByText("Searching Workspace and Calendar…")).toBeNull();
+});
 
 it("finds real active Workspace notes through the scoped server search",async()=>{
  accountRequest.mockImplementation(async(path:string)=>path==="/api/contacts"?{contacts:[]}:{results:[{id:"item-a",workspaceId:"workspace-a",workspaceName:"Release team",type:"task",title:"Prepare launch",snippet:"Confirm migration plan",updatedAt:1},{id:"event-a",workspaceId:"workspace-a",workspaceName:"Release team",type:"calendar",title:"Launch review",snippet:"Discuss launch",startsAt:1800000000000,updatedAt:1800000000000}]});

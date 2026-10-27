@@ -49,6 +49,9 @@ export default function Search() {
     return()=>{window.clearTimeout(timer);control.abort();};
   },[preview,user?.id,q]);
   const workspaceSearchError=currentAccountId&&workspaceState?.accountId===currentAccountId&&workspaceState.query===q.trim()?workspaceState.error??'':'';
+  const termReady=q.trim().length>=2;
+  const serverSearchMatches=Boolean(currentAccountId&&workspaceState?.accountId===currentAccountId&&workspaceState.query===q.trim()&&(workspaceState.results!==undefined||workspaceState.error!==undefined));
+  const serverSearchPending=!preview&&Boolean(currentAccountId)&&termReady&&!serverSearchMatches;
 
   const results = useMemo<SearchResultView[]>(() => {
     const workspaceResults=currentAccountId&&workspaceState?.accountId===currentAccountId&&workspaceState.query===q.trim()?workspaceState.results??EMPTY_WORKSPACE_RESULTS:EMPTY_WORKSPACE_RESULTS;
@@ -69,7 +72,6 @@ export default function Search() {
     ].filter((result) => scope === "all" || result.scope === scope);
   }, [q, scope, preview, contacts, currentAccountId, workspaceState]);
   const groups = [...new Set(results.map((result) => result.scope))];
-  const termReady = q.trim().length >= 2;
 
   return (
     <Screen title="Search" testId="search-screen" toolbar={<><SearchField autoFocus value={q} onChange={setQ} maxLength={100} placeholder="Search people, Workspace, Calendar and modules" testId="global-search-input" />
@@ -79,9 +81,11 @@ export default function Search() {
           {preview ? "Sample messages and people are for layout preview only." : "Global search covers accepted contacts, authorized Workspace content, Calendar events, and Locat modules. Search encrypted message text inside an open conversation; it is never sent to the server."}
         </Banner>
         {workspaceSearchError&&<p role="alert" className="mb-4 text-sm text-danger">Server search is unavailable: {workspaceSearchError}</p>}
+        {serverSearchPending&&<p role="status" className="mb-4 text-sm text-ink-3">Searching Workspace and Calendar…</p>}
         {contactError && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-danger/10 p-3 text-sm text-danger"><span role="alert">Contacts could not be loaded: {contactError}</span><Button size="sm" variant="ghost" onClick={() => setAttempt(value => value + 1)}>Retry</Button></div>}
         {!preview && user && !contactsLoaded && !contactError && <p role="status" className="mb-4 text-sm text-ink-3">Loading your contacts…</p>}
         {!termReady ? <StateView compact kind="empty" title="Type at least 2 characters" body="Results are grouped into people, shared content, Calendar and modules." />
+          : !results.length && serverSearchPending ? null
           : !results.length ? <StateView compact kind="empty" title={`No results for "${q}"`} body={preview ? "Try a sample name, message or module." : scope === "messages" || scope === "attachments" ? "Open a conversation to search its locally decrypted messages." : "Try another name, content term or module."} />
           : groups.map((group) => <Section key={group} title={group}>{results.filter((result) => result.scope === group).map((result) => <ListRow key={result.id} icon={ICON[result.scope]} title={result.title} subtitle={result.subtitle} onClick={() => nav(result.route)} chevron testId={`result-${result.id}`} />)}</Section>)}
       </div>

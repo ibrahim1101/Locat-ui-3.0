@@ -170,6 +170,10 @@ The global Search input now enforces the same 100-character maximum as the serve
 
 Added `.github/workflows/ci.yml` with Node 24 type/lint/frontend+server test/build checks, followed by independent Chromium and Firefox Playwright jobs with retained JSON and browser artifacts. Workflow YAML parses locally. `actionlint` is not installed, and GitHub cannot run the workflow until the development branch can be pushed; no hosted result is claimed.
 
+Global Search now shows an in-progress status during the 250 ms debounce and server request, and suppresses the empty state until the bounded query resolves. The first focused regression failed because the empty panel remained visible and the prior fixture returned no `results` field; the UI now waits for a matched result/error state and the mock returns the API shape. All five focused Search tests pass.
+
+Final validation after the pending-state change passes TypeScript, ESLint, all 325 frontend tests across 74 files, all 119 server tests, and the production build. Playwright continues to list eight specs; browser execution remains unavailable because neither browser binary is installed.
+
 ## Nginx authenticated WebSocket forwarding
 
 The self-hosted Nginx example now redirects HTTP to HTTPS and forwards Upgrade/Connection headers on the exact authenticated `/api/connect/socket` endpoint. This was missing from the first sample and would leave live connection health unavailable through the proxy while ordinary HTTP readiness still worked. The deployment guide now includes a signed-in WSS health check and explains the socket carries health only. The Nginx executable is unavailable in this workspace, so host-level syntax and proxy acceptance remain open. A second approved development-branch push attempt still fails because Git cannot read a GitHub username/credential; the local feature branch remains committed and unchanged at the remote boundary.
