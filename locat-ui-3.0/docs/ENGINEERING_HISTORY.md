@@ -151,3 +151,8 @@ Global Search now queries active Workspace memberships for title/content matches
 
 
 GitHub publication checkpoint: the approved development-branch push was attempted directly after local validation, but HTTPS Git failed with `could not read Username for 'https://github.com': No such device or address`. No alternate upload route was used. Current local feature branch contains the approved work and remains ahead of the remote; merge/deploy/release remain unauthorized.
+
+
+## Optional scheduled backup timer
+
+Added an opt-in systemd oneshot and daily timer for the single-host Linux package. It uses SQLite's online snapshot CLI, verifies each unique timestamped output before success, keeps files owner-only and never overwrites or prunes them. This improves backup execution repeatability while leaving retention and off-host copying under explicit operator control. Shell syntax and systemd unit/timer verification pass. Physical timer execution and restore drills remain open acceptance.

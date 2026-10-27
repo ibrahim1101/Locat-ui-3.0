@@ -40,6 +40,21 @@ sudo systemctl reload nginx
 
 Verify `https://locat.example.net/api/ready` from a client. Confirm the returned TLS and origin fields, then register a non-sensitive test account. Review `journalctl -u locat` for startup errors. The server's strict origin and proxy-peer checks intentionally reject alternate hostnames and untrusted proxy connections.
 
+## Optional daily backups
+
+The package includes an opt-in `locat-backup.timer`. It creates a fresh timestamped SQLite online backup each day under `/var/lib/locat/backups`, then verifies it before reporting success. It never overwrites or automatically deletes an existing backup. The snapshots are not encrypted; the directory is private to the `locat` service account. Enable and inspect it with:
+
+```sh
+sudo install -m 0644 deploy/systemd/locat-backup.service /etc/systemd/system/locat-backup.service
+sudo install -m 0644 deploy/systemd/locat-backup.timer /etc/systemd/system/locat-backup.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now locat-backup.timer
+sudo systemctl start locat-backup.service
+sudo systemctl status locat-backup.service
+```
+
+This intentionally has no automatic retention policy. Monitor free space and arrange operator-controlled off-host copies and retention before enabling it on a long-lived server. A backup on the same host does not protect against host or disk loss.
+
 ## Upgrade and rollback
 
 Build a new copy outside `/opt/locat`, run the full check sequence above, and create and verify a new database backup before switching versions:

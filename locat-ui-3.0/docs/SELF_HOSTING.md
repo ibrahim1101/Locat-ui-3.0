@@ -56,7 +56,7 @@ npm run backup:server -- /absolute/path/backups/locat-YYYYMMDD-HHMM.sqlite
 npm run verify:backup -- /absolute/path/backups/locat-YYYYMMDD-HHMM.sqlite
 ```
 
-The backup contains password hashes, session hashes and encrypted payloads. It is **not encrypted**; protect it as sensitive account data. Keep backups outside the web root and database directory. The application does not schedule retention or verify that off-host copies exist. Preserve the operator identity signing key separately if one is configured; it is not included in the database backup. See [server/README.md](../server/README.md) for restore instructions and journal-file handling.
+The backup contains password hashes, session hashes and encrypted payloads. It is **not encrypted**; protect it as sensitive account data. Keep backups outside the web root and database directory. The app does not schedule backup retention or verify off-host copies. The Linux deployment package includes an opt-in daily snapshot-and-verify timer; it retains every backup, so operators must monitor disk space and configure retention separately. Preserve the operator identity signing key separately if one is configured; it is not included in the database backup. See [server/README.md](../server/README.md) for restore instructions and journal-file handling.
 
 ## Release limitations
 
