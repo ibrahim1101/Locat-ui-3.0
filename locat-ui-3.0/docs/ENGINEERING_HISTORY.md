@@ -2,6 +2,10 @@
 
 Date: 2026-10-20. Earlier records are preserved in `docs/archive/ENGINEERING_HISTORY_2026-10-20_pre-search.md`.
 
+## Home encrypted conversation summaries
+
+Date: 2026-10-27. Hosted Matrix acceptance exposed that `LiveHomeConversations` existed and had unit coverage but was not mounted by `LiveOverview`, so sent and decrypted conversations were missing from Home. The Home section now mounts that component for the signed-in account and opens the selected peer's `/messages/:accountId` route; signed-out users receive a device-local messaging explanation. The overview integration test now checks both the rendered summary and navigation. Validation passes: 326 frontend tests across 74 files, 119 server tests, ESLint, TypeScript via production build, and production build. Local Playwright execution remains blocked because the browser CDN returns a truncated zero-byte archive. The previous hosted `locat-core` run passed cross-platform checks and connector preparation but failed one two-account Matrix assertion because this Home component was not mounted; the later fix still needs hosted browser confirmation.
+
 ## Encrypted Share QR and PWA receive
 
 Date: 2026-10-25. Local commit `11df2b0` adds a downloadable client-generated QR code for the full encrypted bearer link and a Web Share Target for title/text/URL. The service worker bounds encoded input to 5 MB and reviewed content to 1.5 MB, keeps at most ten one-hour handoffs in IndexedDB, and consumes each by one-use UUID. The page receives staged text only after sign-in, reviews it locally, and removes the query token; no shared plaintext is sent to an API. Authentication preserves both the opaque handoff and encrypted-link fragment so sign-in does not discard the destination. UI tests cover QR output and local review staging; an actual service-worker browser spec is added but remains unexecuted because this workspace has no installed browser binary. TypeScript, ESLint, 306 frontend tests, 111 server tests, and production build passed before adding that browser-only spec; Playwright lists eight specs. The browser spec remains an open acceptance item.
