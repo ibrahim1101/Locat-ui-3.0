@@ -168,7 +168,7 @@ The global Search input now enforces the same 100-character maximum as the serve
 
 ## Continuous integration and browser acceptance
 
-Added `.github/workflows/ci.yml` with Node 24 type/lint/frontend+server test/build checks, followed by independent Chromium and Firefox Playwright jobs with retained JSON and browser artifacts. Workflow YAML parses locally. `actionlint` is not installed, and GitHub cannot run the workflow until the development branch can be pushed; no hosted result is claimed.
+Added `.github/workflows/ci.yml` with Node 24 dependency audit/type/lint/frontend+server test/build checks, followed by independent Chromium and Firefox Playwright jobs with retained JSON and browser artifacts. Workflow YAML parses locally. `actionlint` is not installed, and GitHub cannot run the workflow until the development branch can be pushed; no hosted result is claimed.
 
 Global Search now shows an in-progress status during the 250 ms debounce and server request, and suppresses the empty state until the bounded query resolves. The first focused regression failed because the empty panel remained visible and the prior fixture returned no `results` field; the UI now waits for a matched result/error state and the mock returns the API shape. All five focused Search tests pass.
 
