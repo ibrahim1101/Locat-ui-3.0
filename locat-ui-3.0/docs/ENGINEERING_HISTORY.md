@@ -174,6 +174,8 @@ Global Search now shows an in-progress status during the 250 ms debounce and ser
 
 Final validation after the pending-state change passes TypeScript, ESLint, all 325 frontend tests across 74 files, all 119 server tests, and the production build. Playwright continues to list eight specs; browser execution remains unavailable because neither browser binary is installed.
 
+Workspace member lookup for invitations now waits 250 ms, aborts the previous request and ignores stale account results; selecting a candidate also cancels in-flight lookup work. The regression resolves an older username query after a newer one and confirms the stale person does not return. TypeScript and ESLint pass; full validation passes with 326 frontend tests across 74 files, all 119 server tests, production build and zero npm audit findings.
+
 ## Dependency audit and supported lint toolchain
 
 The full npm audit found two moderate Vitest/mocker advisories and a high `undici` advisory in the development dependency tree; the production dependency audit was clean. Updated Vitest/mocker to 4.1.12 and `undici` to 8.12.3. A clean install also warned that ESLint 9 was out of support, so ESLint and `@eslint/js` were upgraded to 10.13.0 and 10.0.1 after confirming plugin peer ranges include ESLint 10. New lint rules identified four swallowed error causes and two redundant initial assignments; safe diagnostic causes are now preserved and declarations simplified. A fresh `npm ci` emits no ESLint deprecation warning, full audit reports zero vulnerabilities, and check, lint, all 325 frontend tests, all 119 server tests and production build pass.
