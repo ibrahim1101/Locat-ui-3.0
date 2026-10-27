@@ -5,6 +5,7 @@ import { useSession } from "../app/session";
 import { Screen } from "../layouts/Screen";
 import { Badge } from "../ui";
 import { LiveHomeContactSummary } from "./LiveHomeContactSummary";
+import { LiveHomeConversations } from "./LiveHomeConversations";
 
 const categories: ModuleCategory[] = ["core", "connect", "protect", "organize", "system"];
 const homeIds = new Set(["messages", "devices", "files", "workspace", "calendar", "settings"]);
@@ -28,7 +29,11 @@ export function LiveOverview({ kind }: { kind: "home" | "modules" }) {
       {kind === "home" && <div className="grid gap-4 lg:grid-cols-2">
         <section aria-label="Recent conversations" className="rounded-3xl bg-s1 p-5 hairline">
           <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Recent conversations</h2><Link className="text-sm font-semibold text-ember hover:underline" to="/messages">Open Chat</Link></div>
-          <p className="mt-3 rounded-2xl bg-s2 p-4 text-sm leading-6 text-ink-3">Conversation summaries are not connected to this dashboard yet. Open Chat to view your account contacts and encrypted conversations.</p>
+          <div className="mt-3">
+            {user
+              ? <LiveHomeConversations accountId={user.id} onOpen={accountId => navigate(`/messages/${accountId}`)} />
+              : <p className="rounded-2xl bg-s2 p-4 text-sm leading-6 text-ink-3">Sign in and keep messaging active on this device to see locally decrypted conversations here.</p>}
+          </div>
         </section>
         {user && <LiveHomeContactSummary accountId={user.id} onOpenMessages={section => navigate(`/messages?section=${section}`)} />}
       </div>}
@@ -40,7 +45,7 @@ export function LiveOverview({ kind }: { kind: "home" | "modules" }) {
             <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-ember/10 text-ember"><Icon className="size-5" /></span><h3 className="flex-1 font-semibold">{module.name}</h3><ArrowUpRight className="size-4 text-ink-3 transition group-hover:text-ember" /></div>
             <p className="mt-3 min-h-10 text-sm leading-5 text-ink-3">{module.tagline}</p>
             <div className="mt-4 flex items-center justify-between"><span className="text-xs text-ink-3">{status.reason ?? "Ready to open"}</span><Badge>{status.availability}</Badge></div>
-          </Link>;
+          </Link>
         })}</div>
       </section>)}
     </div>
