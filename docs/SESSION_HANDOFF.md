@@ -1,10 +1,10 @@
 # Locat session handoff
 
-Updated 2026-10-27. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The GitHub branch contains the current local source tree at commit `065d417412479f24917bb74b2e324b20e0fcbfd8`.
+Updated 2026-10-27. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status. The published tree matches current local `HEAD`.
 
 ## Published checkpoint
 
-All 36 local commits after `18f703f` were published to the development branch. GitHub reports 36 commits ahead of `18f703f` and no commits behind. The published tree SHA matches the local `HEAD` tree exactly (`d3a992ff9f7f74f370926714ef20169a55146a68`), covering 72 changed files. GitHub's connector recreated the commits, so their commit SHAs differ from the local commit SHAs. The local branch still shows 36 commits ahead of its stale `origin/rework/locat-core-scope` tracking ref; do not push that local history directly. Development-branch publication is authorized. Merging, deployment, and release publication are not authorized.
+All 36 local feature commits after `18f703f` were published to the development branch, covering 72 changed files. The initial published tree SHA exactly matched the local feature tree (`d3a992ff9f7f74f370926714ef20169a55146a68`); documentation-only follow-ups were also published and the latest remote tree matches current local `HEAD`. GitHub's connector recreated the commits, so their commit SHAs differ from the local commit SHAs. The local branch retains its original history and must not be pushed directly over the published branch. Development-branch publication is authorized. Merging, deployment, and release publication are not authorized.
 
 The direct Git push failed because the local client has no GitHub credential (`could not read Username for 'https://github.com': terminal prompts disabled`). After the user explicitly approved connector publication, GitHub's commit/tree API published the same 36 changes and messages. The branch ref update used an expected-head check. No other branch was changed.
 
