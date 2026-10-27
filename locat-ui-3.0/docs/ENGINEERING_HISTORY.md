@@ -166,6 +166,10 @@ The authenticated Origin-checked `POST /api/search` route now returns active-mem
 
 The global Search input now enforces the same 100-character maximum as the server and names Workspace and Calendar in its placeholder. Updated UI coverage confirms the limit. Full local check, lint, test suite and production build pass again.
 
+## Continuous integration and browser acceptance
+
+Added `.github/workflows/ci.yml` with Node 24 type/lint/frontend+server test/build checks, followed by independent Chromium and Firefox Playwright jobs with retained JSON and browser artifacts. Workflow YAML parses locally. `actionlint` is not installed, and GitHub cannot run the workflow until the development branch can be pushed; no hosted result is claimed.
+
 ## Nginx authenticated WebSocket forwarding
 
 The self-hosted Nginx example now redirects HTTP to HTTPS and forwards Upgrade/Connection headers on the exact authenticated `/api/connect/socket` endpoint. This was missing from the first sample and would leave live connection health unavailable through the proxy while ordinary HTTP readiness still worked. The deployment guide now includes a signed-in WSS health check and explains the socket carries health only. The Nginx executable is unavailable in this workspace, so host-level syntax and proxy acceptance remain open. A second approved development-branch push attempt still fails because Git cannot read a GitHub username/credential; the local feature branch remains committed and unchanged at the remote boundary.

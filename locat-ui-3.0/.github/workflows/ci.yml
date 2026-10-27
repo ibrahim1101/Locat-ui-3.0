@@ -1,0 +1,61 @@
+name: Locat checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: locat-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Type, lint, tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run test:all
+      - run: npm run build
+
+  browser:
+    name: Browser acceptance (${{ matrix.engine }})
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox]
+    env:
+      LOCAT_BROWSER_ENGINE: ${{ matrix.engine }}
+      LOCAT_BROWSER_REPORT: test-results/browser-${{ matrix.engine }}.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.engine }}
+      - run: npm run test:browser
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-results-${{ matrix.engine }}
+          path: |
+            test-results/browser-${{ matrix.engine }}.json
+            test-results/browser-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
