@@ -19,7 +19,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 export const liveMessagingApi = {
   findExactUsername: (username: string) =>
-    api<{ users: DirectoryUser[] }>("/api/users/search?q=" + encodeURIComponent(username)),
+    api<{ users: DirectoryUser[] }>("/api/users/search", { method: "POST", body: JSON.stringify({ q: username }) }),
   inbox: (after = 0) =>
     api<{ messages: CiphertextEnvelope[]; nextCursor: number }>("/api/messages?after=" + encodeURIComponent(after)),
   sendEncrypted: (input: Pick<CiphertextEnvelope, "recipientId" | "ciphertext" | "nonce" | "algorithm">) =>

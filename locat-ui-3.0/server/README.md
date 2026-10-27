@@ -24,7 +24,7 @@ Open http://127.0.0.1:5173. Vite proxies /api to 127.0.0.1:8787. Run `npm run te
 | POST | /api/auth/login | Issue session cookie |
 | GET | /api/auth/me | Current authenticated account |
 | POST | /api/auth/logout | Revoke session |
-| GET | /api/users/search?q=username | Exact username or LC identity lookup (authenticated; 60 requests per minute per account and 300 per minute per client address) |
+| POST | /api/users/search with {q} | Exact username or LC identity lookup (same-origin authenticated; terms stay in the body; 60 requests per minute per account and 300 per minute per client address) |
 | POST | /api/search with {q} | Active-member Workspace note/task/file names and personal or active-workspace Calendar title/note search; Origin-checked, 50 results and 30 requests per minute per account. Terms are sent in the body, not the URL. |
 | GET/POST | /api/share | List owned links or create an encrypted link with expiry and bounded opens |
 | GET/DELETE | /api/share/:id | Rate-limited ciphertext retrieval or owner revocation |

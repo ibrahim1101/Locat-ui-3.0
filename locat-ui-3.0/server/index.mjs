@@ -237,12 +237,16 @@ async function handle(req, res) {
       return json(res, 200, { ok: true }, { "Set-Cookie": setCookie("", 0) });
     });
   }
-  if (req.method === "GET" && url.pathname === "/api/users/search") {
+  if (url.pathname === "/api/users/search") {
+    if(req.method!=='POST')return json(res,405,{error:'User search requires POST.'},{Allow:'POST'});
+    if(req.headers.origin!==trustedOrigin)return json(res,403,{error:'Origin mismatch'});
     const viewer = sessionUser(req);
     if (!viewer) return json(res, 401, { error: "Not authenticated" });
     const retryAfter=Math.max(userSearchPeerLimit(req),userSearchLimit(viewer.id));
     if(retryAfter)return json(res,429,{error:"Too many user searches. Try again later."},{"Retry-After":String(retryAfter)});
-    const query = localDiscoveryQuery(url.searchParams.get("q") ?? "",config.origin);
+    const input=await body(req,512);
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length!==1||typeof input.q!=='string')return json(res,400,{error:'Search requires a single query.'});
+    const query = localDiscoveryQuery(input.q,config.origin);
     const code = /^(?:lc-)?([1-9][0-9]{3})$/.exec(query)?.[1];
     if (!code && !/^[a-z0-9_]{3,32}$/.test(query)) return json(res, 400, { error: "Search requires an exact username or LC-1234 identity" });
     const found = code ? db.userByCode(code) : db.userByName(query);

@@ -62,18 +62,22 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     }finally{socket.terminate();}
     const bobLogin = await request("/api/auth/login", "POST", { username: "bob", password });
     const bobCookie = bobLogin.headers.get("set-cookie").split(";")[0];
-    const bob = (await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users[0];
+    assert.equal((await request('/api/users/search?q=bob')).status,405,'Discovery queries are not accepted in URLs');
+    assert.equal((await request('/api/users/search','POST',{q:'bob'},aliceCookie,{Origin:'https://evil.invalid'})).status,403);
+    assert.equal((await request('/api/users/search','POST',{q:'bob',extra:true},aliceCookie)).status,400);
+    const bob = (await (await request("/api/users/search", "POST", {q:"bob"}, aliceCookie)).json()).users[0];
     assert.ok(bob.id);
-    for(const path of ['/api/auth/me','/api/contacts','/api/users/search?q=bob','/api/preferences','/api/profile/privacy','/api/auth/sessions','/api/private/vault','/api/private/secrets','/api/security/events'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
+    for(const path of ['/api/auth/me','/api/contacts','/api/preferences','/api/profile/privacy','/api/auth/sessions','/api/private/vault','/api/private/secrets','/api/security/events'])assert.equal((await request(path,'GET',undefined,aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard: '+path);
+    assert.equal((await request('/api/users/search','POST',{q:'bob'},aliceCookie,{'X-Locat-Account':bob.id})).status,403,'Stale account guard applies to POST user discovery');
     assert.equal((await request('/api/contacts','GET',undefined,bobCookie,{'X-Locat-Account':bob.id})).status,200,'Matching expected account remains authorized');
     assert.equal(bob.globalIdentity.address,bob.lcCode+'@127.0.0.1:'+port);
-    assert.equal((await (await request('/api/users/search?q='+encodeURIComponent(bob.globalIdentity.address),'GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
-    assert.equal((await request('/api/users/search?q=LC-1234@elsewhere.test','GET',undefined,aliceCookie)).status,501);
+    assert.equal((await (await request('/api/users/search','POST',{q:bob.globalIdentity.address},aliceCookie)).json()).users[0].id,bob.id);
+    assert.equal((await request('/api/users/search','POST',{q:'LC-1234@elsewhere.test'},aliceCookie)).status,501);
     for (const path of ['/api/media','/api/media/refresh','/api/media/shares','/api/media/stream/'+'a'.repeat(64),'/api/sentinel/incidents','/api/sentinel/tokens']) {
       assert.equal((await request(path, 'GET', undefined, aliceCookie)).status, 404, 'retired module route must not be served: '+path);
     }
     assert.match(bob.lcCode, /^LC-[1-9][0-9]{3}$/);
-    const codeLookup = await (await request("/api/users/search?q=" + bob.lcCode, "GET", undefined, aliceCookie)).json();
+    const codeLookup = await (await request("/api/users/search", "POST", {q:bob.lcCode}, aliceCookie)).json();
     assert.equal(codeLookup.users[0].id, bob.id);
     assert.equal((await request("/api/diagnostics")).status, 401);
     const diagnostics = await (await request("/api/diagnostics", "GET", undefined, aliceCookie)).json();
@@ -264,11 +268,11 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie,{Origin:'https://evil.test'})).status,403);
     assert.equal((await request('/api/profile/privacy','POST',{...privacy,extra:true},bobCookie)).status,400);
     assert.equal((await request('/api/profile/privacy','POST',privacy,bobCookie)).status,200);
-    assert.equal((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users[0].id,bob.id);
+    assert.equal((await (await request('/api/users/search','POST',{q:'bob'},aliceCookie)).json()).users[0].id,bob.id);
     assert.equal((await (await request('/api/contacts','GET',undefined,aliceCookie)).json()).contacts[0].user.bio,'Synthetic contact-only bio');
     assert.equal((await request('/api/contacts/remove','POST',{userId:bob.id},aliceCookie)).status,200);
-    assert.deepEqual((await (await request('/api/users/search?q=bob','GET',undefined,aliceCookie)).json()).users,[]);
-    const hidden=(await (await request('/api/users/search?q='+bob.lcCode,'GET',undefined,aliceCookie)).json()).users[0];
+    assert.deepEqual((await (await request('/api/users/search','POST',{q:'bob'},aliceCookie)).json()).users,[]);
+    const hidden=(await (await request('/api/users/search','POST',{q:bob.lcCode},aliceCookie)).json()).users[0];
     assert.equal(hidden.username,'');assert.equal(hidden.bio,'');
     assert.equal((await request('/api/contacts/request','POST',{userId:bob.id},aliceCookie)).status,403);
     assert.equal((await (await request('/api/auth/me','GET',undefined,bobCookie)).json()).user.username,'bob');
@@ -276,7 +280,7 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: true }, bobCookie)).status, 200);
     assert.equal((await request("/api/messages", "POST", payload, aliceCookie)).status, 501);
     assert.equal((await request("/api/contacts/request", "POST", { userId: bob.id }, aliceCookie)).status, 403);
-    assert.deepEqual((await (await request("/api/users/search?q=bob", "GET", undefined, aliceCookie)).json()).users, []);
+    assert.deepEqual((await (await request("/api/users/search", "POST", {q:'bob'}, aliceCookie)).json()).users, []);
     assert.equal((await request("/api/contacts/block", "POST", { userId: alice.id, blocked: false }, bobCookie)).status, 200);
     assert.deepEqual((await (await request("/api/contacts", "GET", undefined, aliceCookie)).json()).contacts, []);
     assert.equal((await request("/api/auth/sessions")).status, 401);
@@ -308,10 +312,10 @@ test("development API: auth, isolation, discovery and messaging security gate", 
     assert.ok(events.some(event => event.event === "login.failed"));
     assert.equal((await request("/api/security/events")).status, 401);
     let limitedSearch;
-    for(let attempt=0;attempt<60;attempt++)limitedSearch=await request('/api/users/search?q=bob','GET',undefined,updatedCookie);
+    for(let attempt=0;attempt<60;attempt++)limitedSearch=await request('/api/users/search','POST',{q:'bob'},updatedCookie);
     assert.equal(limitedSearch.status,429);
     assert.ok(Number(limitedSearch.headers.get('retry-after'))>0);
-    assert.equal((await request('/api/users/search?q=alice','GET',undefined,bobCookie)).status,200,'User search quota is scoped to the authenticated account');
+    assert.equal((await request('/api/users/search','POST',{q:'alice'},bobCookie)).status,200,'User search quota is scoped to the authenticated account');
     assert.equal((await request("/api/auth/logout", "POST", undefined, updatedCookie)).status, 200);
     assert.equal((await request("/api/auth/me", "GET", undefined, updatedCookie)).status, 401);
     assert.equal((await request("/api/auth/logout", "POST", undefined, aliceCookie)).status, 200);
