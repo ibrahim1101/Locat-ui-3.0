@@ -26,7 +26,7 @@ sudo install -d -o root -g root -m 0750 /etc/locat
 
 Copy the built application to `/opt/locat`. Make its files owned by `root:locat`, directories mode `0750`, and files mode `0640`; keep `/var/lib/locat` owned by `locat` with mode `0700`. Install `deploy/locat.env.example` as `/etc/locat/locat.env`, set the exact public HTTPS origin, and make the file root-owned mode `0640`.
 
-Install `deploy/nginx/locat.conf.example` as an Nginx site. Replace the sample hostname and certificate paths. Configure a trusted certificate before enabling the site. The proxy overwrites `X-Forwarded-For` with one canonical client address and connects to Locat over loopback; keep `LOCAT_PROXY_PEERS` aligned with that exact socket address. Do not add other peers or accept forwarded client headers directly from the network.
+Install `deploy/nginx/locat.conf.example` as an Nginx site. Replace the sample hostname and certificate paths. Configure a trusted certificate before enabling the site. The port 80 server redirects to HTTPS. The exact `/api/connect/socket` location forwards WebSocket upgrade headers for the authenticated live-health socket; it does not carry messages. The proxy overwrites `X-Forwarded-For` with one canonical client address and connects to Locat over loopback; keep `LOCAT_PROXY_PEERS` aligned with that exact socket address. Do not add other peers or accept forwarded client headers directly from the network.
 
 Install and start the unit:
 
@@ -39,6 +39,8 @@ sudo systemctl reload nginx
 ```
 
 Verify `https://locat.example.net/api/ready` from a client. Confirm the returned TLS and origin fields, then register a non-sensitive test account. Review `journalctl -u locat` for startup errors. The server's strict origin and proxy-peer checks intentionally reject alternate hostnames and untrusted proxy connections.
+
+With that account signed in, open Settings → Connection and confirm **Real-time session** reports connected. This exercises the authenticated WSS upgrade and heartbeat through Nginx. If it stays unavailable while `/api/ready` succeeds, check the exact socket location and the `Upgrade`/`Connection` forwarding before investigating application health.
 
 ## Optional daily backups
 
