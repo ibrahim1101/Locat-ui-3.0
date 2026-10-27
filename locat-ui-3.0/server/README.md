@@ -1,6 +1,6 @@
 # Locat 3.0 development API
 
-**Status: local-only development service, not production-ready.** Run from the `locat-ui-3.0/` directory using Node.js 24+.
+**Status: local development service and self-hosted preview; not production-ready.** Run from the `locat-ui-3.0/` directory using Node.js 24+.
 
 In PowerShell terminal 1:
 ```powershell
@@ -61,7 +61,7 @@ With a configured key, `GET /.well-known/locat` publishes a domain-separated sig
 
 Run `npm run backup:server -- ./server/data/backups/manual.sqlite` from the app directory. Choose a new filename each time; existing backups are never overwritten. SQLite's online backup API creates a consistent snapshot even with WAL enabled. Backups contain password hashes, session hashes and ciphertext: restrict access just like the live database.
 
-Recovery: stop the API, preserve the current database and its `-wal`/`-shm` sidecars together, and point `LOCAT_DATABASE_FILE` at a separate copy of the chosen backup. Start the API and verify accounts before resuming use. Never replace an open SQLite file, or copy only its main file while it is running. Backups are not encrypted; automated retention and a recovery UI are still pending. The optional Linux `locat-backup.timer` creates and verifies daily snapshots but never deletes them. Supported migrations through schema 28 are applied in transactions; schema 18 removes retired media-sharing, Remote, and Sentinel tables, schemas 19–28 add Calendar, Share, Workspace activity/files and Automate data, and future unknown schemas fail closed.
+Recovery rehearsal: preserve the current database and any `-wal`/`-shm` sidecars together. Verify a completed standalone backup, record its SHA-256 and compare it with a trusted separately stored digest, then use `npm run restore:server -- <backup.sqlite> <new-destination.sqlite> <trusted-sha256>` to publish a verified copy to a new unused path. Re-verify that restored copy before using it in an isolated rehearsal. The restore tool never replaces or activates a live database. Never replace an open SQLite file, or copy only its main file while it is running. A restored database contains stale session/revocation state and must not be attached to production integrations without a separate recovery review. Backups are not encrypted; automated retention and a recovery UI are still pending. The optional Linux `locat-backup.timer` creates and verifies daily snapshots but never deletes them. Supported migrations through schema 28 are applied in transactions; schema 18 removes retired media-sharing, Remote, and Sentinel tables, schemas 19–28 add Calendar, Share, Workspace activity/files and Automate data, and future unknown schemas fail closed. See ../docs/BACKUP_VERIFICATION.md for the full restore and activation boundaries.
 
 ## Live integration endpoints
 
