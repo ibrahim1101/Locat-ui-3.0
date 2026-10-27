@@ -1,38 +1,26 @@
-# Locat UI 3.0 session handoff
+# Locat session handoff
 
-Updated 2026-10-20. Continue on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. Latest published checkpoint: `21cf810` (`Allow Windows proxy test more startup time`). The feature checkpoint `342ebbc` connects the account summary to the actual live Home route; the checkout is clean at the published tip.
+Updated 2026-10-27. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The GitHub branch contains the current local source tree at commit `065d417412479f24917bb74b2e324b20e0fcbfd8`.
 
-## Active direction
+## Published checkpoint
 
-Preserve the Obsidian Ember theme and nested navigation/options. Continue retained Locat work in Chat, Link, Files & Vault, account/security and workspace foundations. Standalone media libraries, Locat Remote and SentinelLab are retired. Fresh install is acceptable; no data recovery is requested. Development-branch commits and publication are authorized; do not merge, deploy or publish a release.
+All 36 local commits after `18f703f` were published to the development branch. GitHub reports 36 commits ahead of `18f703f` and no commits behind. The published tree SHA matches the local `HEAD` tree exactly (`d3a992ff9f7f74f370926714ef20169a55146a68`), covering 72 changed files. GitHub's connector recreated the commits, so their commit SHAs differ from the local commit SHAs. The local branch still shows 36 commits ahead of its stale `origin/rework/locat-core-scope` tracking ref; do not push that local history directly. Development-branch publication is authorized. Merging, deployment, and release publication are not authorized.
 
-Read `docs/REWORK_SCOPE.md` and `docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` first. `docs/LOCAT_INTEGRATION_HANDOFF.md` describes the active live architecture; its pre-scope version is archived. `docs/ENGINEERING_HISTORY.md` records implementation decisions and test outcomes.
+The direct Git push failed because the local client has no GitHub credential (`could not read Username for 'https://github.com': terminal prompts disabled`). After the user explicitly approved connector publication, GitHub's commit/tree API published the same 36 changes and messages. The branch ref update used an expected-head check. No other branch was changed.
 
-## Recently published work
+## Product scope
 
-- `84a473b` grouped Vault/Secrets into Entries, Backups and Security.
-- `e86aadb` stopped Home from presenting fixture conversations/devices as live account data and visibly labels preview fixtures.
-- `ee37f1c` added a live server-backed contact summary with accepted-contact and incoming-request counts, cancellation, loading and retry states.
-- `af607c0` refreshed the active integration handoff, archived its stale fixture-only predecessor, and corrected the Messages availability description.
-- `12e4ffe` opens the nested Requests section from Home when incoming requests exist; otherwise the shortcut opens Contacts.
-- `d81921d` routes live Search through account-owned accepted contacts and module results while keeping encrypted message search inside conversations; `678f181` corrects the loading state for accounts with no contacts.
-- `342ebbc` mounts the contact/request summary in the actual live Home route, keeps the conversation summary unavailable state honest, and updates browser acceptance for live Home and Search.
-- `21cf810` extends the Windows proxy-server readiness window after hosted CI showed the prior three-second limit was too short.
+Read `locat-ui-3.0/docs/REWORK_SCOPE.md` and `locat-ui-3.0/docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` for current scope and evidence. Preserve Obsidian Ember styling and nested navigation. Retained areas include account/security, encrypted one-to-one Matrix Chat, Link pairing/transfers, Files & Vault, Workspace, Calendar, Automate, and encrypted text Share. Standalone media libraries, Locat Remote and SentinelLab are retired from this rework.
 
-Current Home conversation summaries are still not connected. Do not derive “recent conversations” from contact membership or show preview records as live.
+Final local validation on `3d1daaf` passes TypeScript, ESLint, all 326 frontend tests, all 119 server tests, production build, and `npm audit --audit-level=high` (zero vulnerabilities). The build still reports the Matrix crypto chunk size advisory. Playwright discovers eight browser specs, but execution is blocked because Chromium is missing; installing Chromium and Firefox failed when the browser CDN returned a truncated zero-byte archive. The GitHub connector reports no combined status checks on the published tip yet; hosted CI is still unverified.
 
-## Validation and hosted status
+## Remaining release gates
 
-The latest full local run passes `npm run check`, `npm run lint`, `npm run test:all` (286 frontend tests and 108 server tests), and `npm run build`. The production build retains the known large Matrix crypto chunk advisory. The test suite verifies nested Contacts, server-owned Home counts, route-to-Requests navigation, encrypted messaging, Link and private storage behavior. The two-account Home-to-Requests browser scenario asserts live Home contains no preview conversations or devices, and now checks that global live Search returns no fictional person for a fixture-only query. The spec passes syntax checking and Playwright discovery, but local execution is blocked because the Chromium headless executable is not installed in this workspace. Commit `cf605a3` exposed that browser acceptance was asserting preview Home copy on the separate live Home route; `342ebbc` fixes the expectation and mounts the server-backed summary on live Home. The proxy readiness fix passes focused hosting tests locally. At the latest check, hosted checks for `342ebbc` and `21cf810` were still running; verify the latest commit check-runs before reporting.
+- Run and review the published branch's hosted Node, Chromium and Firefox workflows.
+- Complete real browser and installed-PWA recipient acceptance, including two-account flows.
+- Exercise the Linux systemd/Nginx install, upgrade, backup, restore and rollback recipe on a physical host.
+- Complete Windows, Android and physical-device acceptance for Link, app lock and encrypted storage.
+- Run account recovery drills and obtain an independent security review.
+- Preserve documented limits: Calendar, Workspace and Automate data are server-readable; reminders require Locat to be open and visible; there are no OS/push notifications; Share currently handles text only.
 
-The workflow-run summary wrapper filters pull-request runs, so query commit check-runs when verifying push-triggered hosted results.
-
-## Remaining work
-
-- Live Home now includes account-owned contact/request counts and a direct nested Requests shortcut. Live Search uses account-owned accepted contacts and modules; encrypted message search stays inside an open conversation. Continue useful server-backed workspace destinations and truthful unavailable states.
-- Connect Home to actual conversation summaries only if the Matrix session can provide a safe, account-scoped local projection.
-- Continue encrypted messaging lifecycle and Link real-device/larger-transfer acceptance.
-- Keep scheduled sending unavailable until a durable sender can safely use device-held Matrix credentials while the app is closed.
-- Physical-device/cross-platform persistence checks, identity recovery limits, single-writer hosting assumptions and independent security review remain open.
-
-Run from `locat-ui-3.0/` for meaningful code batches: `npm run check`, `npm run lint`, `npm run test:all`, `npm run build`. Keep this handoff current after a significant checkpoint.
+Do not ask the user to test until the implementation and automated checks are complete. Do not merge, deploy or publish a release without separate authorization. Continue independent implementation and keep evidence and remaining limits current in `ENGINEERING_HISTORY.md` and the scope documents.
