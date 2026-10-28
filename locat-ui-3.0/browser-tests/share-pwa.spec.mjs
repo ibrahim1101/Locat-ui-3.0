@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,chromium} from '@playwright/test';
 import {randomBytes} from 'node:crypto';
 import {startBrowserFixture} from '../tools/browser-fixture.mjs';
 
@@ -6,8 +6,10 @@ let fixture;
 test.beforeAll(async()=>{fixture=await startBrowserFixture();});
 test.afterAll(async()=>{await fixture?.stop();});
 
-test('PWA share target stays local and signed-out recipients can open encrypted links',async({browser})=>{
- const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'allow'}),page=await context.newPage(),apiWrites=[],shareRequests=[];
+test('PWA share target stays local and signed-out recipients can open encrypted links',async()=>{
+ // Chromium's service-worker process does not inherit Playwright's context-level certificate exception.
+ // Pin the isolated fixture's generated certificate so only this synthetic HTTPS origin is trusted.
+ const browser=await chromium.launch({args:[`--ignore-certificate-errors-spki-list=${fixture.serviceWorkerCertPin}`]}),context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'allow'}),page=await context.newPage(),apiWrites=[],shareRequests=[];
  const serviceWorkerMessages=[],serviceWorkerResponses=[];
  page.on('console',message=>{if(message.text().includes('offline sharing'))serviceWorkerMessages.push(message.text());});
  page.on('response',response=>{if(new URL(response.url()).pathname==='/sw.js')serviceWorkerResponses.push({status:response.status(),type:response.headers()['content-type']??''});});
@@ -39,5 +41,5 @@ test('PWA share target stays local and signed-out recipients can open encrypted 
   console.info('Share PWA checkpoint: creating and opening an encrypted public link');
   const publicText='Account-free encrypted recipient '+randomBytes(12).toString('hex'),shared=await page.evaluate(async text=>{const raw=crypto.getRandomValues(new Uint8Array(32)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt']),ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(text))),base64=bytes=>{let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary);},url=bytes=>base64(bytes).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');const response=await fetch('/api/share',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({iv:base64(iv),ciphertext:base64(ciphertext),ttlHours:1,downloadLimit:1}),signal:AbortSignal.timeout(15000)}),data=await response.json();return{status:response.status,id:data.share?.id,secret:url(raw)};},publicText);
   expect(shared.status).toBe(201);await context.clearCookies();await page.goto(fixture.origin+'/share#'+shared.id+'.'+shared.secret);await expect(page.getByText(publicText,{exact:true})).toBeVisible();expect(shareRequests).toContain('/api/share/'+shared.id);expect(shareRequests.every(path=>!path.includes(shared.secret))).toBe(true);
- }finally{await context.close();}
+ }finally{await context.close();await browser.close();}
 });
