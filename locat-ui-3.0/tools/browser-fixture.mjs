@@ -1,5 +1,5 @@
 /** Isolated production HTTPS fixture. Never accepts an existing server/database. */
-import {createHash,generateKeyPairSync,randomBytes,scryptSync} from 'node:crypto';
+import {createHash,generateKeyPairSync,randomBytes,scryptSync,X509Certificate} from 'node:crypto';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createServer} from 'node:net';
@@ -26,7 +26,7 @@ export async function startBrowserFixture({matrix=false,media=false,mediaOwnersh
   const origin='https://'+hostname+':'+port,key=join(dir,'fixture.key'),cert=join(dir,'fixture.crt');
   await exec('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1,DNS:localhost']);await chmod(key,0o600);
   const identityKey=join(dir,'identity.pem');if(identitySigning){const pair=generateKeyPairSync('ed25519');await writeFile(identityKey,pair.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});await chmod(identityKey,0o600);}
-  const ca=await readFile(cert),runtime=Object.fromEntries(['PATH','SystemRoot','WINDIR','TEMP','TMP','LANG'].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
+  const ca=await readFile(cert),certificate=new X509Certificate(ca),serviceWorkerCertPin=createHash('sha256').update(certificate.publicKey.export({type:'spki',format:'der'})).digest('base64'),runtime=Object.fromEntries(['PATH','SystemRoot','WINDIR','TEMP','TMP','LANG'].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   if(matrix){const db=openDatabase(join(dir,'fixture.sqlite'));let serverId;try{serverId=db.serverId;}finally{db.close();}synapse=await startBrowserSynapse(dir,serverId);}
   let mediaFiles;
   if(media){
@@ -58,7 +58,7 @@ export async function startBrowserFixture({matrix=false,media=false,mediaOwnersh
   const deadline=Date.now()+20000;
   while(Date.now()<deadline){
    if(startupError)throw startupError;if(child.exitCode!==null)throw new Error('Browser fixture server exited: '+diagnostic);
-   if(await ready())return {origin,homeserverOrigin:synapse?.environment.LOCAT_MATRIX_UPSTREAM,inspectMatrixMedia:synapse?.inspectMedia,stop,mediaFiles,mediaAccounts,restartGateway,replaceIdentityKey,restartHomeserver:async()=>{if(!synapse)throw new Error('No synthetic homeserver is running');await synapse.restart();},assertNoMessagePlaintext:async markers=>{if(!Array.isArray(markers)||!markers.length||markers.length>10||markers.some(marker=>typeof marker!=='string'||marker.length<32||marker.length>1024))throw new Error('Use bounded unique synthetic markers');for(const file of ['fixture.sqlite','fixture.sqlite-wal',...(synapse?['browser-synapse.sqlite','browser-synapse.sqlite-wal']:[])]){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT'&&file.endsWith('-wal'))continue;throw error;}if(markers.some(marker=>bytes.includes(Buffer.from(marker))))throw new Error('Synthetic message plaintext found in fixture persistence');}if(markers.some(marker=>diagnostic.includes(marker)))throw new Error('Synthetic message plaintext found in captured server diagnostics');}};await pause(100);
+   if(await ready())return {origin,serviceWorkerCertPin,homeserverOrigin:synapse?.environment.LOCAT_MATRIX_UPSTREAM,inspectMatrixMedia:synapse?.inspectMedia,stop,mediaFiles,mediaAccounts,restartGateway,replaceIdentityKey,restartHomeserver:async()=>{if(!synapse)throw new Error('No synthetic homeserver is running');await synapse.restart();},assertNoMessagePlaintext:async markers=>{if(!Array.isArray(markers)||!markers.length||markers.length>10||markers.some(marker=>typeof marker!=='string'||marker.length<32||marker.length>1024))throw new Error('Use bounded unique synthetic markers');for(const file of ['fixture.sqlite','fixture.sqlite-wal',...(synapse?['browser-synapse.sqlite','browser-synapse.sqlite-wal']:[])]){let bytes;try{bytes=await readFile(join(dir,file));}catch(error){if(error.code==='ENOENT'&&file.endsWith('-wal'))continue;throw error;}if(markers.some(marker=>bytes.includes(Buffer.from(marker))))throw new Error('Synthetic message plaintext found in fixture persistence');}if(markers.some(marker=>diagnostic.includes(marker)))throw new Error('Synthetic message plaintext found in captured server diagnostics');}};await pause(100);
   }
   throw new Error('Browser fixture readiness timed out: '+diagnostic);
  }catch(error){await stop();throw error;}
