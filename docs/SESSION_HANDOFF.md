@@ -1,6 +1,6 @@
 # Locat session handoff
 
-Updated 2026-10-27. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status. The published tree matches current local `HEAD`.
+Updated 2026-10-29. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status. The published tree matches current local `HEAD`.
 
 ## Published checkpoint
 
@@ -18,7 +18,7 @@ Latest local validation after the Home conversation fix passes TypeScript, ESLin
 
 - Run and review the published branch's hosted Node, Chromium and Firefox workflows.
 - Complete real browser and installed-PWA recipient acceptance, including two-account flows.
-- Exercise the Linux systemd/Nginx install, upgrade, backup, restore and rollback recipe on a physical host.
+- Exercise the versioned Linux systemd/Nginx install, upgrade, backup, restore and rollback procedure on a physical host using the [acceptance checklist](locat-ui-3.0/docs/PHYSICAL_ACCEPTANCE_CHECKLIST.md).
 - Complete Windows, Android and physical-device acceptance for Link, app lock and encrypted storage.
 - Run account recovery drills and obtain an independent security review.
 - Preserve documented limits: Calendar, Workspace and Automate data are server-readable; reminders require Locat to be open and visible; there are no OS/push notifications; Share currently handles text only.

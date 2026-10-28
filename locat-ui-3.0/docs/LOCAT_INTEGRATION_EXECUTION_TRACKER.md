@@ -1,6 +1,6 @@
 # Locat UI 3.0 active execution tracker
 
-Updated 2026-10-26. This tracker follows the current user-directed scope on `rework/locat-core-scope`, superseding older roadmap priorities that include retired standalone modules. The Obsidian Ember theme and nested navigation/options remain required.
+Updated 2026-10-29. This tracker follows the current user-directed scope on `rework/locat-core-scope`, superseding older roadmap priorities that include retired standalone modules. The Obsidian Ember theme and nested navigation/options remain required.
 
 ## Retained scope
 
@@ -11,7 +11,7 @@ Updated 2026-10-26. This tracker follows the current user-directed scope on `rew
 | Link | Devices, Pairings and Transfers are separate Obsidian Ember sections; pairing requires two-device code comparison, and verified peers can send encrypted file/text transfers. Hosted Chromium and Firefox acceptance now covers an 8 MiB file (33 encrypted chunks), a forced interruption at chunk 10, resuming from the original file, and byte-for-byte verified receipt | Continue physical two-device, native and network acceptance |
 | Files & Vault | Entries, Backups and Security are separate nested sections; credential and secure note stay a nested choice inside the Secrets editor; local unlocked search includes note text | Continue workspace integration, permissions and acceptance without restoring standalone media libraries |
 | Workspace | Nested destinations, Search, Home, command palette and grouped Settings using Obsidian Ember; Home labels fixtures in preview; live Home shows account-owned contact/request counts and summaries decrypted from the active device's authorized Matrix timeline; Home names only current accepted contacts; live Search uses account-owned accepted contacts and modules, while account-authorized Workspace and Calendar search runs on the server and encrypted message search remains on-device | Continue useful retained destinations with server-backed data and truthful unavailable states; finish hosted Home summary acceptance and continue workspace integration |
-| Global readiness | Same-origin service, discovery, session-bound identity proofs and authenticated health; Offline & LAN has a user-triggered bounded `/api/ready` diagnostic with result, timeout and unmount cancellation handling | A single-host Linux systemd/Nginx preview recipe and authenticated WebSocket proxy path are checked in under `deploy/`; physical-host, recovery, production-container, public-hosting and independent-review gates remain open |
+| Global readiness | Same-origin service, discovery, session-bound identity proofs and authenticated health; Offline & LAN has a user-triggered bounded `/api/ready` diagnostic with result, timeout and unmount cancellation handling; deploy guide stages immutable versioned releases, backs up the configured live DB, verifies snapshot hashes, and describes separate-file restore plus atomic symlink rollback | Nginx syntax, physical-host install/upgrade/restore/rollback, production-container, public-hosting and independent-review gates remain open; see [`PHYSICAL_ACCEPTANCE_CHECKLIST.md`](PHYSICAL_ACCEPTANCE_CHECKLIST.md) |
 
 ## Retired scope
 
