@@ -4,7 +4,7 @@ The Locat UI 3.0 development app combines the existing React/TypeScript UI with 
 
 Encrypted text conversations now have actual two-account Chromium acceptance, including SAS verification, offline delivery, reload, tamper and revocation checks. Broader recovery, messaging features, public/global deployment and native-platform validation remain incomplete. This is an experimental development branch, not a public release or independently audited system.
 
-Start with the [current engineering handoff](locat-ui-3.0/docs/SESSION_HANDOFF.md), [messaging guide](locat-ui-3.0/docs/MESSAGING_QUICKSTART.md) and [self-hosting instructions](locat-ui-3.0/docs/SELF_HOSTING.md). The [complete roadmap](locat-ui-3.0/docs/MASTER_ROADMAP.md) remains in scope.
+Start with the [current engineering handoff](locat-ui-3.0/docs/SESSION_HANDOFF.md), [messaging guide](locat-ui-3.0/docs/MESSAGING_QUICKSTART.md) and [self-hosting instructions](locat-ui-3.0/docs/SELF_HOSTING.md). The [current scope register](locat-ui-3.0/docs/REWORK_SCOPE.md) supersedes historical media/remote/Sentinel roadmaps. Standalone Cinema, Music, Photos, Remote control and SentinelLab integration are retired. Calendar, Workspace and Automate are not end-to-end encrypted; consult the register for data visibility and platform limits.
 
 ## Where the code is
 
@@ -12,9 +12,9 @@ Everything lives in [`locat-ui-3.0/`](locat-ui-3.0/README.md):
 
 | Path | Contents |
 |---|---|
-| `locat-ui-3.0/src/screens/` | All module screens: auth, home, messages, cinema, music, photos, devices, remote, sentinel, vault/secrets, search, hub/admin/diagnostics, offline, planned, settings, **gallery** |
+| `locat-ui-3.0/src/screens/` | Current Chat, Link, Files & Vault and collaboration screens; use the scope register for active versus retired modules |
 | `locat-ui-3.0/src/ui/` | Design-system components, incl. `Virtual.tsx` (virtualized lists/grids), `ContextMenu*.ts(x)` (cursor-anchored menus) |
-| `locat-ui-3.0/src/app/` | Shell infrastructure: session, Android back contract, drag-and-drop, player, registry |
+| `locat-ui-3.0/src/app/` | Shell infrastructure: session, nested navigation, Android back contract and module registry |
 | `locat-ui-3.0/src/contracts/` | Typed adapter contracts (`LocatUiAdapter`) for live/preview integration |
 | `locat-ui-3.0/src/fixtures/` | Preview adapter + fixture data, incl. large-library stress sets |
 | `locat-ui-3.0/src/test/` | Vitest suites (contracts + enhancements) |
