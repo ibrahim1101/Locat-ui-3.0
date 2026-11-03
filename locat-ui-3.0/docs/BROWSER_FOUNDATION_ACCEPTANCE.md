@@ -21,7 +21,7 @@ This first browser test does not run Matrix/Synapse, Rust crypto, SAS, exclusive
 
 ## Certificate and network scope
 
-Only the isolated browser context permits the generated self-signed certificate through Playwright ignoreHTTPSErrors. HTTP routing is restricted to the exact loopback fixture origin and service workers are blocked. This is not production browser CA/trust acceptance. Existing Node HTTPS acceptance separately trusts only its generated fixture CA. No browser-wide certificate policy or operator certificate is changed.
+Only the isolated browser context permits the generated self-signed certificate through Playwright ignoreHTTPSErrors. HTTP routing is restricted to the exact loopback fixture origin. Default browser fixtures block service workers; the dedicated PWA share-target acceptance enables its service worker only inside an isolated context and pins the generated fixture certificate for that Chromium launch. This is not production browser CA/trust acceptance. Existing Node HTTPS acceptance separately trusts only its generated fixture CA. No browser-wide certificate policy or operator certificate is changed.
 
 ## CI evidence
 
@@ -329,3 +329,8 @@ Next publish and observe/fix all source CI jobs before standard acceptance. Cros
 ### Sharing cleanup checkpoint — 2026-10-18
 
 Source9b170d9f9aa0e123cc448efcd8fad55e5b0936ca aborts parallel discovery on failure; regression also covers mutation unmount. Local302frontend/136backend/type/lint/build passed; schema16 realSynapse/HTTPS/SDK encrypted transport and restart/revocation/plaintext-scan harness passed. Foundation39136756492 all5green (12Chromium7.7m,8Firefox35.4s,3storage9.1s +realVite). OwnerUI candidate39137528686 still running; final cleanup CI pending. Full commands/SHAs/security/next steps in SESSION_HANDOFF and ENGINEERING_HISTORY. Cross-server/native/hardware/global milestones and BUILD001 remain open; full roadmap retained.
+
+
+## Shared Calendar, Workspace and Automate acceptance — 2026-11-03
+
+Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41621564711) passed its focused two-account scenario in Chromium and Firefox, then the full Chromium and Firefox browser suites and three repeated private-store checks. The scenario creates two synthetic accounts, sends and accepts a Workspace invitation, checks a shared task revision and activity/read state, verifies a member sees a shared recurring Calendar event before the owner deletes the series, and verifies a member cannot see the owner's recurring Automate reminder while the owner can pause and delete it. This is isolated hosted-browser acceptance; it does not certify physical devices, installed-PWA behavior on a user's device, deployment, backup recovery, or independent security review. The same run passed connector preparation and Ubuntu, Windows, and macOS jobs.

@@ -1,32 +1,21 @@
 # Locat session handoff
 
-Updated 2026-11-03. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status.
+Updated 2026-11-03. Active repository: `ibrahim1101/Locat-ui-3.0`, development branch `rework/locat-core-scope`. The latest code checkpoint is `e1e4fe8896ef24a991a186c1ff996e30870bbd08`; its hosted CI is green. The user asked to complete all work that can be done before physical testing.
 
-## Current continuation
+## Current validation
 
-The PWA share-target browser acceptance is fixed and passed in Chromium in run `41609715996`; core checks, including Chromium, Firefox, repeated private-store, cross-platform checks and the Matrix acceptance, passed in run `41609715970` at `dc453bfdfe96407347a703d52e2e4bd3268cdd33`. A new two-account browser scenario now covers workspace invitations, shared task revisions/activity, shared recurring Calendar events and owner-private recurring Automate reminders. It is included in the Firefox core workflow. Local TypeScript, ESLint, all 326 frontend tests, all 119 server tests and production build pass. Local Playwright execution is blocked because this environment has no installed Chromium binary; hosted Chromium and Firefox acceptance for the new scenario is pending.
+Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41621564711) passed connector preparation, Ubuntu/Windows/macOS verification, Chromium, Firefox, Matrix, cross-platform browser storage, repeated private-store checks, and the new two-account Calendar/Workspace/Automate scenario. Workflow [41621564595](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41621564595) passed UI3 check, lint, full tests and build. The new browser flow covers workspace invite/acceptance, shared task revision/activity, shared recurring Calendar visibility/deletion, and owner-private recurring reminders including pause/delete.
 
-Keep all physical installation, upgrade/rollback, installed-PWA-on-device, cross-device, Windows/Android device, account-recovery and independent security-review gates open until they are actually exercised. Do not call the branch release-ready based on source or CI alone.
+Local validation on the code checkpoint passed `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build`. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox ran the acceptance successfully. Build emits the existing large Matrix crypto chunk advisory.
 
-## Published checkpoint
+`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` currently reports 12 moderate findings in the development lint-tooling dependency chain, including `minimatch` globparts denial-of-service. The automated suggested resolution requires a major toolchain change; no upgrade was applied without compatibility validation. Track and resolve this before general release.
 
-All 36 local feature commits after `18f703f` were published to the development branch, covering 72 changed files. The initial published tree SHA exactly matched the local feature tree (`d3a992ff9f7f74f370926714ef20169a55146a68`); documentation-only follow-ups were also published and the latest remote tree matches current local `HEAD`. GitHub's connector recreated the commits, so their commit SHAs differ from the local commit SHAs. The active local checkout now tracks the published branch and matches its tree. The original local history is preserved in `archive/local-original-history-2026-10-27`. Development-branch publication is authorized. Merging, deployment, and release publication are not authorized.
+## Remaining physical and independent gates
 
-The direct Git push failed because the local client has no GitHub credential (`could not read Username for 'https://github.com': terminal prompts disabled`). After the user explicitly approved connector publication, GitHub's commit/tree API published the same 36 changes and messages. The branch ref update used an expected-head check. Later Home-summary, integration-test, and documentation follow-ups were published through the connector; local and remote trees were compared before realigning the active checkout. No other remote branch was changed.
+The automated code checkpoint is ready for physical acceptance, but is not certified release-ready. Complete and record every applicable item in `locat-ui-3.0/docs/PHYSICAL_ACCEPTANCE_CHECKLIST.md`: real Linux install/upgrade/backup/restore/binary rollback behind Nginx; two-account Chat and Link on separate profiles/devices; app-lock and storage behavior; installed-PWA share handoff; and account/device recovery. Windows/Android and native device coverage and an independent security review also remain open. Do not imply CI covers physical deployment, native hardware, cross-device durability, or full account recovery.
 
-## Product scope
+Documented product limits remain: Calendar, Workspace and Automate data are readable by the server; reminders require Locat to stay open and visible, with no OS/push notifications; Share handles text only; Messages/Calls remain experimental and gated from ordinary conversations pending security/recovery work.
 
-Read `locat-ui-3.0/docs/REWORK_SCOPE.md` and `locat-ui-3.0/docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md` for current scope and evidence. Preserve Obsidian Ember styling and nested navigation. Retained areas include account/security, encrypted one-to-one Matrix Chat, Link pairing/transfers, Files & Vault, Workspace, Calendar, Automate, and encrypted text Share. Standalone media libraries, Locat Remote and SentinelLab are retired from this rework.
+## Publication and scope
 
-Latest local validation after the Home conversation fix passes TypeScript, ESLint, all 326 frontend tests, all 119 server tests, and production build. `npm audit --audit-level=high` previously passed with zero vulnerabilities. The build still reports the Matrix crypto chunk advisory. Playwright discovers eight specs, but four browser launches fail because Chromium is missing and four Matrix tests skip without the isolated homeserver; installing Chromium and Firefox failed because the browser CDN returned a truncated zero-byte archive. Hosted run `40426560013` passed the base checks; run `40426560046` passed connector preparation and Ubuntu/macOS/Windows verification but its browser job failed because Home did not mount the existing conversation-summary component. The source fix and integration regression test are published on the development branch. The GitHub connector has not exposed a hosted run or status for the current head yet.
-
-## Remaining release gates
-
-- Run and review the published branch's hosted Node, Chromium and Firefox workflows.
-- Complete real browser and installed-PWA recipient acceptance, including two-account flows.
-- Exercise the versioned Linux systemd/Nginx install, upgrade, backup, restore and rollback procedure on a physical host using the [acceptance checklist](locat-ui-3.0/docs/PHYSICAL_ACCEPTANCE_CHECKLIST.md).
-- Complete Windows, Android and physical-device acceptance for Link, app lock and encrypted storage.
-- Run account recovery drills and obtain an independent security review.
-- Preserve documented limits: Calendar, Workspace and Automate data are server-readable; reminders require Locat to be open and visible; there are no OS/push notifications; Share currently handles text only.
-
-Do not ask the user to test until the implementation and automated checks are complete. Do not merge, deploy or publish a release without separate authorization. Continue independent implementation and keep evidence and remaining limits current in `ENGINEERING_HISTORY.md` and the scope documents.
+The user explicitly approved publishing the development branch through the GitHub connector. That authorization covers follow-up work on this branch. Do not merge, deploy, tag, or publish a release without separate authorization. Preserve retired scope and styling; see `locat-ui-3.0/docs/REWORK_SCOPE.md` and `locat-ui-3.0/docs/LOCAT_INTEGRATION_EXECUTION_TRACKER.md`.
