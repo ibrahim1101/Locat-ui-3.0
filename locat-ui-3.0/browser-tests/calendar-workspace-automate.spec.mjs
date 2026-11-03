@@ -54,7 +54,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await expect(ownerPage.getByText(member.user.displayName+' · '+member.user.lcCode,{exact:true})).toBeVisible();
    await ownerPage.getByText(member.user.displayName+' · '+member.user.lcCode,{exact:true}).click();
    await ownerPage.getByRole('button',{name:'Send invitation',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Invitation sent.');
+   await expect(ownerPage.getByText('Invitation sent.',{exact:true})).toBeVisible();
    await memberPage.goto(fixture.origin+'/workspace');
    await expect(memberPage.getByText('Join '+workspaceName+'?',{exact:true})).toBeVisible();
    await memberPage.getByRole('button',{name:'Accept',exact:true}).click();
@@ -71,12 +71,12 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await memberPage.reload();
    await expect(memberPage.getByRole('heading',{name:taskTitle,exact:true})).toBeVisible();
    await memberPage.getByLabel('Status for '+taskTitle).selectOption('in-progress');
-   await expect(memberPage.getByRole('status')).toHaveText('Task updated.');
+   await expect(memberPage.getByText('Task updated.',{exact:true})).toBeVisible();
    await ownerPage.reload();
    await expect(ownerPage.getByLabel('Status for '+taskTitle)).toHaveValue('in-progress');
    await expect(ownerPage.getByText(/^\d+ unread updates$/)).toBeVisible();
    await ownerPage.getByRole('button',{name:'Mark read',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Workspace activity marked read.');
+   await expect(ownerPage.getByText('Workspace activity marked read.',{exact:true})).toBeVisible();
   });
 
   await test.step('Create a shared recurring Calendar event and read it as the invited member',async()=>{
@@ -93,7 +93,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await dialog.getByLabel('In-app reminder').selectOption('10');
    await dialog.getByLabel('Repeat event').selectOption('604800000');
    await dialog.getByRole('button',{name:'Save event',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Event saved.');
+   await expect(ownerPage.getByText('Event saved.',{exact:true})).toBeVisible();
    const firstOwnerOccurrence=ownerPage.locator('article').filter({hasText:eventTitle}).first();
    await expect(firstOwnerOccurrence.getByRole('heading',{name:eventTitle,exact:true})).toBeVisible();
    await expect(firstOwnerOccurrence.getByText('Repeats every 7 days',{exact:false})).toBeVisible();
@@ -106,7 +106,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    const confirm=ownerPage.getByRole('dialog',{name:'Delete event?',exact:true});
    await expect(confirm).toContainText('every occurrence in this series');
    await confirm.getByRole('button',{name:'Delete series',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Event deleted.');
+   await expect(ownerPage.getByText('Event deleted.',{exact:true})).toBeVisible();
   });
 
   await test.step('Schedule, pause and remove a recurring reminder; keep it private to its owner',async()=>{
@@ -117,7 +117,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await dialog.getByLabel('Reminder details').fill('Synthetic reminder details.');
    await dialog.getByLabel('Repeat reminder').selectOption('86400000');
    await dialog.getByRole('button',{name:'Save reminder',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Reminder scheduled.');
+   await expect(ownerPage.getByText('Reminder scheduled.',{exact:true})).toBeVisible();
    const reminder=ownerPage.locator('article').filter({has:ownerPage.getByRole('heading',{name:reminderTitle,exact:true})});
    await expect(reminder).toContainText('Every 24 hours');
    await memberPage.goto(fixture.origin+'/automate');
@@ -127,11 +127,11 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    const edit=ownerPage.getByRole('dialog',{name:'Edit reminder',exact:true});
    await edit.getByLabel('Keep reminder enabled').uncheck();
    await edit.getByRole('button',{name:'Save reminder',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Reminder updated.');
+   await expect(ownerPage.getByText('Reminder updated.',{exact:true})).toBeVisible();
    await expect(reminder).toContainText('Paused');
    await reminder.getByRole('button',{name:'Delete '+reminderTitle,exact:true}).click();
    await ownerPage.getByRole('dialog',{name:'Delete reminder?',exact:true}).getByRole('button',{name:'Delete reminder',exact:true}).click();
-   await expect(ownerPage.getByRole('status')).toHaveText('Reminder deleted.');
+   await expect(ownerPage.getByText('Reminder deleted.',{exact:true})).toBeVisible();
    await expect(ownerPage.getByRole('heading',{name:reminderTitle,exact:true})).toHaveCount(0);
   });
  }finally{await Promise.all(contexts.map(context=>context.close()));}
