@@ -8,7 +8,7 @@ Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/
 
 Local validation on the code checkpoint passed `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build`. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox ran the acceptance successfully. Build emits the existing large Matrix crypto chunk advisory.
 
-`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` currently reports 12 moderate findings in the development lint-tooling dependency chain, including `minimatch` globparts denial-of-service. The automated suggested resolution requires a major toolchain change; no upgrade was applied without compatibility validation. Track and resolve this before general release.
+`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` currently reports 12 moderate findings in the development lint-tooling dependency chain, including `minimatch` globparts denial-of-service. npm’s advisory metadata proposes a breaking-version change for the lint toolchain; the safe semver-range dry run still reports the advisories. No dependency change was applied without a verified compatible fix. Track and resolve this before general release.
 
 ## Remaining physical and independent gates
 
