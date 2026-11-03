@@ -74,7 +74,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await expect(memberPage.getByRole('status')).toHaveText('Task updated.');
    await ownerPage.reload();
    await expect(ownerPage.getByLabel('Status for '+taskTitle)).toHaveValue('in-progress');
-   await expect(ownerPage.getByText('unread updates')).toBeVisible();
+   await expect(ownerPage.getByText(/^\d+ unread updates$/)).toBeVisible();
    await ownerPage.getByRole('button',{name:'Mark read',exact:true}).click();
    await expect(ownerPage.getByRole('status')).toHaveText('Workspace activity marked read.');
   });
