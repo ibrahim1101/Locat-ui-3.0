@@ -34,7 +34,7 @@ test('PWA share target stays local and signed-out recipients can open encrypted 
   console.info('Share PWA checkpoint: signing in and reviewing local text');
   await page.getByTestId('login-username').fill(username);await page.getByTestId('login-password').fill(password);await page.getByTestId('login-submit').click();
   await expect(page.getByLabel('Message')).toHaveValue('Incoming note\n\n'+marker+'\n\nhttps://example.invalid/item');
-  await expect(page.getByRole('status')).toHaveTextContent('Shared text staged locally. Review it before creating the encrypted link.');
+  await expect(page.getByRole('status')).toContainText('Shared text staged locally. Review it before creating the encrypted link.');
   expect(apiWrites).toEqual([]);
   const response=await page.evaluate(async id=>{const worker=navigator.serviceWorker.controller;if(!worker)throw new Error('The active service worker is unavailable for the one-time handoff check.');const channel=new MessageChannel();return await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{channel.port1.close();reject(new Error('The service worker did not answer the one-time handoff check within 10 seconds.'));},10000);channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();resolve(event.data);};worker.postMessage({type:'locat-share-consume',id},[channel.port2]);});},handoffId);
   expect(response).toEqual({ok:false});
