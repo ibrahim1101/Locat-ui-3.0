@@ -1,12 +1,12 @@
 # Locat session handoff
 
-Updated 2026-11-03. Active repository: `ibrahim1101/Locat-ui-3.0`, development branch `rework/locat-core-scope`. The hosted code checkpoint `e1e4fe8896ef24a991a186c1ff996e30870bbd08` passed CI. A follow-up dependency security fix and moderate-level audit gate are prepared for publication; hosted CI for that follow-up is pending.
+Updated 2026-11-03. Active repository: `ibrahim1101/Locat-ui-3.0`, development branch `rework/locat-core-scope`. The current code checkpoint is `b2c25e3164a7edd94ffa2e7e8962c14c3db70848`; hosted CI is green on both workflows.
 
 ## Current validation
 
-Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41621564711) passed connector preparation, Ubuntu/Windows/macOS verification, Chromium, Firefox, Matrix, cross-platform browser storage, repeated private-store checks, and the new two-account Calendar/Workspace/Automate scenario. Workflow [41621564595](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41621564595) passed UI3 check, lint, full tests and build. The new browser flow covers workspace invite/acceptance, shared task revision/activity, shared recurring Calendar visibility/deletion, and owner-private recurring reminders including pause/delete.
+Core workflow [41695280027](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41695280027) passed all five jobs: connector preparation, Ubuntu/Windows/macOS verification, Chromium, Firefox, Matrix, cross-platform browser storage, repeated private-store checks, and the two-account Calendar/Workspace/Automate scenario. UI3 workflow [41695280160](https://github.com/ibrahim1101/Locat-ui-3.0/actions/runs/41695280160) passed check, lint, all tests, build, and the new moderate-severity audit gate. The two-account flow covers Workspace invite/accept, shared task revision/activity, shared recurring Calendar visibility/deletion, and owner-private recurring reminders including pause/delete.
 
-Local validation on the code checkpoint passed `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build`. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox ran the acceptance successfully. Build emits the existing large Matrix crypto chunk advisory.
+A clean `npm ci`, `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build` pass locally. Full `npm audit` and `npm audit --omit=dev` report zero findings after the root override pins vulnerable lint-tree minimatch to patched 11.0.1. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox pass. The build retains the existing large Matrix crypto chunk advisory.
 
 A tested root override now pins the lint tree to patched `minimatch@11.0.1`. Clean `npm ci`, check, lint, all 326 frontend and 119 server tests, build and full `npm audit` pass with zero findings. The installed ESLint/config-array/TypeScript-ESLint consumers passed lint and project validation with the override. CI now fails on moderate advisories. Hosted CI for the dependency follow-up is pending.
 
