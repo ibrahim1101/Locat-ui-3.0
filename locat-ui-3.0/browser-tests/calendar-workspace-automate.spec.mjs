@@ -68,6 +68,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await ownerPage.getByLabel('Workspace item details').fill('Verify shared board access and revision updates.');
    await ownerPage.getByRole('button',{name:'Save to board',exact:true}).click();
    await expect(ownerPage.getByRole('heading',{name:taskTitle,exact:true})).toBeVisible();
+   await memberPage.reload();
    await expect(memberPage.getByRole('heading',{name:taskTitle,exact:true})).toBeVisible();
    await memberPage.getByLabel('Status for '+taskTitle).selectOption('in-progress');
    await expect(memberPage.getByRole('status')).toHaveText('Task updated.');
