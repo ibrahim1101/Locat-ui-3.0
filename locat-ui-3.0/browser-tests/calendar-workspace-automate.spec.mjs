@@ -116,6 +116,8 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await expect(ownerPage.getByRole('status')).toHaveText('Reminder scheduled.');
    const reminder=ownerPage.locator('article').filter({has:ownerPage.getByRole('heading',{name:reminderTitle,exact:true})});
    await expect(reminder).toContainText('Every 24 hours');
+   await memberPage.goto(fixture.origin+'/automate');
+   await expect(memberPage.getByText('No scheduled reminders',{exact:true})).toBeVisible();
    await expect(memberPage.getByRole('heading',{name:reminderTitle,exact:true})).toHaveCount(0);
    await reminder.getByRole('button',{name:'Edit',exact:true}).click();
    const edit=ownerPage.getByRole('dialog',{name:'Edit reminder',exact:true});
