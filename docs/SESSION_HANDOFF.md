@@ -8,7 +8,7 @@ Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/
 
 Local validation on the code checkpoint passed `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build`. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox ran the acceptance successfully. Build emits the existing large Matrix crypto chunk advisory.
 
-`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` currently reports 12 moderate findings in the development lint-tooling dependency chain, including `minimatch` globparts denial-of-service. npm’s advisory metadata proposes a breaking-version change for the lint toolchain; the safe semver-range dry run still reports the advisories. No dependency change was applied without a verified compatible fix. Track and resolve this before general release.
+`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` reports 12 moderate findings in the development lint-tooling dependency chain, all stemming from the `minimatch` globparts denial-of-service advisory. The lockfile resolves vulnerable `minimatch@10.2.6`; upstream currently lists 11.0.1 as patched. An override to 11 can break APIs used by lint plugins, and ESLint has an open request to migrate. Keep this dependency finding open until upstream-compatible releases are available and validated; do not use an unverified override. [Advisory](https://github.com/advisories/GHSA-g3hv-75wg-m249).
 
 ## Remaining physical and independent gates
 
