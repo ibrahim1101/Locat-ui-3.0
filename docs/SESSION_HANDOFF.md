@@ -1,6 +1,12 @@
 # Locat session handoff
 
-Updated 2026-10-29. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status. The published tree matches current local `HEAD`.
+Updated 2026-11-03. Continue work on `rework/locat-core-scope` in `ibrahim1101/Locat-ui-3.0`. The full feature checkpoint was published at `065d417412479f24917bb74b2e324b20e0fcbfd8`; follow-up documentation commits record publication and final validation status.
+
+## Current continuation
+
+The PWA share-target browser acceptance is fixed and passed in Chromium in run `41609715996`; core checks, including Chromium, Firefox, repeated private-store, cross-platform checks and the Matrix acceptance, passed in run `41609715970` at `dc453bfdfe96407347a703d52e2e4bd3268cdd33`. A new two-account browser scenario now covers workspace invitations, shared task revisions/activity, shared recurring Calendar events and owner-private recurring Automate reminders. It is included in the Firefox core workflow. Local TypeScript, ESLint, all 326 frontend tests, all 119 server tests and production build pass. Local Playwright execution is blocked because this environment has no installed Chromium binary; hosted Chromium and Firefox acceptance for the new scenario is pending.
+
+Keep all physical installation, upgrade/rollback, installed-PWA-on-device, cross-device, Windows/Android device, account-recovery and independent security-review gates open until they are actually exercised. Do not call the branch release-ready based on source or CI alone.
 
 ## Published checkpoint
 

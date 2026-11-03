@@ -141,7 +141,7 @@ jobs:
           LOCAT_BROWSER_ENGINE: firefox
           LOCAT_BROWSER_REPORT: test-results/core-firefox-results.json
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
-        run: npm run test:browser -- foundation.spec.mjs link.spec.mjs matrix.spec.mjs server-setup.spec.mjs
+        run: npm run test:browser -- foundation.spec.mjs link.spec.mjs matrix.spec.mjs server-setup.spec.mjs calendar-workspace-automate.spec.mjs
       - name: Repeated private-store foreground acceptance
         env:
           LOCAT_BROWSER_REPORT: test-results/private-store-repeat-results.json
