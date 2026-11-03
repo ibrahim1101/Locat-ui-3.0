@@ -130,13 +130,27 @@ jobs:
         run: |
           python -m venv "$RUNNER_TEMP/locat-browser-matrix-python"
           "$RUNNER_TEMP/locat-browser-matrix-python/bin/pip" install -r tools/matrix-test-requirements.txt
-      - name: Built UI and browser storage foundation
+      - name: Shared Calendar, Workspace and Automate acceptance
+        id: shared_product_acceptance
         if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_homeserver.outcome == 'success' }}
         env:
           LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
+        run: npm run test:browser -- calendar-workspace-automate.spec.mjs
+      - name: Built UI and browser storage foundation
+        id: chromium_browser_suite
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_homeserver.outcome == 'success' && steps.shared_product_acceptance.outcome == 'success' }}
+        env:
+          LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
         run: npm run test:browser
+      - name: Firefox shared Calendar, Workspace and Automate acceptance
+        id: firefox_shared_product_acceptance
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_homeserver.outcome == 'success' && steps.shared_product_acceptance.outcome == 'success' }}
+        env:
+          LOCAT_BROWSER_ENGINE: firefox
+          LOCAT_TEST_SYNAPSE_PYTHON: ${{ runner.temp }}/locat-browser-matrix-python/bin/python
+        run: npm run test:browser -- calendar-workspace-automate.spec.mjs
       - name: Firefox core acceptance
-        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_homeserver.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.browser_build.outcome == 'success' && steps.browser_runtimes.outcome == 'success' && steps.browser_homeserver.outcome == 'success' && steps.firefox_shared_product_acceptance.outcome == 'success' }}
         env:
           LOCAT_BROWSER_ENGINE: firefox
           LOCAT_BROWSER_REPORT: test-results/core-firefox-results.json
