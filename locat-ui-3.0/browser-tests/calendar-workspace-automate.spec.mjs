@@ -110,7 +110,7 @@ test('Calendar, Workspace and Automate live flows use account-scoped server data
    await ownerPage.getByRole('button',{name:'New reminder',exact:true}).click();
    const dialog=ownerPage.getByRole('dialog',{name:'New reminder',exact:true});
    await dialog.getByLabel('Reminder title').fill(reminderTitle);
-   await dialog.getByLabel('Details').fill('Synthetic reminder details.');
+   await dialog.getByLabel('Reminder details').fill('Synthetic reminder details.');
    await dialog.getByLabel('Repeat reminder').selectOption('86400000');
    await dialog.getByRole('button',{name:'Save reminder',exact:true}).click();
    await expect(ownerPage.getByRole('status')).toHaveText('Reminder scheduled.');
