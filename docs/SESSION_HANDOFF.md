@@ -1,6 +1,6 @@
 # Locat session handoff
 
-Updated 2026-11-03. Active repository: `ibrahim1101/Locat-ui-3.0`, development branch `rework/locat-core-scope`. The latest code checkpoint is `e1e4fe8896ef24a991a186c1ff996e30870bbd08`; its hosted CI is green. The user asked to complete all work that can be done before physical testing.
+Updated 2026-11-03. Active repository: `ibrahim1101/Locat-ui-3.0`, development branch `rework/locat-core-scope`. The hosted code checkpoint `e1e4fe8896ef24a991a186c1ff996e30870bbd08` passed CI. A follow-up dependency security fix and moderate-level audit gate are prepared for publication; hosted CI for that follow-up is pending.
 
 ## Current validation
 
@@ -8,7 +8,7 @@ Core workflow [41621564711](https://github.com/ibrahim1101/Locat-ui-3.0/actions/
 
 Local validation on the code checkpoint passed `npm run check`, `npm run lint`, all 326 frontend tests, all 119 server tests, and `npm run build`. Local Playwright could not launch because browser binaries are absent; hosted Chromium and Firefox ran the acceptance successfully. Build emits the existing large Matrix crypto chunk advisory.
 
-`npm audit --omit=dev` reports zero production dependency vulnerabilities. Full `npm audit` reports 12 moderate findings in the development lint-tooling dependency chain, all stemming from the `minimatch` globparts denial-of-service advisory. The lockfile resolves vulnerable `minimatch@10.2.6`; upstream currently lists 11.0.1 as patched. An override to 11 can break APIs used by lint plugins, and ESLint has an open request to migrate. Keep this dependency finding open until upstream-compatible releases are available and validated; do not use an unverified override. [Advisory](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+A tested root override now pins the lint tree to patched `minimatch@11.0.1`. Clean `npm ci`, check, lint, all 326 frontend and 119 server tests, build and full `npm audit` pass with zero findings. The installed ESLint/config-array/TypeScript-ESLint consumers passed lint and project validation with the override. CI now fails on moderate advisories. Hosted CI for the dependency follow-up is pending.
 
 ## Remaining physical and independent gates
 

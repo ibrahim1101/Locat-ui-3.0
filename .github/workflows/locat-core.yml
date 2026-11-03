@@ -70,6 +70,9 @@ jobs:
           brew install ffmpeg openssl@3
           echo "$(brew --prefix openssl@3)/bin" >> "$GITHUB_PATH"
       - run: npm ci
+      - name: Audit dependencies
+        if: runner.os == 'Linux'
+        run: npm audit --audit-level=moderate
       - run: npm run check
       - run: npm run lint
       - run: npm run test:all
